@@ -1,17 +1,29 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+import DashboardLayout from "./layouts/DashboardLayout";
+
 import DashboardPage from "./pages/DashboardPage";
 import LanguagesPage from "./pages/LanguagesPage";
 import ProvidersPage from "./pages/ProvidersPage";
+import TranslationsPage from "./pages/TranslationsPage";
+import JobsPage from "./pages/JobsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import SettingsPage from "./pages/SettingsPage";
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/languages" element={<LanguagesPage />} />
-        <Route path="/providers" element={<ProvidersPage />} />
-      </Routes>
+      <DashboardLayout>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/languages" element={<LanguagesPage />} />
+          <Route path="/providers" element={<ProvidersPage />} />
+          <Route path="/translations" element={<TranslationsPage />} />
+          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Routes>
+      </DashboardLayout>
     </BrowserRouter>
   );
 }
