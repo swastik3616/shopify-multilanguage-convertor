@@ -5,6 +5,7 @@ app = Flask(__name__)
 CORS(app)
 
 language_settings = {}
+provider_settings = {}
 
 @app.route("/")
 def home():
@@ -27,6 +28,18 @@ def save_languages():
 @app.route("/get-languages")
 def get_languages():
     return jsonify(language_settings)
+
+@app.route("/save-provider", methods=["POST"])
+def save_provider():
+    data = request.json
+
+    provider_settings["provider"] = data["provider"]
+    provider_settings["api_key"] = data["api_key"]
+
+    return jsonify({
+        "success": True,
+        "message": "Provider saved successfully"
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

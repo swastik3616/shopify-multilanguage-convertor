@@ -85,3 +85,24 @@ body {
   border-radius: 8px;
   cursor: pointer;
 }
+
+.card input,
+.card select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.card button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.card button:hover {
+  background: #1d4ed8;
+}

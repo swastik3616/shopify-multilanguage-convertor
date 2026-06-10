@@ -22,6 +22,7 @@ function App() {
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/providers" element={<ProvidersPage />} />
         </Routes>
       </DashboardLayout>
     </BrowserRouter>
