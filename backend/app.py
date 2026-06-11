@@ -20,7 +20,8 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-CORS(app)
+# Configure CORS
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 # ----------------------------
 
@@ -170,6 +171,29 @@ def update_translation():
     "success": True,
     "message": "Translation updated successfully"
 })
+
+
+
+@app.route('/analytics', methods=['GET'])
+def analytics():
+    total_translations = Translation.query.count()
+    last_translation = Translation.query.order_by(Translation.id.desc()).first()
+    
+    last_translation_data = None
+    if last_translation:
+        last_translation_data = {
+            "id": last_translation.id,
+            "source_text": last_translation.source_text,
+            "target_language": last_translation.target_language,
+            "translated_text": last_translation.translated_text
+        }
+    
+    return jsonify({
+        "total_translations": total_translations,
+        "total_languages": len(language_settings.get("targets", [])),
+        "providers": 1 if provider_settings else 0,
+        "last_translation": last_translation_data or "No translations yet"
+    })
 
 
 # ----------------------------

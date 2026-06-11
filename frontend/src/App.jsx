@@ -10,6 +10,7 @@ import JobsPage from "./pages/JobsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 
+
 function App() {
   return (
     <BrowserRouter>
