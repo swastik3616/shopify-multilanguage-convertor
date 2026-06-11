@@ -10,6 +10,7 @@ import JobsPage from "./pages/JobsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AuditHistoryPage from "./pages/AuditHistoryPage";
+import StoreSettingsPage from "./pages/StoreSettingsPage";
 
 
 function App() {
@@ -26,6 +27,8 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/providers" element={<ProvidersPage />} />
           <Route path="/audit-history" element={<AuditHistoryPage />} />
+          <Route path="/store-settings"element={<StoreSettingsPage />}
+/>
         </Routes>
       </DashboardLayout>
     </BrowserRouter>

@@ -31,6 +31,7 @@ CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "
 
 language_settings = {}
 provider_settings = {}
+store_setting={}
 
 # ----------------------------
 
@@ -50,8 +51,11 @@ def home():
 
 # ----------------------------
 
-@app.route("/save-languages", methods=["POST"])
+@app.route("/save-languages", methods=["POST", "OPTIONS"])
 def save_languages():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     data = request.json
 
     language_settings["source"] = data["source_language"]
@@ -85,8 +89,11 @@ def get_languages():
 
 # ----------------------------
 
-@app.route("/save-provider", methods=["POST"])
+@app.route("/save-provider", methods=["POST", "OPTIONS"])
 def save_provider():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     data = request.json
 
   
@@ -97,11 +104,6 @@ def save_provider():
 )
 
     db.session.add(audit)
-    db.session.commit()
-    audit_log = AuditLog(
-        action="Translation created"
-    )
-    db.session.add(audit_log)
     db.session.commit()
 
     return jsonify({
@@ -228,7 +230,40 @@ def get_audit_history():
         }
         for log in logs
     ])
+    
+@app.route('/save-store-settings', methods=['POST', 'OPTIONS'])
+def save_store_settings():
+    if request.method == 'OPTIONS':
+        return '', 204
 
+    data = request.json
+
+    print("Received Data:", data)
+
+    store_setting["store_url"] = data["store_url"]
+    store_setting["access_token"] = data["access_token"]
+
+    print("Saved Settings:", store_setting)
+
+    audit = AuditLog(
+        action="Store Settings Updated"
+    )
+
+    db.session.add(audit)
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": "Store settings saved successfully"
+    })
+    
+
+@app.route("/get-store-settings", methods=['GET', 'OPTIONS'])
+def get_store_settings():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    return jsonify(store_setting)
 # ----------------------------
 
 # Run Application

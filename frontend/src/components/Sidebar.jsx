@@ -22,6 +22,7 @@ function Sidebar() {
       <Link to="/analytics"><FaChartBar /> Analytics</Link>
       <Link to="/settings"><FaCog /> Settings</Link>
       <Link to="/audit-history"><FaCog /> Audit History</Link>
+      <Link to="/store-settings"><FaCog /> Store Settings</Link>
     </div>
   );
 }
