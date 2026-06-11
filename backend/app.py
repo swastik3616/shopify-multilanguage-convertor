@@ -6,6 +6,8 @@ CORS(app)
 
 language_settings = {}
 provider_settings = {}
+translations = []
+
 
 @app.route("/")
 def home():
@@ -39,6 +41,48 @@ def save_provider():
     return jsonify({
         "success": True,
         "message": "Provider saved successfully"
+    })
+
+
+
+@app.route("/translate", methods=["POST"])
+def translate_text():
+    data = request.json
+
+    source_text = data["source_text"]
+    target_language = data["target_language"]
+
+    translated_text = (
+        f"{source_text} translated to {target_language}"
+    )
+
+    translations.append({
+        "source_text": source_text,
+        "target_language": target_language,
+        "translated_text": translated_text
+    })
+
+    return jsonify({
+        "translated_text": translated_text
+    })
+    
+@app.route("/translations", methods=["GET"])
+def get_translations():
+    return jsonify(translations)
+
+
+@app.route("/update-translation", methods=["POST"])
+def update_translation():
+    data = request.json
+
+    index = data["index"]
+    translated_text = data["translated_text"]
+
+    translations[index]["translated_text"] = translated_text
+
+    return jsonify({
+        "success": True,
+        "message": "Translation updated"
     })
 
 if __name__ == "__main__":
