@@ -9,6 +9,7 @@ import TranslationsPage from "./pages/TranslationsPage";
 import JobsPage from "./pages/JobsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
+import AuditHistoryPage from "./pages/AuditHistoryPage";
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/providers" element={<ProvidersPage />} />
+          <Route path="/audit-history" element={<AuditHistoryPage />} />
         </Routes>
       </DashboardLayout>
     </BrowserRouter>

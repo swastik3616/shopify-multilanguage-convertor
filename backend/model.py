@@ -1,4 +1,5 @@
 from database import db
+from datetime import datetime
 
 class Translation(db.Model):
     __tablename__ = "translations"
@@ -18,4 +19,19 @@ class Translation(db.Model):
     translated_text = db.Column(
         db.Text,
         nullable=False
+    )
+
+class AuditLog(db.Model):
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    action = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
     )

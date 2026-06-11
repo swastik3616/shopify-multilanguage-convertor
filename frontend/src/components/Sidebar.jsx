@@ -21,6 +21,7 @@ function Sidebar() {
       <Link to="/jobs"><FaTasks /> Jobs</Link>
       <Link to="/analytics"><FaChartBar /> Analytics</Link>
       <Link to="/settings"><FaCog /> Settings</Link>
+      <Link to="/audit-history"><FaCog /> Audit History</Link>
     </div>
   );
 }

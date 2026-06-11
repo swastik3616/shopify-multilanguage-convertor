@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from database import db
-from model import Translation
+from model import Translation,AuditLog
 
 app = Flask(__name__)
 
@@ -56,6 +56,12 @@ def save_languages():
 
     language_settings["source"] = data["source_language"]
     language_settings["targets"] = data["target_languages"]
+    audit = AuditLog(
+    action="Language Settings Updated"
+)
+
+    db.session.add(audit)
+    db.session.commit()
 
     return jsonify({
     "success": True,
@@ -86,6 +92,17 @@ def save_provider():
   
     provider_settings["provider"] = data["provider"]
     provider_settings["api_key"] = data["api_key"]
+    audit = AuditLog(
+    action="Provider Updated"
+)
+
+    db.session.add(audit)
+    db.session.commit()
+    audit_log = AuditLog(
+        action="Translation created"
+    )
+    db.session.add(audit_log)
+    db.session.commit()
 
     return jsonify({
         "success": True,
@@ -195,6 +212,22 @@ def analytics():
         "last_translation": last_translation_data or "No translations yet"
     })
 
+
+@app.route("/audit-history", methods=["GET"])
+def get_audit_history():
+
+    logs = AuditLog.query.order_by(
+        AuditLog.id.desc()
+    ).all()
+
+    return jsonify([
+        {
+            "id": log.id,
+            "action": log.action,
+            "created_at": str(log.created_at)
+        }
+        for log in logs
+    ])
 
 # ----------------------------
 
