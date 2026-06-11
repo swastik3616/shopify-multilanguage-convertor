@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { translateText } from "../services/translationService";
 import { getTranslations } from "../services/translationHistoryService";
 
 function TranslationsPage() {
@@ -7,74 +6,93 @@ const [sourceText, setSourceText] = useState("");
 const [targetLanguage, setTargetLanguage] = useState("Hindi");
 const [translatedText, setTranslatedText] = useState("");
 const [history, setHistory] = useState([]);
-const [editingIndex, setEditingIndex] = useState(null);
+const [editingId, setEditingId] = useState(null);
 
 const [searchTerm, setSearchTerm] = useState("");
 const [filterLanguage, setFilterLanguage] = useState("All");
 
 const loadTranslations = async () => {
-try {
-const data = await getTranslations();
-setHistory(data);
-} catch (error) {
-console.error("Error loading translations:", error);
-}
+  try {
+    const data = await getTranslations();
+
+    console.log("Translations:", data);
+
+    setHistory(data);
+  } catch (error) {
+    console.error("Error loading translations:", error);
+  }
 };
 
 useEffect(() => {
-  let mounted = true;
+  let isMounted = true;
 
   (async () => {
     try {
       const data = await getTranslations();
-      if (mounted) setHistory(data);
+
+      console.log("Translations:", data);
+
+      if (isMounted) {
+        setHistory(data);
+      }
     } catch (error) {
       console.error("Error loading translations:", error);
     }
   })();
 
   return () => {
-    mounted = false;
+    isMounted = false;
   };
 }, []);
 
 const handleTranslate = async () => {
-try {
-const response = await translateText({
-source_text: sourceText,
-target_language: targetLanguage,
-});
-
-
-
-  setTranslatedText(response.translated_text);
-
-  await loadTranslations();
-} catch (error) {
-  console.error("Translation failed:", error);
-}
-
+  if (!sourceText.trim() || !targetLanguage) {
+    alert("Please enter text and select a language");
+    return;
+  }
+  try {
+    const response = await fetch("http://localhost:5000/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_text: sourceText,
+        target_language: targetLanguage,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    setTranslatedText(data.translated_text || "");
+    await loadTranslations();
+  } catch (error) {
+    console.error("Error translating text:", error);
+    alert("Failed to translate text");
+  }
 };
 
 const handleSaveChanges = () => {
-if (editingIndex === null) return;
+  if (editingId === null) return;
 
+  const editingIndex = history.findIndex((item) => item.id === editingId);
+  if (editingIndex === -1) return;
 
-const updatedHistory = [...history];
+  const updatedHistory = [...history];
 
-updatedHistory[editingIndex] = {
-  ...updatedHistory[editingIndex],
-  source_text: sourceText,
-  target_language: targetLanguage,
-  translated_text: translatedText,
-};
+  updatedHistory[editingIndex] = {
+    ...updatedHistory[editingIndex],
+    source_text: sourceText,
+    target_language: targetLanguage,
+    translated_text: translatedText,
+  };
 
-setHistory(updatedHistory);
-setEditingIndex(null);
+  setHistory(updatedHistory);
+  setEditingId(null);
+  setSourceText("");
+  setTargetLanguage("Hindi");
+  setTranslatedText("");
 
-alert("Translation updated successfully");
-
-
+  alert("Translation updated successfully");
 };
 
 const filteredHistory = history.filter((item) => {
@@ -91,6 +109,7 @@ const matchesLanguage =
   item.target_language === filterLanguage;
 
 return matchesSearch && matchesLanguage;
+
 
 
 });
@@ -130,7 +149,7 @@ return ( <div> <h1>Translations</h1>
       Translate
     </button>
 
-    {editingIndex !== null && (
+    {editingId !== null && (
       <>
         <br />
         <br />
@@ -180,6 +199,8 @@ return ( <div> <h1>Translations</h1>
     <br />
     <br />
 
+    <p>Total Records: {history.length}</p>
+
     <table className="translation-table">
       <thead>
         <tr>
@@ -198,16 +219,16 @@ return ( <div> <h1>Translations</h1>
               <td>{item.target_language}</td>
               <td>{item.translated_text}</td>
               <td>
-                <button
-                  onClick={() => {
-                    setEditingIndex(index);
-                    setSourceText(item.source_text);
-                    setTargetLanguage(item.target_language);
-                    setTranslatedText(item.translated_text);
-                  }}
-                >
-                  Edit
-                </button>
+              <button
+                onClick={() => {
+                  setEditingId(item.id);
+                  setSourceText(item.source_text);
+                  setTargetLanguage(item.target_language);
+                  setTranslatedText(item.translated_text);
+                }}
+              >
+                Edit
+              </button>
               </td>
             </tr>
           ))
