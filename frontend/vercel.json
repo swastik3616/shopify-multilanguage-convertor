@@ -1,12 +1,12 @@
 {
   "experimentalServices": {
     "frontend": {
-      "root": "shopify-multilingual-translator/frontend",
+      "root": "frontend",
       "routePrefix": "/",
       "framework": "vite"
     },
     "backend": {
-      "root": "shopify-multilingual-translator/backend",
+      "root": "backend",
       "routePrefix": "/_/backend"
     }
   }
