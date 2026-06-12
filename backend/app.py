@@ -1,43 +1,31 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, make_response,request,redirect
 from flask_cors import CORS
-
+import os
+import requests
 from database import db
-from model import Translation,AuditLog
+from model import Translation, AuditLog, ShopifyStore
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 
-# ----------------------------
-
-# Database Configuration
-
-# ----------------------------
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///translator.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+STORE_URL = os.getenv("SHOPIFY_STORE_URL")
+ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
 
 db.init_app(app)
 
 with app.app_context():
     db.create_all()
 
-# Configure CORS
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type"]}})
 
-# ----------------------------
-
-# Temporary Settings Storage
-
-# ----------------------------
 
 language_settings = {}
 provider_settings = {}
 store_setting={}
-
-# ----------------------------
-
-# Home Route
-
-# ----------------------------
+load_dotenv()
 
 @app.route("/")
 def home():
@@ -45,11 +33,6 @@ def home():
     "message": "Shopify Translator Backend Running"
 })
 
-# ----------------------------
-
-# Save Languages
-
-# ----------------------------
 
 @app.route("/save-languages", methods=["POST", "OPTIONS"])
 def save_languages():
@@ -73,21 +56,9 @@ def save_languages():
 })
 
 
-# ----------------------------
-
-# Get Languages
-
-# ----------------------------
-
 @app.route("/get-languages", methods=["GET"])
 def get_languages():
     return jsonify(language_settings)
-
-# ----------------------------
-
-# Save Provider
-
-# ----------------------------
 
 @app.route("/save-provider", methods=["POST", "OPTIONS"])
 def save_provider():
@@ -111,12 +82,6 @@ def save_provider():
         "message": "Provider saved successfully"
     })
 
-
-# ----------------------------
-
-# Translate Text
-
-# ----------------------------
 
 @app.route("/translate", methods=["POST"])
 def translate_text():
@@ -144,12 +109,6 @@ def translate_text():
 })
 
 
-# ----------------------------
-
-# Get All Translations
-
-# ----------------------------
-
 @app.route("/translations", methods=["GET"])
 def get_translations():
     records = Translation.query.all()
@@ -164,11 +123,7 @@ def get_translations():
     for item in records
 ])
 
-# ----------------------------
 
-# Update Translation
-
-# ----------------------------
 
 @app.route("/update-translation", methods=["POST"])
 def update_translation():
@@ -264,11 +219,95 @@ def get_store_settings():
         return '', 204
     
     return jsonify(store_setting)
-# ----------------------------
 
-# Run Application
 
-# ----------------------------
+@app.route("/shopify/test")
+def shopify_test():
+    
+    store = ShopifyStore.query.first()
+
+    if not store:
+        return jsonify({
+        "success": False,
+        "message": "No Shopify store connected"
+    }), 404
+
+    headers = {
+    "X-Shopify-Access-Token": store.access_token
+}
+
+    response = requests.get(
+        f"https://{store.shop}/admin/api/2025-07/shop.json",
+        headers=headers
+    )
+
+    return jsonify(response.json())
+
+
+@app.route("/install")
+def install():
+
+    shop = "0jeqkm-rp.myshopify.com"
+
+    install_url = (
+        f"https://{shop}/admin/oauth/authorize"
+        f"?client_id={os.getenv('SHOPIFY_CLIENT_ID')}"
+        f"&scope={os.getenv('SHOPIFY_SCOPES')}"
+        f"&redirect_uri={os.getenv('SHOPIFY_REDIRECT_URI')}"
+    )
+
+    return redirect(install_url)
+@app.route("/auth/callback")
+def auth_callback():
+
+    shop = request.args.get("shop")
+    code = request.args.get("code")
+
+    response = requests.post(
+        f"https://{shop}/admin/oauth/access_token",
+        json={
+            "client_id": os.getenv("SHOPIFY_CLIENT_ID"),
+            "client_secret": os.getenv("SHOPIFY_CLIENT_SECRET"),
+            "code": code
+        }
+    )
+
+    token_data = response.json()
+
+    print("TOKEN DATA:", token_data)
+
+    store = ShopifyStore.query.filter_by(
+        shop=shop
+    ).first()
+
+    if not store:
+        store = ShopifyStore(
+            shop=shop,
+            access_token=token_data["access_token"]
+        )
+        db.session.add(store)
+    else:
+        store.access_token = token_data["access_token"]
+
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "shop": shop
+    })
+    
+@app.route("/stores")
+def stores():
+
+    stores = ShopifyStore.query.all()
+
+    return jsonify([
+        {
+            "id": store.id,
+            "shop": store.shop
+        }
+        for store in stores
+    ])
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

@@ -35,3 +35,18 @@ class AuditLog(db.Model):
         db.DateTime,
         default=datetime.utcnow
     )
+    
+class ShopifyStore(db.Model):
+    __tablename__ = "shopify_stores"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    shop = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    access_token = db.Column(
+        db.Text,
+        nullable=False
+    )
