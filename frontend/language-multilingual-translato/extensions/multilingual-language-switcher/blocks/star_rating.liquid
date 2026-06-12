@@ -1,0 +1,32 @@
+<div class="language-switcher">
+  <select id="translator-language">
+    <option value="en">English</option>
+    <option value="fr">French</option>
+    <option value="de">German</option>
+    <option value="es">Spanish</option>
+    <option value="hi">Hindi</option>
+  </select>
+</div>
+
+<style>
+.language-switcher{
+  position:fixed;
+  top:20px;
+  right:20px;
+  z-index:9999;
+}
+
+#translator-language{
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+}
+</style>
+
+{% schema %}
+{
+  "name": "Language Switcher",
+  "target": "section",
+  "settings": []
+}
+{% endschema %}
