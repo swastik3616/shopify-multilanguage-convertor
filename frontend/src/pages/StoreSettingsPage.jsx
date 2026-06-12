@@ -20,39 +20,46 @@ function StoreSettingsPage() {
   };
 
   return (
-    <div>
-      <h1>Store Settings</h1>
+    <div className="flex flex-col gap-8 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Store Settings</h1>
+      </div>
 
-      <br />
+      <div className="card-container flex flex-col">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="font-semibold text-slate-900 mb-1">Connection Details</h3>
+          <p className="text-sm text-slate-500">Manage your Shopify store connection credentials.</p>
+        </div>
 
-      <div className="card">
-        <h3>Store URL</h3>
+        <div className="p-6 flex flex-col gap-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Store URL</label>
+            <input
+              type="text"
+              placeholder="mystore.myshopify.com"
+              className="input-field w-full md:max-w-md"
+              value={storeUrl}
+              onChange={(e) => setStoreUrl(e.target.value)}
+            />
+          </div>
 
-        <input
-          type="text"
-          placeholder="mystore.myshopify.com"
-          value={storeUrl}
-          onChange={(e) => setStoreUrl(e.target.value)}
-        />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Access Token</label>
+            <input
+              type="password"
+              placeholder="Enter Access Token"
+              className="input-field w-full md:max-w-md font-mono"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+            />
+          </div>
+        </div>
 
-        <br />
-        <br />
-
-        <h3>Access Token</h3>
-
-        <input
-          type="password"
-          placeholder="Enter Access Token"
-          value={accessToken}
-          onChange={(e) => setAccessToken(e.target.value)}
-        />
-
-        <br />
-        <br />
-
-        <button onClick={handleSave}>
-          Save Store Settings
-        </button>
+        <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-xl flex justify-end">
+          <button className="btn btn-primary px-6 py-2" onClick={handleSave}>
+            Save Store Settings
+          </button>
+        </div>
       </div>
     </div>
   );
