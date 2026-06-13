@@ -23,7 +23,17 @@ CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "
 
 
 language_settings = {}
-provider_settings = {}
+provider_settings = {
+    "provider": "openai",
+    "model": "gpt-3.5-turbo",
+    "api_keys": {
+        "openai": "",
+        "gemini": "",
+        "claude": "",
+        "groq": "",
+        "ollama": ""
+    }
+}
 store_setting={}
 load_dotenv()
 
@@ -60,6 +70,10 @@ def save_languages():
 def get_languages():
     return jsonify(language_settings)
 
+@app.route("/get-provider", methods=["GET"])
+def get_provider():
+    return jsonify(provider_settings)
+
 @app.route("/save-provider", methods=["POST", "OPTIONS"])
 def save_provider():
     if request.method == 'OPTIONS':
@@ -67,12 +81,17 @@ def save_provider():
     
     data = request.json
 
+    provider = data.get("provider", "openai")
+    model = data.get("model", "gpt-3.5-turbo")
+    api_key = data.get("api_key", "")
   
-    provider_settings["provider"] = data["provider"]
-    provider_settings["api_key"] = data["api_key"]
+    provider_settings["provider"] = provider
+    provider_settings["model"] = model
+    provider_settings["api_keys"][provider] = api_key
+
     audit = AuditLog(
-    action="Provider Updated"
-)
+        action=f"Provider Updated: {provider}"
+    )
 
     db.session.add(audit)
     db.session.commit()
@@ -83,30 +102,83 @@ def save_provider():
     })
 
 
+def get_provider_response(provider, model, api_key, source_text, target_language):
+    prompt = f"Translate the following text to {target_language}. Only return the translated text without any quotes or explanations.\n\nText: {source_text}"
+    try:
+        if provider == "openai":
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
+            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            res.raise_for_status()
+            return res.json()["choices"][0]["message"]["content"].strip()
+            
+        elif provider == "gemini":
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {"contents": [{"parts":[{"text": prompt}]}]}
+            res = requests.post(url, headers=headers, json=payload)
+            res.raise_for_status()
+            return res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            
+        elif provider == "claude":
+            headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+            payload = {"model": model, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]}
+            res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            res.raise_for_status()
+            return res.json()["content"][0]["text"].strip()
+            
+        elif provider == "groq":
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+            res.raise_for_status()
+            return res.json()["choices"][0]["message"]["content"].strip()
+            
+        elif provider == "ollama":
+            url = "http://localhost:11434/api/generate"
+            payload = {"model": model, "prompt": prompt, "stream": False}
+            res = requests.post(url, json=payload)
+            res.raise_for_status()
+            return res.json()["response"].strip()
+            
+        else:
+            return f"{source_text} translated to {target_language} (Mock - Unknown Provider)"
+            
+    except Exception as e:
+        print(f"Provider Error ({provider}):", str(e))
+        raise Exception(f"Failed to translate using {provider}: {str(e)}")
+
 @app.route("/translate", methods=["POST"])
 def translate_text():
     data = request.json
 
+    source_text = data.get("source_text", "")
+    target_language = data.get("target_language", "")
+    
+    if not source_text or not target_language:
+        return jsonify({"success": False, "message": "Missing text or language"}), 400
 
-    source_text = data["source_text"]
-    target_language = data["target_language"]
+    provider = provider_settings.get("provider", "openai")
+    model = provider_settings.get("model", "gpt-3.5-turbo")
+    api_key = provider_settings["api_keys"].get(provider, "")
 
-    translated_text = (
-    f"{source_text} translated to {target_language}"
-)
+    try:
+        translated_text = get_provider_response(provider, model, api_key, source_text, target_language)
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
     translation = Translation(
-    source_text=source_text,
-    target_language=target_language,
-    translated_text=translated_text
-)
+        source_text=source_text,
+        target_language=target_language,
+        translated_text=translated_text
+    )
 
     db.session.add(translation)
     db.session.commit()
 
     return jsonify({
-    "translated_text": translated_text
-})
+        "translated_text": translated_text
+    })
 
 
 @app.route("/translations", methods=["GET"])

@@ -1,5 +1,10 @@
 const API_URL = "http://localhost:5000";
 
+export const getProviderSettings = async () => {
+  const response = await fetch(`${API_URL}/get-provider`);
+  return response.json();
+};
+
 export const saveProvider = async (payload) => {
   const response = await fetch(
     `${API_URL}/save-provider`,
