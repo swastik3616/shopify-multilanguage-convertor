@@ -60,15 +60,18 @@ const handleTranslate = async () => {
         target_language: targetLanguage,
       }),
     });
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
+    
     const data = await response.json();
     setTranslatedText(data.translated_text || "");
     await loadTranslations();
   } catch (error) {
     console.error("Error translating text:", error);
-    alert("Failed to translate text");
+    alert(`Failed to translate text: ${error.message}`);
   }
 };
 

@@ -109,6 +109,8 @@ def get_provider_response(provider, model, api_key, source_text, target_language
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
             payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
             res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            if not res.ok:
+                raise Exception(f"OpenAI Error {res.status_code}: {res.text}")
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
             
@@ -117,6 +119,8 @@ def get_provider_response(provider, model, api_key, source_text, target_language
             headers = {"Content-Type": "application/json"}
             payload = {"contents": [{"parts":[{"text": prompt}]}]}
             res = requests.post(url, headers=headers, json=payload)
+            if not res.ok:
+                raise Exception(f"Gemini Error {res.status_code}: {res.text}")
             res.raise_for_status()
             return res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
             
@@ -124,6 +128,8 @@ def get_provider_response(provider, model, api_key, source_text, target_language
             headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
             payload = {"model": model, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]}
             res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            if not res.ok:
+                raise Exception(f"Claude Error {res.status_code}: {res.text}")
             res.raise_for_status()
             return res.json()["content"][0]["text"].strip()
             
@@ -131,6 +137,8 @@ def get_provider_response(provider, model, api_key, source_text, target_language
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
             payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
             res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+            if not res.ok:
+                raise Exception(f"Groq Error {res.status_code}: {res.text}")
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
             
@@ -138,6 +146,8 @@ def get_provider_response(provider, model, api_key, source_text, target_language
             url = "http://localhost:11434/api/generate"
             payload = {"model": model, "prompt": prompt, "stream": False}
             res = requests.post(url, json=payload)
+            if not res.ok:
+                raise Exception(f"Ollama Error {res.status_code}: {res.text}")
             res.raise_for_status()
             return res.json()["response"].strip()
             

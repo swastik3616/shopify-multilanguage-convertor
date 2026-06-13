@@ -5,7 +5,7 @@ const PROVIDER_MODELS = {
   openai: ["gpt-3.5-turbo", "gpt-4", "gpt-4o"],
   gemini: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"],
   claude: ["claude-3-haiku-20240307", "claude-3-sonnet-20240229", "claude-3-opus-20240229"],
-  groq: ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"],
+  groq: ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"],
   ollama: ["llama3", "mistral", "gemma"]
 };
 
@@ -27,8 +27,15 @@ function ProvidersPage() {
       try {
         const settings = await getProviderSettings();
         if (isMounted) {
-          if (settings.provider) setProvider(settings.provider);
-          if (settings.model) setModel(settings.model);
+          if (settings.provider) {
+            setProvider(settings.provider);
+            const validModels = PROVIDER_MODELS[settings.provider] || [];
+            if (settings.model && validModels.includes(settings.model)) {
+              setModel(settings.model);
+            } else if (validModels.length > 0) {
+              setModel(validModels[0]);
+            }
+          }
           if (settings.api_keys) setApiKeys(settings.api_keys);
           setIsLoading(false);
         }
