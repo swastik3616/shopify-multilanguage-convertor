@@ -1,4 +1,4 @@
-ÿþFlask
+Flask
 Flask-Cors
 Flask-SQLAlchemy
 requests
