@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5000";
+const API_URL = "https://shopify-multilanguage-convertor.onrender.com";
 
 export const getAuditHistory = async () => {
   const response = await fetch(
