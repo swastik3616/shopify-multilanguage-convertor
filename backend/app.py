@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 import requests
 import json
+import re
 from database import db
 from model import Translation, AuditLog, ShopifyStore, AppSetting
 from dotenv import load_dotenv
@@ -166,6 +167,110 @@ def get_provider_response(provider, model, api_key, source_text, target_language
     except Exception as e:
         print(f"Provider Error ({provider}):", str(e))
         raise Exception(f"Failed to translate using {provider}: {str(e)}")
+
+def get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language):
+    prompt = (
+        f"You are a professional translator. Translate the following JSON object's values to {target_language}. "
+        "Return ONLY a valid JSON object with the exact same keys and the translated values. "
+        "Do not include any markdown formatting, explanations, or backticks.\n\n"
+        f"Input: {json.dumps(source_texts_dict)}"
+    )
+    
+    try:
+        response_text = ""
+        if provider == "openai":
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
+            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            res.raise_for_status()
+            response_text = res.json()["choices"][0]["message"]["content"].strip()
+            
+        elif provider == "gemini":
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {"contents": [{"parts":[{"text": prompt}]}]}
+            res = requests.post(url, headers=headers, json=payload)
+            res.raise_for_status()
+            response_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            
+        elif provider == "claude":
+            headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+            payload = {"model": model, "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]}
+            res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            res.raise_for_status()
+            response_text = res.json()["content"][0]["text"].strip()
+            
+        elif provider == "groq":
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
+            res.raise_for_status()
+            response_text = res.json()["choices"][0]["message"]["content"].strip()
+            
+        elif provider == "ollama":
+            url = "http://localhost:11434/api/generate"
+            payload = {"model": model, "prompt": prompt, "stream": False}
+            res = requests.post(url, json=payload)
+            res.raise_for_status()
+            response_text = res.json()["response"].strip()
+            
+        else:
+            return {k: f"{v} (Mock)" for k, v in source_texts_dict.items()}
+
+        # Clean markdown if the LLM hallucinated it
+        response_text = re.sub(r'^```json\s*', '', response_text, flags=re.IGNORECASE)
+        response_text = re.sub(r'^```\s*', '', response_text)
+        response_text = re.sub(r'\s*```$', '', response_text)
+        
+        return json.loads(response_text)
+            
+    except Exception as e:
+        print(f"Bulk Provider Error ({provider}):", str(e))
+        raise Exception(f"Failed to bulk translate using {provider}: {str(e)}")
+
+@app.route("/bulk-translate", methods=["POST", "OPTIONS"])
+def bulk_translate():
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    data = request.json
+    texts = data.get("texts", [])
+    target_language = data.get("target_language", "")
+    
+    if not texts or not target_language:
+        return jsonify({"success": False, "message": "Missing texts or language"}), 400
+
+    provider_settings = get_setting("provider_settings", get_default_provider_settings())
+    provider = provider_settings.get("provider", "openai")
+    model = provider_settings.get("model", "gpt-3.5-turbo")
+    api_key = provider_settings["api_keys"].get(provider, "")
+
+    # Convert array to dict with numeric keys
+    source_texts_dict = {str(i): text for i, text in enumerate(texts)}
+
+    try:
+        translated_dict = get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language)
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+    # Build the final array and save to DB
+    translated_texts = []
+    for i in range(len(texts)):
+        key = str(i)
+        source = texts[i]
+        translated = translated_dict.get(key, source) # fallback to original if missing
+        translated_texts.append(translated)
+        
+        # Save to DB for history
+        db.session.add(Translation(
+            source_text=source,
+            target_language=target_language,
+            translated_text=translated
+        ))
+    
+    db.session.commit()
+
+    return jsonify({"translations": translated_texts})
 
 @app.route("/translate", methods=["POST", "OPTIONS"])
 def translate_text():
