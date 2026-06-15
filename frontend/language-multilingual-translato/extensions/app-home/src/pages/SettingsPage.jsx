@@ -1,9 +1,10 @@
-export default function SettingsPage() {
-  return (
-    <s-page heading="Settings">
-      <s-section>
-        <s-paragraph>A second route for settings.</s-paragraph>
-      </s-section>
-    </s-page>
-  );
+import { useEffect } from "react";
+
+export default function Settings() {
+  useEffect(() => {
+    window.location.href =
+      "https://shopify-multilanguage-convertor-plugin.vercel.app/";
+  }, []);
+
+  return <p>Redirecting...</p>;
 }
