@@ -1,13 +1,13 @@
-from flask import Flask, jsonify, make_response,request,redirect
+from flask import Flask, jsonify, make_response, request, redirect
 from flask_cors import CORS
 import os
 import requests
+import json
 from database import db
-from model import Translation, AuditLog, ShopifyStore
+from model import Translation, AuditLog, ShopifyStore, AppSetting
 from dotenv import load_dotenv
 
 app = Flask(__name__)
-
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///translator.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -21,28 +21,41 @@ with app.app_context():
 
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type"]}})
 
-
-language_settings = {}
-provider_settings = {
-    "provider": "openai",
-    "model": "gpt-3.5-turbo",
-    "api_keys": {
-        "openai": "",
-        "gemini": "",
-        "claude": "",
-        "groq": "",
-        "ollama": ""
-    }
-}
-store_setting={}
 load_dotenv()
+
+def get_setting(key, default_value):
+    setting = AppSetting.query.filter_by(key=key).first()
+    if setting:
+        return json.loads(setting.value)
+    return default_value
+
+def set_setting(key, value):
+    setting = AppSetting.query.filter_by(key=key).first()
+    if not setting:
+        setting = AppSetting(key=key, value=json.dumps(value))
+        db.session.add(setting)
+    else:
+        setting.value = json.dumps(value)
+    db.session.commit()
+
+def get_default_provider_settings():
+    return {
+        "provider": "openai",
+        "model": "gpt-3.5-turbo",
+        "api_keys": {
+            "openai": "",
+            "gemini": "",
+            "claude": "",
+            "groq": "",
+            "ollama": ""
+        }
+    }
 
 @app.route("/")
 def home():
     return jsonify({
-    "message": "Shopify Translator Backend Running"
-})
-
+        "message": "Shopify Translator Backend Running"
+    })
 
 @app.route("/save-languages", methods=["POST", "OPTIONS"])
 def save_languages():
@@ -50,29 +63,26 @@ def save_languages():
         return '', 204
     
     data = request.json
+    language_settings = get_setting("language_settings", {})
 
     language_settings["source"] = data["source_language"]
     language_settings["targets"] = data["target_languages"]
-    audit = AuditLog(
-    action="Language Settings Updated"
-)
+    
+    set_setting("language_settings", language_settings)
 
+    audit = AuditLog(action="Language Settings Updated")
     db.session.add(audit)
     db.session.commit()
 
-    return jsonify({
-    "success": True,
-    "message": "Languages saved successfully"
-})
-
+    return jsonify({"success": True, "message": "Languages saved successfully"})
 
 @app.route("/get-languages", methods=["GET"])
 def get_languages():
-    return jsonify(language_settings)
+    return jsonify(get_setting("language_settings", {}))
 
 @app.route("/get-provider", methods=["GET"])
 def get_provider():
-    return jsonify(provider_settings)
+    return jsonify(get_setting("provider_settings", get_default_provider_settings()))
 
 @app.route("/save-provider", methods=["POST", "OPTIONS"])
 def save_provider():
@@ -80,27 +90,22 @@ def save_provider():
         return '', 204
     
     data = request.json
-
     provider = data.get("provider", "openai")
     model = data.get("model", "gpt-3.5-turbo")
     api_key = data.get("api_key", "")
   
+    provider_settings = get_setting("provider_settings", get_default_provider_settings())
     provider_settings["provider"] = provider
     provider_settings["model"] = model
     provider_settings["api_keys"][provider] = api_key
 
-    audit = AuditLog(
-        action=f"Provider Updated: {provider}"
-    )
+    set_setting("provider_settings", provider_settings)
 
+    audit = AuditLog(action=f"Provider Updated: {provider}")
     db.session.add(audit)
     db.session.commit()
 
-    return jsonify({
-        "success": True,
-        "message": "Provider saved successfully"
-    })
-
+    return jsonify({"success": True, "message": "Provider saved successfully"})
 
 def get_provider_response(provider, model, api_key, source_text, target_language):
     prompt = f"Translate the following text to {target_language}. Only return the translated text without any quotes or explanations.\n\nText: {source_text}"
@@ -164,13 +169,13 @@ def translate_text():
         return '', 204
         
     data = request.json
-
     source_text = data.get("source_text", "")
     target_language = data.get("target_language", "")
     
     if not source_text or not target_language:
         return jsonify({"success": False, "message": "Missing text or language"}), 400
 
+    provider_settings = get_setting("provider_settings", get_default_provider_settings())
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
     api_key = provider_settings["api_keys"].get(provider, "")
@@ -189,49 +194,30 @@ def translate_text():
     db.session.add(translation)
     db.session.commit()
 
-    return jsonify({
-        "translated_text": translated_text
-    })
-
+    return jsonify({"translated_text": translated_text})
 
 @app.route("/translations", methods=["GET"])
 def get_translations():
     records = Translation.query.all()
-
-    return jsonify([
-    {
+    return jsonify([{
         "id": item.id,
         "source_text": item.source_text,
         "target_language": item.target_language,
         "translated_text": item.translated_text
-    }
-    for item in records
-])
-
-
+    } for item in records])
 
 @app.route("/update-translation", methods=["POST"])
 def update_translation():
     data = request.json
-
     translation = Translation.query.get(data["id"])
 
     if not translation:
-        return jsonify({
-        "success": False,
-        "message": "Translation not found"
-    }), 404
+        return jsonify({"success": False, "message": "Translation not found"}), 404
 
     translation.translated_text = data["translated_text"]
-
     db.session.commit()
 
-    return jsonify({
-    "success": True,
-    "message": "Translation updated successfully"
-})
-
-
+    return jsonify({"success": True, "message": "Translation updated successfully"})
 
 @app.route('/analytics', methods=['GET'])
 def analytics():
@@ -247,6 +233,9 @@ def analytics():
             "translated_text": last_translation.translated_text
         }
     
+    language_settings = get_setting("language_settings", {})
+    provider_settings = get_setting("provider_settings", get_default_provider_settings())
+    
     return jsonify({
         "total_translations": total_translations,
         "total_languages": len(language_settings.get("targets", [])),
@@ -254,22 +243,14 @@ def analytics():
         "last_translation": last_translation_data or "No translations yet"
     })
 
-
 @app.route("/audit-history", methods=["GET"])
 def get_audit_history():
-
-    logs = AuditLog.query.order_by(
-        AuditLog.id.desc()
-    ).all()
-
-    return jsonify([
-        {
-            "id": log.id,
-            "action": log.action,
-            "created_at": str(log.created_at)
-        }
-        for log in logs
-    ])
+    logs = AuditLog.query.order_by(AuditLog.id.desc()).all()
+    return jsonify([{
+        "id": log.id,
+        "action": log.action,
+        "created_at": str(log.created_at)
+    } for log in logs])
     
 @app.route('/save-store-settings', methods=['POST', 'OPTIONS'])
 def save_store_settings():
@@ -277,74 +258,50 @@ def save_store_settings():
         return '', 204
 
     data = request.json
-
     print("Received Data:", data)
 
+    store_setting = get_setting("store_setting", {})
     store_setting["store_url"] = data["store_url"]
     store_setting["access_token"] = data["access_token"]
+    set_setting("store_setting", store_setting)
 
     print("Saved Settings:", store_setting)
 
-    audit = AuditLog(
-        action="Store Settings Updated"
-    )
-
+    audit = AuditLog(action="Store Settings Updated")
     db.session.add(audit)
     db.session.commit()
 
-    return jsonify({
-        "success": True,
-        "message": "Store settings saved successfully"
-    })
-    
+    return jsonify({"success": True, "message": "Store settings saved successfully"})
 
 @app.route("/get-store-settings", methods=['GET', 'OPTIONS'])
 def get_store_settings():
     if request.method == 'OPTIONS':
         return '', 204
-    
-    return jsonify(store_setting)
-
+    return jsonify(get_setting("store_setting", {}))
 
 @app.route("/shopify/test")
 def shopify_test():
-    
     store = ShopifyStore.query.first()
-
     if not store:
-        return jsonify({
-        "success": False,
-        "message": "No Shopify store connected"
-    }), 404
+        return jsonify({"success": False, "message": "No Shopify store connected"}), 404
 
-    headers = {
-    "X-Shopify-Access-Token": store.access_token
-}
-
-    response = requests.get(
-        f"https://{store.shop}/admin/api/2025-07/shop.json",
-        headers=headers
-    )
-
+    headers = {"X-Shopify-Access-Token": store.access_token}
+    response = requests.get(f"https://{store.shop}/admin/api/2025-07/shop.json", headers=headers)
     return jsonify(response.json())
-
 
 @app.route("/install")
 def install():
-
     shop = "0jeqkm-rp.myshopify.com"
-
     install_url = (
         f"https://{shop}/admin/oauth/authorize"
         f"?client_id={os.getenv('SHOPIFY_CLIENT_ID')}"
         f"&scope={os.getenv('SHOPIFY_SCOPES')}"
         f"&redirect_uri={os.getenv('SHOPIFY_REDIRECT_URI')}"
     )
-
     return redirect(install_url)
+
 @app.route("/auth/callback")
 def auth_callback():
-
     shop = request.args.get("shop")
     code = request.args.get("code")
 
@@ -356,43 +313,26 @@ def auth_callback():
             "code": code
         }
     )
-
     token_data = response.json()
-
     print("TOKEN DATA:", token_data)
 
-    store = ShopifyStore.query.filter_by(
-        shop=shop
-    ).first()
-
+    store = ShopifyStore.query.filter_by(shop=shop).first()
     if not store:
-        store = ShopifyStore(
-            shop=shop,
-            access_token=token_data["access_token"]
-        )
+        store = ShopifyStore(shop=shop, access_token=token_data["access_token"])
         db.session.add(store)
     else:
         store.access_token = token_data["access_token"]
 
     db.session.commit()
+    return jsonify({"success": True, "shop": shop})
 
-    return jsonify({
-        "success": True,
-        "shop": shop
-    })
-    
 @app.route("/stores")
 def stores():
-
     stores = ShopifyStore.query.all()
-
-    return jsonify([
-        {
-            "id": store.id,
-            "shop": store.shop
-        }
-        for store in stores
-    ])
+    return jsonify([{
+        "id": store.id,
+        "shop": store.shop
+    } for store in stores])
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
