@@ -1,0 +1,17 @@
+# Database files
+*.db
+*.sqlite3
+
+# Instance folder
+backend/instance/
+instance/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+
+# Logs
+*.log
