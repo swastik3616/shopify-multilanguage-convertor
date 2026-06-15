@@ -9,7 +9,11 @@ from dotenv import load_dotenv
 
 app = Flask(__name__)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///translator.db"
+db_url = os.getenv("DATABASE_URL", "sqlite:///translator.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 STORE_URL = os.getenv("SHOPIFY_STORE_URL")
 ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
