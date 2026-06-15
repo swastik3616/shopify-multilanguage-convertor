@@ -23,6 +23,20 @@
 }
 </style>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const languageSelector = document.getElementById('translator-language');
+
+  languageSelector.addEventListener('change', function() {
+    const selectedLanguage = this.value;
+
+    console.log('Selected Language:', selectedLanguage);
+
+    alert('Selected Language: ' + selectedLanguage);
+  });
+});
+</script>
+
 {% schema %}
 {
   "name": "Language Switcher",
