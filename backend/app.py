@@ -158,8 +158,11 @@ def get_provider_response(provider, model, api_key, source_text, target_language
         print(f"Provider Error ({provider}):", str(e))
         raise Exception(f"Failed to translate using {provider}: {str(e)}")
 
-@app.route("/translate", methods=["POST"])
+@app.route("/translate", methods=["POST", "OPTIONS"])
 def translate_text():
+    if request.method == 'OPTIONS':
+        return '', 204
+        
     data = request.json
 
     source_text = data.get("source_text", "")

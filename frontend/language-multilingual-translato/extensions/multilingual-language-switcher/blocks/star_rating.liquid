@@ -27,12 +27,45 @@
 document.addEventListener('DOMContentLoaded', function() {
   const languageSelector = document.getElementById('translator-language');
 
-  languageSelector.addEventListener('change', function() {
+  languageSelector.addEventListener('change', async function() {
     const selectedLanguage = this.value;
-
     console.log('Selected Language:', selectedLanguage);
 
-    alert('Selected Language: ' + selectedLanguage);
+    // 1. Get all text elements you want to translate
+    // For a real store, you might want to specifically target product titles, descriptions, etc.
+    const textElements = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, a');
+
+    // 2. Loop through each element and send it to your backend
+    for (let i = 0; i < textElements.length; i++) {
+      const el = textElements[i];
+      const originalText = el.innerText.trim();
+      
+      // Skip empty strings to save API calls
+      if (!originalText) continue;
+
+      try {
+        const response = await fetch("https://shopify-multilanguage-convertor.onrender.com/translate", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          // 3. Your backend expects "source_text" and "target_language"
+          body: JSON.stringify({
+            source_text: originalText,
+            target_language: selectedLanguage
+          })
+        });
+
+        const data = await response.json();
+        
+        // 4. Update the website text with the response
+        if (data.translated_text) {
+          el.innerText = data.translated_text;
+        }
+      } catch (error) {
+        console.error("Translation failed for text:", originalText, error);
+      }
+    }
   });
 });
 </script>
