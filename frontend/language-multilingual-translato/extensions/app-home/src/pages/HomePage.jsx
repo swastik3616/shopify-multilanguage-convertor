@@ -1,46 +1,50 @@
 import { useState, useEffect } from 'preact/hooks';
 import { useLocation } from 'preact-iso';
-import { listFAQs, primeFAQ } from '../../../../shared/models/faq';
-import { gidToId } from '../../../../shared/utils/gid';
-
-/** @typedef {import('../../../../shared/models/faq').FAQSummary} FAQSummary */
 
 export default function HomePage() {
   const location = useLocation();
-  const [faqs, setFaqs] = useState(/** @type {FAQSummary[]} */([]));
   const [loading, setLoading] = useState(true);
 
+  // Mock data state for future API integration
+  const [dashboardData, setDashboardData] = useState({
+    overview: {
+      totalProducts: 1540,
+      totalPages: 12,
+      totalCollections: 24,
+      activeLanguages: 5,
+      translationRequests: 128,
+      status: 'Healthy',
+    },
+    analytics: {
+      translatedProducts: 1420,
+      translatedPages: 10,
+      mostUsedLanguage: 'Spanish (ES)',
+      successRate: '99.8%',
+    },
+    extension: {
+      switcherStatus: 'Active',
+      connection: 'Connected',
+      lastSync: '10 mins ago',
+    },
+    settings: {
+      googleApi: 'Verified',
+      backend: 'Online',
+      storeConnection: 'Authorized',
+    },
+    recentActivity: [
+      { id: 1, action: 'Translated 50 Products to French', time: '2 hours ago', status: 'Success' },
+      { id: 2, action: 'Updated Language Switcher Settings', time: '5 hours ago', status: 'Success' },
+      { id: 3, action: 'Scanned Store Content', time: '1 day ago', status: 'Completed' },
+    ]
+  });
+
   useEffect(() => {
-    (async () => {
-      setFaqs(await listFAQs());
+    // Simulate API fetch delay
+    const timer = setTimeout(() => {
       setLoading(false);
-    })();
+    }, 500);
+    return () => clearTimeout(timer);
   }, []);
-
-  /**
-   * @param {Event} event
-   * @param {FAQSummary} faq
-   */
-  const openFAQ = (event, faq) => {
-    const mouseEvent = /** @type {MouseEvent} */ (event);
-    if (
-      mouseEvent.defaultPrevented ||
-      mouseEvent.button !== 0 ||
-      mouseEvent.metaKey ||
-      mouseEvent.altKey ||
-      mouseEvent.ctrlKey ||
-      mouseEvent.shiftKey
-    ) {
-
-    }
-
-    const id = gidToId(faq.id);
-    mouseEvent.preventDefault();
-    primeFAQ(id, faq);
-    location.route(`/faq/${id}`);
-  };
-
-  const hasFaqs = faqs.length > 0;
 
   return (
     <s-page heading="🌐 Language Multilingual Translator">
@@ -48,90 +52,148 @@ export default function HomePage() {
         Translate Store
       </s-button>
 
-      <s-section>
-        <s-heading>Welcome to Shopify Multilingual Translator</s-heading>
-        <s-paragraph>
-          Manage and translate your Shopify store into multiple languages.
-        </s-paragraph>
-      </s-section>
+      {loading ? (
+        <s-section>
+          <s-paragraph>Loading dashboard data...</s-paragraph>
+        </s-section>
+      ) : (
+        <>
+          {/* Quick Actions */}
+          <s-section heading="Quick Actions">
+            <s-button-group>
+              <s-button>🔍 Scan Store Content</s-button>
+              <s-button>🛍️ Translate Products</s-button>
+              <s-button>📄 Translate Pages</s-button>
+              <s-button>📂 Translate Collections</s-button>
+              <s-button onClick={() => location.route('/settings')}>⚙️ Language Settings</s-button>
+            </s-button-group>
+          </s-section>
 
-      <s-section heading="Dashboard">
-        <s-grid gap="base">
+          {/* Dashboard Overview */}
+          <s-section heading="Dashboard Overview">
+            <s-grid gap="base">
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>Total Products</s-heading>
+                <s-paragraph>{dashboardData.overview.totalProducts}</s-paragraph>
+              </s-box>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>Total Pages</s-heading>
+                <s-paragraph>{dashboardData.overview.totalPages}</s-paragraph>
+              </s-box>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>Total Collections</s-heading>
+                <s-paragraph>{dashboardData.overview.totalCollections}</s-paragraph>
+              </s-box>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>Active Languages</s-heading>
+                <s-badge tone="success">{dashboardData.overview.activeLanguages} Languages</s-badge>
+              </s-box>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>Translation Requests</s-heading>
+                <s-paragraph>{dashboardData.overview.translationRequests}</s-paragraph>
+              </s-box>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>Translation Status</s-heading>
+                <s-badge tone="success">{dashboardData.overview.status}</s-badge>
+              </s-box>
+            </s-grid>
+          </s-section>
 
-          <s-box padding="base" borderRadius="base" borderWidth="base">
-            <s-heading>🌍 Supported Languages</s-heading>
-            <s-paragraph>
-              Manage all available store languages.
-            </s-paragraph>
-            <s-badge tone="success">5 Languages</s-badge>
-          </s-box>
+          {/* Translation Analytics & Extension Status */}
+          <s-section>
+            <s-grid gap="base">
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>📈 Translation Analytics</s-heading>
+                <s-table>
+                  <s-table-body>
+                    <s-table-row>
+                      <s-table-cell>Translated Products</s-table-cell>
+                      <s-table-cell>{dashboardData.analytics.translatedProducts}</s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Translated Pages</s-table-cell>
+                      <s-table-cell>{dashboardData.analytics.translatedPages}</s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Most Used Language</s-table-cell>
+                      <s-table-cell>{dashboardData.analytics.mostUsedLanguage}</s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Success Rate</s-table-cell>
+                      <s-table-cell><s-badge tone="success">{dashboardData.analytics.successRate}</s-badge></s-table-cell>
+                    </s-table-row>
+                  </s-table-body>
+                </s-table>
+              </s-box>
 
-          <s-box padding="base" borderRadius="base" borderWidth="base">
-            <s-heading>🔤 Translation Provider</s-heading>
-            <s-paragraph>
-              Configure Google Translate API settings.
-            </s-paragraph>
-            <s-badge tone="info">Google Translate</s-badge>
-          </s-box>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>🎨 Theme Extension Status</s-heading>
+                <s-table>
+                  <s-table-body>
+                    <s-table-row>
+                      <s-table-cell>Language Switcher</s-table-cell>
+                      <s-table-cell><s-badge tone="success">{dashboardData.extension.switcherStatus}</s-badge></s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Extension Connection</s-table-cell>
+                      <s-table-cell><s-badge tone="success">{dashboardData.extension.connection}</s-badge></s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Last Sync Time</s-table-cell>
+                      <s-table-cell>{dashboardData.extension.lastSync}</s-table-cell>
+                    </s-table-row>
+                  </s-table-body>
+                </s-table>
+              </s-box>
+            </s-grid>
+          </s-section>
 
-          <s-box padding="base" borderRadius="base" borderWidth="base">
-            <s-heading>📊 Analytics</s-heading>
-            <s-paragraph>
-              Monitor translation activity and usage.
-            </s-paragraph>
-            <s-badge tone="success">Live</s-badge>
-          </s-box>
+          {/* System Settings & Recent Activity */}
+          <s-section>
+            <s-grid gap="base">
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>⚙️ Settings Connection Status</s-heading>
+                <s-table>
+                  <s-table-body>
+                    <s-table-row>
+                      <s-table-cell>Google Translate API</s-table-cell>
+                      <s-table-cell><s-badge tone="success">{dashboardData.settings.googleApi}</s-badge></s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Backend Services</s-table-cell>
+                      <s-table-cell><s-badge tone="success">{dashboardData.settings.backend}</s-badge></s-table-cell>
+                    </s-table-row>
+                    <s-table-row>
+                      <s-table-cell>Shopify Store Connection</s-table-cell>
+                      <s-table-cell><s-badge tone="success">{dashboardData.settings.storeConnection}</s-badge></s-table-cell>
+                    </s-table-row>
+                  </s-table-body>
+                </s-table>
+              </s-box>
 
-          <s-box padding="base" borderRadius="base" borderWidth="base">
-            <s-heading>⚡ Theme Extension</s-heading>
-            <s-paragraph>
-              Language Switcher extension status.
-            </s-paragraph>
-            <s-badge tone="success">Connected</s-badge>
-          </s-box>
-
-        </s-grid>
-      </s-section>
-
-      <s-section heading="Quick Actions">
-        <s-button-group>
-          <s-button>Scan Store</s-button>
-          <s-button>Translate Products</s-button>
-          <s-button>Translate Pages</s-button>
-          <s-button>Translate Collections</s-button>
-        </s-button-group>
-      </s-section>
-
-      <s-section heading="Translation Overview">
-        <s-table>
-          <s-table-header-row>
-            <s-table-header>Metric</s-table-header>
-            <s-table-header>Value</s-table-header>
-          </s-table-header-row>
-
-          <s-table-body>
-            <s-table-row>
-              <s-table-cell>Total Products</s-table-cell>
-              <s-table-cell>0</s-table-cell>
-            </s-table-row>
-
-            <s-table-row>
-              <s-table-cell>Translated Products</s-table-cell>
-              <s-table-cell>0</s-table-cell>
-            </s-table-row>
-
-            <s-table-row>
-              <s-table-cell>Languages Enabled</s-table-cell>
-              <s-table-cell>5</s-table-cell>
-            </s-table-row>
-
-            <s-table-row>
-              <s-table-cell>Translation Requests</s-table-cell>
-              <s-table-cell>0</s-table-cell>
-            </s-table-row>
-          </s-table-body>
-        </s-table>
-      </s-section>
+              <s-box padding="base" borderRadius="base" borderWidth="base">
+                <s-heading>🕒 Recent Activity</s-heading>
+                <s-table>
+                  <s-table-header-row>
+                    <s-table-header>Activity</s-table-header>
+                    <s-table-header>Time</s-table-header>
+                    <s-table-header>Status</s-table-header>
+                  </s-table-header-row>
+                  <s-table-body>
+                    {dashboardData.recentActivity.map(activity => (
+                      <s-table-row key={activity.id}>
+                        <s-table-cell>{activity.action}</s-table-cell>
+                        <s-table-cell>{activity.time}</s-table-cell>
+                        <s-table-cell><s-badge tone={activity.status === 'Success' || activity.status === 'Completed' ? 'success' : 'neutral'}>{activity.status}</s-badge></s-table-cell>
+                      </s-table-row>
+                    ))}
+                  </s-table-body>
+                </s-table>
+              </s-box>
+            </s-grid>
+          </s-section>
+        </>
+      )}
     </s-page>
   );
 }
