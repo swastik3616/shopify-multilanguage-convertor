@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5000";
+const API_URL = "https://shopify-multilanguage-convertor.onrender.com";
 
 export const getProviderSettings = async () => {
   const response = await fetch(`${API_URL}/get-provider`);
@@ -6,16 +6,13 @@ export const getProviderSettings = async () => {
 };
 
 export const saveProvider = async (payload) => {
-  const response = await fetch(
-    `${API_URL}/save-provider`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await fetch(`${API_URL}/save-provider`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 
   return response.json();
 };
