@@ -21,6 +21,18 @@ class Translation(db.Model):
         nullable=False
     )
 
+class PageContent(db.Model):
+    __tablename__ = "page_contents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    page = db.Column(db.String(255), nullable=False)
+    key = db.Column(db.String(255), nullable=False)
+    source_text = db.Column(db.Text, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('page', 'key', name='uq_page_key'),
+    )
+
 class AuditLog(db.Model):
     __tablename__ = "audit_logs"
 

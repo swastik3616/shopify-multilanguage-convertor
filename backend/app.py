@@ -5,7 +5,7 @@ import requests
 import json
 import re
 from database import db
-from model import Translation, AuditLog, ShopifyStore, AppSetting
+from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
 from dotenv import load_dotenv
 
 app = Flask(__name__)
@@ -314,6 +314,122 @@ def get_translations():
         "target_language": item.target_language,
         "translated_text": item.translated_text
     } for item in records])
+
+@app.route("/contents", methods=["GET"])
+def get_contents():
+    records = PageContent.query.order_by(PageContent.page, PageContent.key).all()
+    return jsonify([{
+        "id": item.id,
+        "page": item.page,
+        "key": item.key,
+        "source_text": item.source_text
+    } for item in records])
+
+@app.route("/contents", methods=["POST", "OPTIONS"])
+def create_content():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json
+    page = data.get("page", "home").strip()
+    key = data.get("key", "").strip()
+    source_text = data.get("source_text", "").strip()
+
+    if not page or not key or not source_text:
+        return jsonify({"success": False, "message": "page, key, and source_text are required"}), 400
+
+    existing = PageContent.query.filter_by(page=page, key=key).first()
+    if existing:
+        return jsonify({"success": False, "message": "Content item already exists for this page and key"}), 400
+
+    content = PageContent(page=page, key=key, source_text=source_text)
+    db.session.add(content)
+    db.session.commit()
+
+    return jsonify({"success": True, "content": {
+        "id": content.id,
+        "page": content.page,
+        "key": content.key,
+        "source_text": content.source_text
+    }})
+
+@app.route("/contents/<int:content_id>", methods=["PUT", "OPTIONS"])
+def update_content(content_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json
+    content = PageContent.query.get(content_id)
+    if not content:
+        return jsonify({"success": False, "message": "Content item not found"}), 404
+
+    page = data.get("page", content.page).strip()
+    key = data.get("key", content.key).strip()
+    source_text = data.get("source_text", content.source_text).strip()
+
+    if not page or not key or not source_text:
+        return jsonify({"success": False, "message": "page, key, and source_text are required"}), 400
+
+    duplicate = PageContent.query.filter(PageContent.page == page, PageContent.key == key, PageContent.id != content_id).first()
+    if duplicate:
+        return jsonify({"success": False, "message": "Another content item already uses this page and key"}), 400
+
+    content.page = page
+    content.key = key
+    content.source_text = source_text
+    db.session.commit()
+
+    return jsonify({"success": True, "content": {
+        "id": content.id,
+        "page": content.page,
+        "key": content.key,
+        "source_text": content.source_text
+    }})
+
+@app.route("/contents/<int:content_id>", methods=["DELETE"])
+def delete_content(content_id):
+    content = PageContent.query.get(content_id)
+    if not content:
+        return jsonify({"success": False, "message": "Content item not found"}), 404
+
+    db.session.delete(content)
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "Content item deleted"})
+
+@app.route("/contents/<int:content_id>/translate", methods=["POST", "OPTIONS"])
+def translate_content(content_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json
+    target_language = data.get("target_language", "").strip()
+    if not target_language:
+        return jsonify({"success": False, "message": "Missing target language"}), 400
+
+    content = PageContent.query.get(content_id)
+    if not content:
+        return jsonify({"success": False, "message": "Content item not found"}), 404
+
+    provider_settings = get_setting("provider_settings", get_default_provider_settings())
+    provider = provider_settings.get("provider", "openai")
+    model = provider_settings.get("model", "gpt-3.5-turbo")
+    api_key = provider_settings["api_keys"].get(provider, "")
+
+    try:
+        translated_text = get_provider_response(provider, model, api_key, content.source_text, target_language)
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+    translation = Translation(
+        source_text=content.source_text,
+        target_language=target_language,
+        translated_text=translated_text
+    )
+    db.session.add(translation)
+    db.session.commit()
+
+    return jsonify({"success": True, "translated_text": translated_text})
 
 @app.route("/update-translation", methods=["POST"])
 def update_translation():
