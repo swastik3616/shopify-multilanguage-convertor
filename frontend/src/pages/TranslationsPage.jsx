@@ -323,8 +323,6 @@ function TranslationsPage() {
           </div>
         </div>
       </div>
-        </div>
-      </div>
 
       <div className="card-container flex flex-col">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
