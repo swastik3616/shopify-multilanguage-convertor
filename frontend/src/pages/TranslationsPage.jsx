@@ -222,8 +222,13 @@ function TranslationsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card-container p-6 flex flex-col gap-4">
-          <h3 className="font-semibold text-slate-900 border-b border-slate-100 pb-2">Content Editor</h3>
+        <div className="card-container p-6 flex flex-col gap-6">
+          <div>
+            <h3 className="font-semibold text-slate-900 border-b border-slate-100 pb-2">Website Content</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Manage the selected page source text on the left, then translate it on the right.
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Current Page</label>
@@ -240,13 +245,20 @@ function TranslationsPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Source Text</label>
+          {selectedContent ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Selected content key</p>
+              <p className="mt-1 text-sm font-medium text-slate-900">{selectedContent.key}</p>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-3">
+            <label className="block text-sm font-medium text-slate-700">Source Text</label>
             <textarea
-              className="input-field min-h-[120px] resize-y"
+              className="input-field min-h-[260px] resize-y"
               value={sourceText}
               onChange={(e) => setSourceText(e.target.value)}
-              placeholder="Enter the website text to save..."
+              placeholder="Select or enter website text here..."
             />
           </div>
 
@@ -264,8 +276,13 @@ function TranslationsPage() {
           </div>
         </div>
 
-        <div className="card-container p-6 flex flex-col gap-4">
-          <h3 className="font-semibold text-slate-900 border-b border-slate-100 pb-2">Translate Saved Content</h3>
+        <div className="card-container p-6 flex flex-col gap-6">
+          <div>
+            <h3 className="font-semibold text-slate-900 border-b border-slate-100 pb-2">Translation Panel</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Translate persisted content and review translated output in a clean side-by-side workflow.
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Target Language</label>
@@ -282,21 +299,30 @@ function TranslationsPage() {
             </select>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">Translation ready</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">
+              {selectedContent ? selectedContent.source_text : "Select a saved content item to translate."}
+            </p>
+          </div>
+
+          <div className="flex gap-3">
             <button className="btn btn-primary flex-1 py-2" onClick={handleTranslateSavedContent}>
               Translate Saved Item
             </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Translated Output</label>
+          <div className="flex flex-col gap-3">
+            <label className="block text-sm font-medium text-slate-700">Translated Output</label>
             <textarea
-              className="input-field flex-1 min-h-[120px] bg-slate-50"
+              className="input-field min-h-[260px] bg-slate-50"
               value={translatedText}
               readOnly
               placeholder="Translated text will appear here after translation."
             />
           </div>
+        </div>
+      </div>
         </div>
       </div>
 
