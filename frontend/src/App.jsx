@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LanguagesPage from "./pages/LanguagesPage";
 import ProvidersPage from "./pages/ProvidersPage";
 import TranslationsPage from "./pages/TranslationsPage";
+import TranslationPage from "./pages/TranslationPage.jsx";
 import JobsPage from "./pages/JobsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -22,13 +23,12 @@ function App() {
           <Route path="/languages" element={<LanguagesPage />} />
           <Route path="/providers" element={<ProvidersPage />} />
           <Route path="/translations" element={<TranslationsPage />} />
+          <Route path="/live-translation" element={<TranslationPage />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/providers" element={<ProvidersPage />} />
           <Route path="/audit-history" element={<AuditHistoryPage />} />
-          <Route path="/store-settings"element={<StoreSettingsPage />}
-/>
+          <Route path="/store-settings" element={<StoreSettingsPage />} />
         </Routes>
       </DashboardLayout>
     </BrowserRouter>

@@ -16,9 +16,6 @@ if db_url.startswith("postgres://"):
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-STORE_URL = os.getenv("SHOPIFY_STORE_URL")
-ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
-
 db.init_app(app)
 
 with app.app_context():
@@ -44,6 +41,47 @@ def set_setting(key, value):
     db.session.commit()
 
 
+def normalize_shopify_store_url(store_url):
+    """Strip scheme and trailing slashes — store URL must be hostname only."""
+    if not store_url:
+        return ""
+    store_url = store_url.strip()
+    store_url = re.sub(r"^https?://", "", store_url, flags=re.I)
+    return store_url.strip("/")
+
+
+def get_shopify_credentials():
+    """Resolve Shopify credentials from saved settings, env vars, or OAuth store."""
+    store_setting = get_setting("store_setting", {})
+    store_url = normalize_shopify_store_url(
+        store_setting.get("store_url") or os.getenv("SHOPIFY_STORE_URL") or ""
+    )
+    access_token = (store_setting.get("access_token") or os.getenv("SHOPIFY_ACCESS_TOKEN") or "").strip()
+
+    # sanitize token: strip common prefixes like 'Bearer ' or 'Basic ', and remove surrounding quotes
+    def _clean_token(t):
+        if not t:
+            return ""
+        t = t.strip()
+        if t.startswith('"') and t.endswith('"'):
+            t = t[1:-1]
+        if t.lower().startswith("bearer "):
+            t = t.split(None, 1)[1]
+        if t.lower().startswith("basic "):
+            t = t.split(None, 1)[1]
+        return t.strip()
+
+    access_token = _clean_token(access_token)
+
+    if not store_url or not access_token:
+        store = ShopifyStore.query.first()
+        if store:
+            store_url = normalize_shopify_store_url(store.shop)
+            access_token = _clean_token(store.access_token or "")
+
+    return store_url, access_token
+
+
 def get_default_provider_settings():
     return {
         "provider": "openai",
@@ -60,76 +98,150 @@ def get_default_provider_settings():
 
 def fetch_shopify_pages():
     """Fetch pages from Shopify store."""
-    if not STORE_URL or not ACCESS_TOKEN:
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
         return []
     
     try:
         headers = {
-            "X-Shopify-Access-Token": ACCESS_TOKEN,
+            "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{STORE_URL}/admin/api/2024-01/pages.json"
+        url = f"https://{store_url}/admin/api/2024-01/pages.json"
         res = requests.get(url, headers=headers, timeout=10)
-        res.raise_for_status()
+        if not res.ok:
+            print(f"Shopify pages request failed: {res.status_code} {res.text}")
+            res.raise_for_status()
         return res.json().get("pages", [])
     except Exception as e:
         print(f"Error fetching Shopify pages: {str(e)}")
+        if 'res' in locals():
+            try:
+                print("Response status:", res.status_code)
+                print("Response body:", res.text)
+            except Exception:
+                pass
         return []
 
 
 def fetch_shopify_products(limit=5):
     """Fetch products from Shopify store."""
-    if not STORE_URL or not ACCESS_TOKEN:
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
         return []
     
     try:
         headers = {
-            "X-Shopify-Access-Token": ACCESS_TOKEN,
+            "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{STORE_URL}/admin/api/2024-01/products.json?limit={limit}&fields=id,title,body_html,handle"
+        url = f"https://{store_url}/admin/api/2024-01/products.json?limit={limit}&fields=id,title,body_html,handle"
         res = requests.get(url, headers=headers, timeout=10)
-        res.raise_for_status()
+        if not res.ok:
+            print(f"Shopify products request failed: {res.status_code} {res.text}")
+            res.raise_for_status()
         return res.json().get("products", [])
     except Exception as e:
         print(f"Error fetching Shopify products: {str(e)}")
+        if 'res' in locals():
+            try:
+                print("Response status:", res.status_code)
+                print("Response body:", res.text)
+            except Exception:
+                pass
         return []
 
 
 def fetch_shopify_collections(limit=5):
     """Fetch collections from Shopify store."""
-    if not STORE_URL or not ACCESS_TOKEN:
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
         return []
     
     try:
         headers = {
-            "X-Shopify-Access-Token": ACCESS_TOKEN,
+            "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{STORE_URL}/admin/api/2024-01/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
+        url = f"https://{store_url}/admin/api/2024-01/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
         res = requests.get(url, headers=headers, timeout=10)
-        res.raise_for_status()
+        if not res.ok:
+            print(f"Shopify collections request failed: {res.status_code} {res.text}")
+            res.raise_for_status()
         return res.json().get("custom_collections", [])
     except Exception as e:
         print(f"Error fetching Shopify collections: {str(e)}")
+        if 'res' in locals():
+            try:
+                print("Response status:", res.status_code)
+                print("Response body:", res.text)
+            except Exception:
+                pass
         return []
+
+
+def _mask_token(token):
+    if not token:
+        return None
+    if len(token) <= 8:
+        return "****"
+    return f"{token[:4]}...{token[-4:]}"
+
+
+@app.route("/shopify/check-token", methods=["GET"])
+def shopify_check_token():
+    """Diagnostic endpoint: checks current resolved Shopify store_url and access token by calling /shop.json."""
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
+        return jsonify({"connected": False, "message": "No Shopify store or access token configured."}), 400
+
+    try:
+        headers = {"X-Shopify-Access-Token": access_token}
+        res = requests.get(f"https://{store_url}/admin/api/2024-01/shop.json", headers=headers, timeout=10)
+        body = None
+        try:
+            body = res.json()
+        except Exception:
+            body = res.text[:200]
+
+        return jsonify({
+            "connected": res.ok,
+            "status_code": res.status_code,
+            "response": body,
+            "store_url": store_url,
+            "masked_token": _mask_token(access_token)
+        }), (200 if res.ok else 401)
+    except Exception as e:
+        print("Shopify check-token error:", str(e))
+        return jsonify({"connected": False, "message": str(e)}), 500
 
 
 def extract_text_from_html(html_text):
     """Extract plain text from HTML content."""
     if not html_text:
         return ""
-    import re
-    # Remove HTML tags
+
+    # Remove script and style blocks entirely.
+    html_text = re.sub(r'<script[^>]*>.*?</script>', '', html_text, flags=re.S | re.I)
+    html_text = re.sub(r'<style[^>]*>.*?</style>', '', html_text, flags=re.S | re.I)
+    html_text = re.sub(r'<!--.*?-->', '', html_text, flags=re.S)
+
+    # Remove any remaining HTML tags.
     text = re.sub(r'<[^>]+>', '', html_text)
-    # Decode HTML entities
-    text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    return text.strip()[:200]  # Limit to 200 chars
+
+    # Decode common HTML entities and normalize whitespace.
+    text = text.replace("&nbsp;", " ")
+    text = text.replace("&amp;", "&")
+    text = text.replace("&lt;", "<")
+    text = text.replace("&gt;", ">")
+    text = re.sub(r'\s+', ' ', text)
+
+    return text.strip()[:1200]
 
 
 def seed_shopify_page_contents(page):
     """Fetch and seed page contents from Shopify store."""
-    created = False
+    imported = 0
     
     try:
         if page == "home":
@@ -140,7 +252,7 @@ def seed_shopify_page_contents(page):
                 
                 if title and not PageContent.query.filter_by(page="home", key=title).first():
                     db.session.add(PageContent(page="home", key=title, source_text=body or title))
-                    created = True
+                    imported += 1
             
             # Also fetch first few products as featured content
             products = fetch_shopify_products(3)
@@ -151,12 +263,12 @@ def seed_shopify_page_contents(page):
                 
                 if not PageContent.query.filter_by(page="home", key=key).first():
                     db.session.add(PageContent(page="home", key=key, source_text=title))
-                    created = True
+                    imported += 1
                     
                 key = f"featured_product_{idx+1}_desc"
                 if body and not PageContent.query.filter_by(page="home", key=key).first():
                     db.session.add(PageContent(page="home", key=key, source_text=body))
-                    created = True
+                    imported += 1
                     
         elif page == "product":
             products = fetch_shopify_products(10)
@@ -167,13 +279,13 @@ def seed_shopify_page_contents(page):
                 
                 if title and not PageContent.query.filter_by(page="product", key=key).first():
                     db.session.add(PageContent(page="product", key=key, source_text=title))
-                    created = True
+                    imported += 1
                     
                 if body:
                     key = f"product_{product.get('id', idx)}_desc"
                     if not PageContent.query.filter_by(page="product", key=key).first():
                         db.session.add(PageContent(page="product", key=key, source_text=body))
-                        created = True
+                        imported += 1
                         
         elif page == "collection":
             collections = fetch_shopify_collections(10)
@@ -184,20 +296,22 @@ def seed_shopify_page_contents(page):
                 
                 if title and not PageContent.query.filter_by(page="collection", key=key).first():
                     db.session.add(PageContent(page="collection", key=key, source_text=title))
-                    created = True
+                    imported += 1
                     
                 if body:
                     key = f"collection_{collection.get('id', idx)}_desc"
                     if not PageContent.query.filter_by(page="collection", key=key).first():
                         db.session.add(PageContent(page="collection", key=key, source_text=body))
-                        created = True
+                        imported += 1
         
-        if created:
+        if imported:
             db.session.commit()
-            print(f"Seeded {page} content from Shopify store")
+            print(f"Seeded {imported} {page} content item(s) from Shopify store")
             
     except Exception as e:
         print(f"Error seeding {page} content from Shopify: {str(e)}")
+
+    return imported
 
 
 
@@ -490,6 +604,27 @@ def translate_text():
 
     return jsonify({"translated_text": translated_text})
 
+@app.route("/api/fetch-url", methods=["POST", "OPTIONS"])
+def fetch_url_content():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"success": False, "message": "URL is required"}), 400
+
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = f"https://{url}"
+
+    try:
+        resp = requests.get(url, timeout=12)
+        resp.raise_for_status()
+        content = extract_text_from_html(resp.text)
+        return jsonify({"success": True, "text": content})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Unable to fetch content: {str(e)}"}), 500
+
 @app.route("/translations", methods=["GET"])
 def get_translations():
     records = Translation.query.all()
@@ -539,6 +674,49 @@ def delete_translation(translation_id):
     
     return jsonify({"success": True, "message": "Translation deleted"})
 
+@app.route("/contents/store-status", methods=["GET"])
+def get_contents_store_status():
+    store_url, access_token = get_shopify_credentials()
+    return jsonify({
+        "connected": bool(store_url and access_token),
+        "store_url": store_url or None,
+    })
+
+
+@app.route("/contents/sync", methods=["POST", "OPTIONS"])
+def sync_contents():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json or {}
+    page = (data.get("page") or "home").strip()
+
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
+        return jsonify({
+            "success": False,
+            "message": "No Shopify store connected. Add your store URL and access token in Store Settings.",
+            "imported": 0,
+        }), 400
+
+    if page not in ["home", "product", "collection"]:
+        return jsonify({
+            "success": False,
+            "message": f"The '{page}' page is not synced from Shopify. Add content manually or choose home, product, or collection.",
+            "imported": 0,
+        }), 400
+
+    imported = seed_shopify_page_contents(page)
+    total = PageContent.query.filter_by(page=page).count()
+
+    return jsonify({
+        "success": True,
+        "message": f"Imported {imported} new item(s) from Shopify. {total} total item(s) on this page.",
+        "imported": imported,
+        "total": total,
+    })
+
+
 @app.route("/contents", methods=["GET"])
 def get_contents():
     page = request.args.get("page")
@@ -583,6 +761,69 @@ def create_content():
         "key": content.key,
         "source_text": content.source_text
     }})
+
+@app.route("/contents/import", methods=["POST", "OPTIONS"])
+def import_content():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.json or {}
+    page = (data.get("page") or "other").strip()
+    key = (data.get("key") or "").strip()
+    source_text = (data.get("source_text") or "").strip()
+    source_url = (data.get("source_url") or "").strip()
+    target_language = (data.get("target_language") or "").strip()
+    translated_text = (data.get("translated_text") or "").strip()
+
+    if not key or not source_text:
+        return jsonify({"success": False, "message": "key and source_text are required"}), 400
+
+    existing = PageContent.query.filter_by(page=page, key=key).first()
+    if existing:
+        existing.source_text = source_text
+        content = existing
+        updated = True
+    else:
+        content = PageContent(page=page, key=key, source_text=source_text)
+        db.session.add(content)
+        updated = False
+
+    translation_saved = False
+    if target_language and translated_text:
+        existing_translation = Translation.query.filter_by(
+            source_text=content.source_text,
+            target_language=target_language
+        ).first()
+        if existing_translation:
+            existing_translation.translated_text = translated_text
+        else:
+            db.session.add(Translation(
+                source_text=content.source_text,
+                target_language=target_language,
+                translated_text=translated_text
+            ))
+        translation_saved = True
+
+    db.session.commit()
+
+    audit_action = f"Content Imported: {page}/{key}"
+    if source_url:
+        audit_action += f" from {source_url}"
+    db.session.add(AuditLog(action=audit_action))
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "updated": updated,
+        "translation_saved": translation_saved,
+        "message": f"Content {'updated' if updated else 'saved'} to Translations library.",
+        "content": {
+            "id": content.id,
+            "page": content.page,
+            "key": content.key,
+            "source_text": content.source_text
+        }
+    })
 
 @app.route("/contents/<int:content_id>", methods=["PUT", "OPTIONS"])
 def update_content(content_id):
@@ -662,19 +903,6 @@ def translate_content(content_id):
 
     return jsonify({"success": True, "translated_text": translated_text})
 
-@app.route("/update-translation", methods=["POST"])
-def update_translation():
-    data = request.json
-    translation = Translation.query.get(data["id"])
-
-    if not translation:
-        return jsonify({"success": False, "message": "Translation not found"}), 404
-
-    translation.translated_text = data["translated_text"]
-    db.session.commit()
-
-    return jsonify({"success": True, "message": "Translation updated successfully"})
-
 @app.route('/analytics', methods=['GET'])
 def analytics():
     total_translations = Translation.query.count()
@@ -717,8 +945,14 @@ def save_store_settings():
     print("Received Data:", data)
 
     store_setting = get_setting("store_setting", {})
-    store_setting["store_url"] = data["store_url"]
-    store_setting["access_token"] = data["access_token"]
+    store_setting["store_url"] = normalize_shopify_store_url(data.get("store_url", ""))
+    raw_token = (data.get("access_token") or "").strip()
+    # strip common prefixes/quotes
+    if raw_token.startswith('"') and raw_token.endswith('"'):
+        raw_token = raw_token[1:-1]
+    if raw_token.lower().startswith("bearer "):
+        raw_token = raw_token.split(None, 1)[1]
+    store_setting["access_token"] = raw_token
     set_setting("store_setting", store_setting)
 
     print("Saved Settings:", store_setting)
@@ -747,7 +981,7 @@ def shopify_test():
 
 @app.route("/install")
 def install():
-    shop = "0jeqkm-rp.myshopify.com"
+    shop = "https://translator-test-store.myshopify.com/"
     install_url = (
         f"https://{shop}/admin/oauth/authorize"
         f"?client_id={os.getenv('SHOPIFY_CLIENT_ID')}"
@@ -774,10 +1008,21 @@ def auth_callback():
 
     store = ShopifyStore.query.filter_by(shop=shop).first()
     if not store:
-        store = ShopifyStore(shop=shop, access_token=token_data["access_token"])
+        # sanitize token before saving
+        atok = token_data.get("access_token", "")
+        if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
+            atok = atok[1:-1]
+        if isinstance(atok, str) and atok.lower().startswith("bearer "):
+            atok = atok.split(None, 1)[1]
+        store = ShopifyStore(shop=shop, access_token=atok)
         db.session.add(store)
     else:
-        store.access_token = token_data["access_token"]
+        atok = token_data.get("access_token", "")
+        if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
+            atok = atok[1:-1]
+        if isinstance(atok, str) and atok.lower().startswith("bearer "):
+            atok = atok.split(None, 1)[1]
+        store.access_token = atok
 
     db.session.commit()
     return jsonify({"success": True, "shop": shop})

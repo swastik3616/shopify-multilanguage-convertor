@@ -1,8 +1,23 @@
-const API_URL = "https://shopify-multilanguage-convertor.onrender.com";
+const API_URL = "http://localhost:5000";
 
 export const getContents = async (page = null) => {
   const url = page ? `${API_URL}/contents?page=${encodeURIComponent(page)}` : `${API_URL}/contents`;
   const response = await fetch(url);
+  return response.json();
+};
+
+export const getContentsStoreStatus = async () => {
+  const response = await fetch(`${API_URL}/contents/store-status`);
+  return response.json();
+};
+
+export const syncContentsFromShopify = async (page) => {
+  const response = await fetch(`${API_URL}/contents/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page }),
+  });
+
   return response.json();
 };
 
@@ -11,6 +26,26 @@ export const createContent = async (payload) => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+
+  return response.json();
+};
+
+export const importContentToLibrary = async (payload) => {
+  const response = await fetch(`${API_URL}/contents/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  return response.json();
+};
+
+export const fetchUrlContent = async (url) => {
+  const response = await fetch(`${API_URL}/api/fetch-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
   });
 
   return response.json();

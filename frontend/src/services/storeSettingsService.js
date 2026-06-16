@@ -1,4 +1,4 @@
-const API_URL = "https://shopify-multilanguage-convertor.onrender.com";
+const API_URL = "http://localhost:5000";
 
 export const saveStoreSettings = async (data) => {
   const response = await fetch(
@@ -12,5 +12,10 @@ export const saveStoreSettings = async (data) => {
     }
   );
 
+  return response.json();
+};
+
+export const checkShopifyToken = async () => {
+  const response = await fetch(`${API_URL}/shopify/check-token`);
   return response.json();
 };

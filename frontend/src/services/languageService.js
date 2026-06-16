@@ -1,4 +1,4 @@
-const API_URL = "https://shopify-multilanguage-convertor.onrender.com";
+const API_URL = "http://localhost:5000";
 
 export const saveLanguages = async (payload) => {
   const response = await fetch(
