@@ -43,3 +43,21 @@ export const translateContent = async (contentId, targetLanguage) => {
 
   return response.json();
 };
+
+export const updateTranslation = async (translationId, translatedText) => {
+  const response = await fetch(`${API_URL}/translations/${translationId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ translated_text: translatedText }),
+  });
+
+  return response.json();
+};
+
+export const deleteTranslation = async (translationId) => {
+  const response = await fetch(`${API_URL}/translations/${translationId}`, {
+    method: "DELETE",
+  });
+
+  return response.json();
+};

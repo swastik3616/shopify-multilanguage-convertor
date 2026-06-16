@@ -500,6 +500,42 @@ def get_translations():
         "translated_text": item.translated_text
     } for item in records])
 
+@app.route("/translations/<int:translation_id>", methods=["PUT", "OPTIONS"])
+def update_translation(translation_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.json
+    translation = Translation.query.get(translation_id)
+    
+    if not translation:
+        return jsonify({"success": False, "message": "Translation not found"}), 404
+    
+    translation.translated_text = data.get("translated_text", translation.translated_text)
+    db.session.commit()
+    
+    audit = AuditLog(action=f"Translation Updated: {translation_id}")
+    db.session.add(audit)
+    db.session.commit()
+    
+    return jsonify({"success": True, "message": "Translation updated", "id": translation.id})
+
+@app.route("/translations/<int:translation_id>", methods=["DELETE"])
+def delete_translation(translation_id):
+    translation = Translation.query.get(translation_id)
+    
+    if not translation:
+        return jsonify({"success": False, "message": "Translation not found"}), 404
+    
+    db.session.delete(translation)
+    db.session.commit()
+    
+    audit = AuditLog(action=f"Translation Deleted: {translation_id}")
+    db.session.add(audit)
+    db.session.commit()
+    
+    return jsonify({"success": True, "message": "Translation deleted"})
+
 @app.route("/contents", methods=["GET"])
 def get_contents():
     page = request.args.get("page")

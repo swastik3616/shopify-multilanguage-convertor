@@ -7,6 +7,8 @@ import {
   updateContent,
   deleteContent,
   translateContent,
+  updateTranslation,
+  deleteTranslation,
 } from "../services/contentService";
 
 const TARGET_LANGUAGES = ["Hindi", "Marathi", "French", "German"];
@@ -24,6 +26,9 @@ function TranslationsPage() {
   const [selectedContent, setSelectedContent] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterLanguage, setFilterLanguage] = useState("All");
+
+  const [editingTranslationId, setEditingTranslationId] = useState(null);
+  const [editingTranslationText, setEditingTranslationText] = useState("");
 
   const loadContents = async (page = "home") => {
     try {
@@ -138,6 +143,50 @@ function TranslationsPage() {
     } catch (error) {
       console.error("Error translating saved content:", error);
       alert(error.message || "Unable to translate saved content.");
+    }
+  };
+
+  const handleEditTranslation = (item) => {
+    setEditingTranslationId(item.id);
+    setEditingTranslationText(item.translated_text);
+  };
+
+  const handleSaveTranslationEdit = async (translationId) => {
+    if (!editingTranslationText.trim()) {
+      alert("Translation text cannot be empty.");
+      return;
+    }
+
+    try {
+      const result = await updateTranslation(translationId, editingTranslationText);
+      if (!result.success) {
+        throw new Error(result.message || "Failed to update translation.");
+      }
+
+      await loadTranslations();
+      setEditingTranslationId(null);
+      setEditingTranslationText("");
+    } catch (error) {
+      console.error("Error updating translation:", error);
+      alert(error.message || "Unable to update translation.");
+    }
+  };
+
+  const handleDeleteTranslation = async (translationId) => {
+    if (!window.confirm("Delete this translation record?")) {
+      return;
+    }
+
+    try {
+      const result = await deleteTranslation(translationId);
+      if (!result.success) {
+        throw new Error(result.message || "Failed to delete translation.");
+      }
+
+      await loadTranslations();
+    } catch (error) {
+      console.error("Error deleting translation:", error);
+      alert(error.message || "Unable to delete translation.");
     }
   };
 
@@ -359,6 +408,7 @@ function TranslationsPage() {
                 <th className="px-6 py-3">Source Text</th>
                 <th className="px-6 py-3">Language</th>
                 <th className="px-6 py-3">Translation</th>
+                <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -369,14 +419,61 @@ function TranslationsPage() {
                       {item.source_text}
                     </td>
                     <td className="px-6 py-4">{item.target_language}</td>
-                    <td className="px-6 py-4 text-slate-600 max-w-xs truncate" title={item.translated_text}>
-                      {item.translated_text}
+                    <td className="px-6 py-4">
+                      {editingTranslationId === item.id ? (
+                        <textarea
+                          className="input-field text-sm w-64 min-h-[80px] resize-y"
+                          value={editingTranslationText}
+                          onChange={(e) => setEditingTranslationText(e.target.value)}
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="text-slate-600 max-w-xs truncate" title={item.translated_text}>
+                          {item.translated_text}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-3">
+                      {editingTranslationId === item.id ? (
+                        <>
+                          <button
+                            className="text-sm font-medium text-[#008060] hover:text-[#006e52]"
+                            onClick={() => handleSaveTranslationEdit(item.id)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                            onClick={() => {
+                              setEditingTranslationId(null);
+                              setEditingTranslationText("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="text-sm font-medium text-[#008060] hover:text-[#006e52]"
+                            onClick={() => handleEditTranslation(item)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="text-sm font-medium text-[#c92a2a] hover:text-[#a50e0e]"
+                            onClick={() => handleDeleteTranslation(item.id)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3" className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan="4" className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center">
                       <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
                         <Search className="h-6 w-6 text-slate-400" />
