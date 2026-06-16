@@ -46,7 +46,6 @@ function TranslationsPage() {
   useEffect(() => {
     loadContents(pageFilter);
     loadTranslations();
-    setPageName(pageFilter);
     setSelectedContent(null);
     setTranslatedText("");
   }, [pageFilter]);
