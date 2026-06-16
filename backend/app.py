@@ -614,6 +614,7 @@ def translate_text():
 
     return jsonify({"translated_text": translated_text})
 
+@app.route("/fetch-url", methods=["POST", "OPTIONS"])
 @app.route("/api/fetch-url", methods=["POST", "OPTIONS"])
 def fetch_url_content():
     if request.method == 'OPTIONS':

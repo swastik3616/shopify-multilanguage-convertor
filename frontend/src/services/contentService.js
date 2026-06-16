@@ -42,7 +42,7 @@ export const importContentToLibrary = async (payload) => {
 };
 
 export const fetchUrlContent = async (url) => {
-  const response = await fetch(`${API_URL}/api/fetch-url`, {
+  const response = await fetch(`${API_URL}/fetch-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
