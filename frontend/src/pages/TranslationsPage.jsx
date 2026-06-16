@@ -15,7 +15,7 @@ function TranslationsPage() {
   const [contents, setContents] = useState([]);
   const [history, setHistory] = useState([]);
 
-  const [pageName, setPageName] = useState("");
+  const [pageFilter, setPageFilter] = useState("home");
   const [contentKey, setContentKey] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("Hindi");
@@ -25,9 +25,9 @@ function TranslationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterLanguage, setFilterLanguage] = useState("All");
 
-  const loadContents = async () => {
+  const loadContents = async (page = "home") => {
     try {
-      const data = await getContents();
+      const data = await getContents(page);
       setContents(data);
     } catch (error) {
       console.error("Error loading contents:", error);
@@ -44,13 +44,15 @@ function TranslationsPage() {
   };
 
   useEffect(() => {
-    loadContents();
+    loadContents(pageFilter);
     loadTranslations();
-  }, []);
+    setPageName(pageFilter);
+    setSelectedContent(null);
+    setTranslatedText("");
+  }, [pageFilter]);
 
   const resetForm = () => {
     setSelectedContent(null);
-    setPageName("");
     setContentKey("");
     setSourceText("");
     setTranslatedText("");
@@ -58,7 +60,6 @@ function TranslationsPage() {
 
   const handleSelectContent = (content) => {
     setSelectedContent(content);
-    setPageName(content.page);
     setContentKey(content.key);
     setSourceText(content.source_text);
     setTranslatedText("");
@@ -66,8 +67,8 @@ function TranslationsPage() {
   };
 
   const handleSaveContent = async () => {
-    if (!pageName.trim() || !contentKey.trim() || !sourceText.trim()) {
-      alert("Page, key, and source text are required.");
+    if (!contentKey.trim() || !sourceText.trim()) {
+      alert("Content key and source text are required.");
       return;
     }
 
@@ -75,13 +76,13 @@ function TranslationsPage() {
       let result;
       if (selectedContent) {
         result = await updateContent(selectedContent.id, {
-          page: pageName,
+          page: selectedContent.page || pageFilter,
           key: contentKey,
           source_text: sourceText,
         });
       } else {
         result = await createContent({
-          page: pageName,
+          page: pageFilter,
           key: contentKey,
           source_text: sourceText,
         });
@@ -91,7 +92,7 @@ function TranslationsPage() {
         throw new Error(result.message || "Failed to save content.");
       }
 
-      await loadContents();
+      await loadContents(pageFilter);
       resetForm();
     } catch (error) {
       console.error("Error saving content:", error);
@@ -177,23 +178,18 @@ function TranslationsPage() {
           <h3 className="font-semibold text-slate-900 border-b border-slate-100 pb-2">Content Editor</h3>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Page</label>
-            <input
+            <label className="block text-sm font-medium text-slate-700 mb-1">Current Page</label>
+            <select
               className="input-field"
-              value={pageName}
-              onChange={(e) => setPageName(e.target.value)}
-              placeholder="home, product, checkout..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Content Key</label>
-            <input
-              className="input-field"
-              value={contentKey}
-              onChange={(e) => setContentKey(e.target.value)}
-              placeholder="hero_title, banner_text..."
-            />
+              value={pageFilter}
+              onChange={(e) => setPageFilter(e.target.value)}
+            >
+              <option value="home">home</option>
+              <option value="product">product</option>
+              <option value="checkout">checkout</option>
+              <option value="collection">collection</option>
+              <option value="other">other</option>
+            </select>
           </div>
 
           <div>

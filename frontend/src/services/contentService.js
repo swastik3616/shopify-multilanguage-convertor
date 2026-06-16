@@ -1,7 +1,8 @@
 const API_URL = "https://shopify-multilanguage-convertor.onrender.com";
 
-export const getContents = async () => {
-  const response = await fetch(`${API_URL}/contents`);
+export const getContents = async (page = null) => {
+  const url = page ? `${API_URL}/contents?page=${encodeURIComponent(page)}` : `${API_URL}/contents`;
+  const response = await fetch(url);
   return response.json();
 };
 

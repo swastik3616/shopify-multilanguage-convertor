@@ -43,6 +43,38 @@ def set_setting(key, value):
         setting.value = json.dumps(value)
     db.session.commit()
 
+DEFAULT_PAGE_CONTENTS = {
+    "home": [
+        {
+            "key": "hero_heading",
+            "source_text": "Welcome to Shopify Multilingual Translator"
+        },
+        {
+            "key": "hero_subtitle",
+            "source_text": "Manage website content, then translate and publish changes instantly."
+        },
+        {
+            "key": "hero_button",
+            "source_text": "Translate Store"
+        },
+        {
+            "key": "overview_title",
+            "source_text": "Dashboard Overview"
+        }
+    ]
+}
+
+def seed_default_page_contents(page):
+    defaults = DEFAULT_PAGE_CONTENTS.get(page, [])
+    created = False
+    for item in defaults:
+        if not PageContent.query.filter_by(page=page, key=item["key"]).first():
+            db.session.add(PageContent(page=page, key=item["key"], source_text=item["source_text"]))
+            created = True
+    if created:
+        db.session.commit()
+
+
 def get_default_provider_settings():
     return {
         "provider": "openai",
@@ -317,7 +349,14 @@ def get_translations():
 
 @app.route("/contents", methods=["GET"])
 def get_contents():
-    records = PageContent.query.order_by(PageContent.page, PageContent.key).all()
+    page = request.args.get("page")
+    if page:
+        if page == "home":
+            seed_default_page_contents(page)
+        records = PageContent.query.filter_by(page=page).order_by(PageContent.key).all()
+    else:
+        records = PageContent.query.order_by(PageContent.page, PageContent.key).all()
+
     return jsonify([{
         "id": item.id,
         "page": item.page,
