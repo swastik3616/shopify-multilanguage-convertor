@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5000";
+const API_URL = "/api";
 
 export const getContents = async (page = null) => {
   const url = page ? `${API_URL}/contents?page=${encodeURIComponent(page)}` : `${API_URL}/contents`;

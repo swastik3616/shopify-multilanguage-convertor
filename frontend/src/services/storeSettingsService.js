@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5000";
+const API_URL = "/api";
 
 export const saveStoreSettings = async (data) => {
   const response = await fetch(

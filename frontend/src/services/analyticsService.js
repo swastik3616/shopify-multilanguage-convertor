@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5000";
+const API_URL = "/api";
 
 export const getAnalytics = async () => {
   const response = await fetch(
