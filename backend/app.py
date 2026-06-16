@@ -981,13 +981,15 @@ def shopify_test():
 
 @app.route("/install")
 def install():
-    shop = "https://translator-test-store.myshopify.com/"
+    shop = "translator-test-store.myshopify.com"
+
     install_url = (
         f"https://{shop}/admin/oauth/authorize"
         f"?client_id={os.getenv('SHOPIFY_CLIENT_ID')}"
         f"&scope={os.getenv('SHOPIFY_SCOPES')}"
         f"&redirect_uri={os.getenv('SHOPIFY_REDIRECT_URI')}"
     )
+
     return redirect(install_url)
 
 @app.route("/auth/callback")
