@@ -43,37 +43,6 @@ def set_setting(key, value):
         setting.value = json.dumps(value)
     db.session.commit()
 
-DEFAULT_PAGE_CONTENTS = {
-    "home": [
-        {
-            "key": "hero_heading",
-            "source_text": "Welcome to Shopify Multilingual Translator"
-        },
-        {
-            "key": "hero_subtitle",
-            "source_text": "Manage website content, then translate and publish changes instantly."
-        },
-        {
-            "key": "hero_button",
-            "source_text": "Translate Store"
-        },
-        {
-            "key": "overview_title",
-            "source_text": "Dashboard Overview"
-        }
-    ]
-}
-
-def seed_default_page_contents(page):
-    defaults = DEFAULT_PAGE_CONTENTS.get(page, [])
-    created = False
-    for item in defaults:
-        if not PageContent.query.filter_by(page=page, key=item["key"]).first():
-            db.session.add(PageContent(page=page, key=item["key"], source_text=item["source_text"]))
-            created = True
-    if created:
-        db.session.commit()
-
 
 def get_default_provider_settings():
     return {
@@ -87,6 +56,150 @@ def get_default_provider_settings():
             "ollama": ""
         }
     }
+
+
+def fetch_shopify_pages():
+    """Fetch pages from Shopify store."""
+    if not STORE_URL or not ACCESS_TOKEN:
+        return []
+    
+    try:
+        headers = {
+            "X-Shopify-Access-Token": ACCESS_TOKEN,
+            "Content-Type": "application/json"
+        }
+        url = f"https://{STORE_URL}/admin/api/2024-01/pages.json"
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        return res.json().get("pages", [])
+    except Exception as e:
+        print(f"Error fetching Shopify pages: {str(e)}")
+        return []
+
+
+def fetch_shopify_products(limit=5):
+    """Fetch products from Shopify store."""
+    if not STORE_URL or not ACCESS_TOKEN:
+        return []
+    
+    try:
+        headers = {
+            "X-Shopify-Access-Token": ACCESS_TOKEN,
+            "Content-Type": "application/json"
+        }
+        url = f"https://{STORE_URL}/admin/api/2024-01/products.json?limit={limit}&fields=id,title,body_html,handle"
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        return res.json().get("products", [])
+    except Exception as e:
+        print(f"Error fetching Shopify products: {str(e)}")
+        return []
+
+
+def fetch_shopify_collections(limit=5):
+    """Fetch collections from Shopify store."""
+    if not STORE_URL or not ACCESS_TOKEN:
+        return []
+    
+    try:
+        headers = {
+            "X-Shopify-Access-Token": ACCESS_TOKEN,
+            "Content-Type": "application/json"
+        }
+        url = f"https://{STORE_URL}/admin/api/2024-01/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        return res.json().get("custom_collections", [])
+    except Exception as e:
+        print(f"Error fetching Shopify collections: {str(e)}")
+        return []
+
+
+def extract_text_from_html(html_text):
+    """Extract plain text from HTML content."""
+    if not html_text:
+        return ""
+    import re
+    # Remove HTML tags
+    text = re.sub(r'<[^>]+>', '', html_text)
+    # Decode HTML entities
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return text.strip()[:200]  # Limit to 200 chars
+
+
+def seed_shopify_page_contents(page):
+    """Fetch and seed page contents from Shopify store."""
+    created = False
+    
+    try:
+        if page == "home":
+            pages = fetch_shopify_pages()
+            for shopify_page in pages:
+                title = shopify_page.get("title", "")
+                body = extract_text_from_html(shopify_page.get("body_html", ""))
+                
+                if title and not PageContent.query.filter_by(page="home", key=title).first():
+                    db.session.add(PageContent(page="home", key=title, source_text=body or title))
+                    created = True
+            
+            # Also fetch first few products as featured content
+            products = fetch_shopify_products(3)
+            for idx, product in enumerate(products):
+                title = product.get("title", f"Product {idx+1}")
+                body = extract_text_from_html(product.get("body_html", ""))
+                key = f"featured_product_{idx+1}_title"
+                
+                if not PageContent.query.filter_by(page="home", key=key).first():
+                    db.session.add(PageContent(page="home", key=key, source_text=title))
+                    created = True
+                    
+                key = f"featured_product_{idx+1}_desc"
+                if body and not PageContent.query.filter_by(page="home", key=key).first():
+                    db.session.add(PageContent(page="home", key=key, source_text=body))
+                    created = True
+                    
+        elif page == "product":
+            products = fetch_shopify_products(10)
+            for idx, product in enumerate(products):
+                title = product.get("title", "")
+                body = extract_text_from_html(product.get("body_html", ""))
+                key = f"product_{product.get('id', idx)}_title"
+                
+                if title and not PageContent.query.filter_by(page="product", key=key).first():
+                    db.session.add(PageContent(page="product", key=key, source_text=title))
+                    created = True
+                    
+                if body:
+                    key = f"product_{product.get('id', idx)}_desc"
+                    if not PageContent.query.filter_by(page="product", key=key).first():
+                        db.session.add(PageContent(page="product", key=key, source_text=body))
+                        created = True
+                        
+        elif page == "collection":
+            collections = fetch_shopify_collections(10)
+            for idx, collection in enumerate(collections):
+                title = collection.get("title", "")
+                body = extract_text_from_html(collection.get("body_html", ""))
+                key = f"collection_{collection.get('id', idx)}_title"
+                
+                if title and not PageContent.query.filter_by(page="collection", key=key).first():
+                    db.session.add(PageContent(page="collection", key=key, source_text=title))
+                    created = True
+                    
+                if body:
+                    key = f"collection_{collection.get('id', idx)}_desc"
+                    if not PageContent.query.filter_by(page="collection", key=key).first():
+                        db.session.add(PageContent(page="collection", key=key, source_text=body))
+                        created = True
+        
+        if created:
+            db.session.commit()
+            print(f"Seeded {page} content from Shopify store")
+            
+    except Exception as e:
+        print(f"Error seeding {page} content from Shopify: {str(e)}")
+
+
 
 @app.route("/")
 def home():
@@ -391,8 +504,8 @@ def get_translations():
 def get_contents():
     page = request.args.get("page")
     if page:
-        if page == "home":
-            seed_default_page_contents(page)
+        if page in ["home", "product", "collection"]:
+            seed_shopify_page_contents(page)
         records = PageContent.query.filter_by(page=page).order_by(PageContent.key).all()
     else:
         records = PageContent.query.order_by(PageContent.page, PageContent.key).all()
