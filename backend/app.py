@@ -520,8 +520,11 @@ def update_translation(translation_id):
     
     return jsonify({"success": True, "message": "Translation updated", "id": translation.id})
 
-@app.route("/translations/<int:translation_id>", methods=["DELETE"])
+@app.route("/translations/<int:translation_id>", methods=["DELETE", "OPTIONS"])
 def delete_translation(translation_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     translation = Translation.query.get(translation_id)
     
     if not translation:
