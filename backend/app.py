@@ -200,6 +200,40 @@ def get_provider_response(provider, model, api_key, source_text, target_language
         print(f"Provider Error ({provider}):", str(e))
         raise Exception(f"Failed to translate using {provider}: {str(e)}")
 
+def extract_json_object(text):
+    start = None
+    depth = 0
+    for i, ch in enumerate(text):
+        if ch == '{':
+            if start is None:
+                start = i
+            depth += 1
+        elif ch == '}' and depth > 0:
+            depth -= 1
+            if depth == 0 and start is not None:
+                return text[start:i + 1]
+    return text
+
+
+def clean_bulk_response_text(response_text):
+    text = re.sub(r'^```json\s*', '', response_text, flags=re.IGNORECASE)
+    text = re.sub(r'^```\s*', '', text)
+    text = re.sub(r'\s*```$', '', text)
+    text = text.strip()
+    text = extract_json_object(text)
+    text = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)
+    text = re.sub(r'\\u(?![0-9A-Fa-f]{4})', r'\\\\u', text)
+    return text
+
+
+def parse_bulk_json_response(response_text):
+    try:
+        return json.loads(response_text)
+    except json.JSONDecodeError:
+        cleaned_text = clean_bulk_response_text(response_text)
+        return json.loads(cleaned_text)
+
+
 def get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language):
     prompt = (
         f"You are a professional translator. Translate the following JSON object's values to {target_language}. "
@@ -208,6 +242,12 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
         f"Input: {json.dumps(source_texts_dict)}"
     )
     
+    def try_single_fallbacks():
+        fallback = {}
+        for key, text in source_texts_dict.items():
+            fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
+        return fallback
+
     try:
         response_text = ""
         if provider == "openai":
@@ -249,12 +289,12 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
         else:
             return {k: f"{v} (Mock)" for k, v in source_texts_dict.items()}
 
-        # Clean markdown if the LLM hallucinated it
-        response_text = re.sub(r'^```json\s*', '', response_text, flags=re.IGNORECASE)
-        response_text = re.sub(r'^```\s*', '', response_text)
-        response_text = re.sub(r'\s*```$', '', response_text)
-        
-        return json.loads(response_text)
+        response_text = clean_bulk_response_text(response_text)
+        try:
+            return parse_bulk_json_response(response_text)
+        except Exception as json_error:
+            print(f"Bulk JSON parse failed, attempting single-item fallback: {json_error}")
+            return try_single_fallbacks()
             
     except Exception as e:
         print(f"Bulk Provider Error ({provider}):", str(e))
