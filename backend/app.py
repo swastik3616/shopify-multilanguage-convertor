@@ -51,36 +51,46 @@ def normalize_shopify_store_url(store_url):
 
 
 def get_shopify_credentials():
-    """Resolve Shopify credentials from saved settings, env vars, or OAuth store."""
-    store_setting = get_setting("store_setting", {})
-    store_url = normalize_shopify_store_url(
-        store_setting.get("store_url") or os.getenv("SHOPIFY_STORE_URL") or ""
-    )
-    access_token = (store_setting.get("access_token") or os.getenv("SHOPIFY_ACCESS_TOKEN") or "").strip()
+    """Always prefer OAuth-installed Shopify store."""
 
-    # sanitize token: strip common prefixes like 'Bearer ' or 'Basic ', and remove surrounding quotes
     def _clean_token(t):
         if not t:
             return ""
+
         t = t.strip()
+
         if t.startswith('"') and t.endswith('"'):
             t = t[1:-1]
+
         if t.lower().startswith("bearer "):
             t = t.split(None, 1)[1]
+
         if t.lower().startswith("basic "):
             t = t.split(None, 1)[1]
+
         return t.strip()
 
-    access_token = _clean_token(access_token)
+    # FIRST: OAuth store
+    store = ShopifyStore.query.first()
 
-    if not store_url or not access_token:
-        store = ShopifyStore.query.first()
-        if store:
-            store_url = normalize_shopify_store_url(store.shop)
-            access_token = _clean_token(store.access_token or "")
+    if store:
+        return (
+            normalize_shopify_store_url(store.shop),
+            _clean_token(store.access_token)
+        )
+
+    # SECOND: Manual store settings
+    store_setting = get_setting("store_setting", {})
+
+    store_url = normalize_shopify_store_url(
+        store_setting.get("store_url", "")
+    )
+
+    access_token = _clean_token(
+        store_setting.get("access_token", "")
+    )
 
     return store_url, access_token
-
 
 def get_default_provider_settings():
     return {
