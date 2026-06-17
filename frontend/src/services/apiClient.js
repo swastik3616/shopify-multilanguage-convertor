@@ -44,7 +44,20 @@ export async function apiFetch(path, options = {}) {
     );
   }
 
-  const url = `${API_URL}${path}`;
+  // Build the final request URL safely:
+  // - If `path` is an absolute URL (http/https or protocol-relative), use it as-is.
+  // - Otherwise join `API_URL` and `path` ensuring there is exactly one slash between them.
+  let url;
+  const isAbsolute = /^(https?:)?\/\//i.test(path);
+  if (isAbsolute) {
+    url = path;
+  } else {
+    const base = (API_URL || '').toString();
+    // remove trailing slash from base and ensure path starts with a single slash
+    const cleanBase = base.replace(/\/$/, '');
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    url = `${cleanBase}${cleanPath}`;
+  }
 
   console.log("API Request:", url);
 
