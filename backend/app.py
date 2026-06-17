@@ -1041,29 +1041,37 @@ def auth_callback():
             "code": code
         }
     )
+
     token_data = response.json()
     print("TOKEN DATA:", token_data)
 
-    store = ShopifyStore.query.filter_by(shop=normalize_shopify_store_url(shop)).first()
-    # sanitize token before saving
+    store = ShopifyStore.query.filter_by(
+        shop=normalize_shopify_store_url(shop)
+    ).first()
+
     atok = token_data.get("access_token", "")
+
     if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
         atok = atok[1:-1]
+
     if isinstance(atok, str) and atok.lower().startswith("bearer "):
         atok = atok.split(None, 1)[1]
 
     if not store:
-        store = ShopifyStore(shop=normalize_shopify_store_url(shop), access_token=atok, installation_date=datetime.utcnow())
+        store = ShopifyStore(
+            shop=normalize_shopify_store_url(shop),
+            access_token=atok
+        )
         db.session.add(store)
     else:
         store.access_token = atok
-        # update installation_date if missing
-        if not store.installation_date:
-            store.installation_date = datetime.utcnow()
 
     db.session.commit()
-    return jsonify({"success": True, "shop": shop})
 
+    return jsonify({
+        "success": True,
+        "shop": shop
+    })
 @app.route("/stores")
 def stores():
     stores = ShopifyStore.query.all()
@@ -1085,7 +1093,7 @@ def debug_store():
         "found": True,
         "shop": store.shop,
         "token": store.access_token,
-        "installed_at": str(store.installation_date) if getattr(store, 'installation_date', None) else None
+        "installed_at": None
     })
 
 if __name__ == "__main__":
