@@ -654,10 +654,25 @@ def fetch_url_content():
         url = f"https://{url}"
 
     try:
-        resp = requests.get(url, timeout=12)
+        # A browser-like User-Agent matters here -- the default python-requests
+        # UA gets blocked outright by a lot of storefront bot protection
+        # (Cloudflare, Shopify's own anti-scraping, etc.), which otherwise
+        # looks like a generic "unable to fetch" failure with no clear cause.
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"
+        }
+        resp = requests.get(url, headers=headers, timeout=12)
         resp.raise_for_status()
-        content = extract_text_from_html(resp.text)
-        return jsonify({"success": True, "text": content})
+
+        # Return the raw HTML instead of regex-stripped, truncated text --
+        # the frontend now parses this client-side into heading/paragraph/
+        # image-alt sections, which needs the actual tags to detect headings.
+        html = resp.text
+        MAX_HTML_LENGTH = 500_000  # guard against pathologically large pages
+        if len(html) > MAX_HTML_LENGTH:
+            html = html[:MAX_HTML_LENGTH]
+
+        return jsonify({"success": True, "html": html})
     except Exception as e:
         return jsonify({"success": False, "message": f"Unable to fetch content: {str(e)}"}), 500
 
