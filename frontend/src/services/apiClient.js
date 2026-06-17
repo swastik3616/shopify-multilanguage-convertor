@@ -36,19 +36,19 @@ export async function apiFetch(path, options = {}) {
     console.warn("apiFetch: missing shop domain; requests may fallback to legacy store settings.");
   }
 
-  const url = path.startsWith("http") ? path : `${API_URL}${path.startsWith("/") ? "" : "/"}${path}`;
-  const response = await fetch(url, options);
+  // Path is already fully constructed (e.g. "/api/shopify/check-token"), use as-is
+  const response = await fetch(path, options);
   const contentType = response.headers.get("content-type") || "";
 
   if (!response.ok) {
     const body = await response.text();
-    const message = `API request failed ${response.status} ${response.statusText}. URL=${url}. shop=${shop || "<none>"}. Body=${body.slice(0, 500)}`;
+    const message = `API request failed ${response.status} ${response.statusText}. URL=${path}. shop=${shop || "<none>"}. Body=${body.slice(0, 500)}`;
     throw new Error(message);
   }
 
   if (!contentType.includes("application/json")) {
     const body = await response.text();
-    const message = `Expected JSON response but got ${contentType}. URL=${url}. shop=${shop || "<none>"}. Body=${body.slice(0, 500)}`;
+    const message = `Expected JSON response but got ${contentType}. URL=${path}. shop=${shop || "<none>"}. Body=${body.slice(0, 500)}`;
     throw new Error(message);
   }
 
