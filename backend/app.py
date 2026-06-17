@@ -12,6 +12,7 @@ from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
 from datetime import datetime
 
 app = Flask(__name__)
+CORS(app)
 
 db_url = os.getenv("DATABASE_URL", "sqlite:///translator.db")
 
