@@ -1017,7 +1017,7 @@ def shopify_test():
 
 @app.route("/install")
 def install():
-    shop = "0jeqkm-rp.myshopify.com"
+    shop = request.args.get("shop")
 
     install_url = (
         f"https://{shop}/admin/oauth/authorize"
@@ -1083,16 +1083,20 @@ def stores():
 
 @app.route("/debug-store")
 def debug_store():
-    stores = ShopifyStore.query.all()
+    shop = request.args.get("shop")
 
-    return jsonify([
-        {
-            "id": s.id,
-            "shop": s.shop,
-            "token": s.access_token[:10] + "..."
-        }
-        for s in stores
-    ])
+    store = ShopifyStore.query.filter_by(
+        shop=shop
+    ).first()
+
+    if not store:
+        return jsonify({"found": False})
+
+    return jsonify({
+        "found": True,
+        "shop": store.shop,
+        "token": store.access_token
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
