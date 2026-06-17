@@ -1,9 +1,6 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const getTranslations = async () => {
-  const response = await fetch(
-    `${API_URL}/translations`
-  );
-
+  const response = await apiFetch(`${API_URL}/translations`);
   return response.json();
 };

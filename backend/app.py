@@ -7,6 +7,7 @@ import re
 from database import db
 from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
 from dotenv import load_dotenv
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -49,9 +50,44 @@ def normalize_shopify_store_url(store_url):
     store_url = re.sub(r"^https?://", "", store_url, flags=re.I)
     return store_url.strip("/")
 
+def get_shop_from_request():
+    """Extract shop domain from request headers, query or JSON body."""
+    shop = None
+    try:
+        shop = request.headers.get("X-Shopify-Shop-Domain")
+    except Exception:
+        shop = None
 
-def get_shopify_credentials():
-    """Always prefer OAuth-installed Shopify store."""
+    if not shop:
+        shop = request.args.get("shop")
+
+    if not shop:
+        try:
+            data = request.get_json(silent=True) or {}
+            shop = data.get("shop")
+        except Exception:
+            shop = None
+
+    return normalize_shopify_store_url(shop) if shop else None
+
+
+def get_current_store(shop=None):
+    """Return ShopifyStore model for provided shop domain (normalized) or from request."""
+    if not shop:
+        shop = get_shop_from_request()
+    if not shop:
+        return None
+    shop = normalize_shopify_store_url(shop)
+    return ShopifyStore.query.filter_by(shop=shop).first()
+
+
+def get_shopify_credentials(shop=None):
+    """Resolve store URL and access token for a given shop (or request).
+
+    Preference order:
+      1) OAuth-saved ShopifyStore row for the provided shop
+      2) Manual store setting (legacy)
+    """
 
     def _clean_token(t):
         if not t:
@@ -70,26 +106,14 @@ def get_shopify_credentials():
 
         return t.strip()
 
-    # FIRST: OAuth store
-    store = ShopifyStore.query.first()
-
+    store = get_current_store(shop)
     if store:
-        return (
-            normalize_shopify_store_url(store.shop),
-            _clean_token(store.access_token)
-        )
+        return normalize_shopify_store_url(store.shop), _clean_token(store.access_token)
 
-    # SECOND: Manual store settings
+    # Fallback: legacy manual store settings
     store_setting = get_setting("store_setting", {})
-
-    store_url = normalize_shopify_store_url(
-        store_setting.get("store_url", "")
-    )
-
-    access_token = _clean_token(
-        store_setting.get("access_token", "")
-    )
-
+    store_url = normalize_shopify_store_url(store_setting.get("store_url", ""))
+    access_token = _clean_token(store_setting.get("access_token", ""))
     return store_url, access_token
 
 def get_default_provider_settings():
@@ -982,9 +1006,10 @@ def get_store_settings():
 
 @app.route("/shopify/test")
 def shopify_test():
-    store = ShopifyStore.query.first()
+    shop = get_shop_from_request()
+    store = get_current_store(shop)
     if not store:
-        return jsonify({"success": False, "message": "No Shopify store connected"}), 404
+        return jsonify({"success": False, "message": "No Shopify store connected for this shop"}), 404
 
     headers = {"X-Shopify-Access-Token": store.access_token}
     response = requests.get(f"https://{store.shop}/admin/api/2025-07/shop.json", headers=headers)
@@ -992,7 +1017,7 @@ def shopify_test():
 
 @app.route("/install")
 def install():
-    shop = "translator-test-store.myshopify.com"
+    shop = "0jeqkm-rp.myshopify.com"
 
     install_url = (
         f"https://{shop}/admin/oauth/authorize"
@@ -1019,23 +1044,22 @@ def auth_callback():
     token_data = response.json()
     print("TOKEN DATA:", token_data)
 
-    store = ShopifyStore.query.filter_by(shop=shop).first()
+    store = ShopifyStore.query.filter_by(shop=normalize_shopify_store_url(shop)).first()
+    # sanitize token before saving
+    atok = token_data.get("access_token", "")
+    if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
+        atok = atok[1:-1]
+    if isinstance(atok, str) and atok.lower().startswith("bearer "):
+        atok = atok.split(None, 1)[1]
+
     if not store:
-        # sanitize token before saving
-        atok = token_data.get("access_token", "")
-        if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
-            atok = atok[1:-1]
-        if isinstance(atok, str) and atok.lower().startswith("bearer "):
-            atok = atok.split(None, 1)[1]
-        store = ShopifyStore(shop=shop, access_token=atok)
+        store = ShopifyStore(shop=normalize_shopify_store_url(shop), access_token=atok, installation_date=datetime.utcnow())
         db.session.add(store)
     else:
-        atok = token_data.get("access_token", "")
-        if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
-            atok = atok[1:-1]
-        if isinstance(atok, str) and atok.lower().startswith("bearer "):
-            atok = atok.split(None, 1)[1]
         store.access_token = atok
+        # update installation_date if missing
+        if not store.installation_date:
+            store.installation_date = datetime.utcnow()
 
     db.session.commit()
     return jsonify({"success": True, "shop": shop})
@@ -1051,17 +1075,17 @@ def stores():
 
 @app.route("/debug-store")
 def debug_store():
-    store = ShopifyStore.query.first()
+    shop = get_shop_from_request()
+    store = get_current_store(shop)
 
     if not store:
-        return jsonify({
-            "found": False
-        })
+        return jsonify({"found": False})
 
     return jsonify({
         "found": True,
         "shop": store.shop,
-        "token": store.access_token
+        "token": store.access_token,
+        "installed_at": str(store.installation_date) if getattr(store, 'installation_date', None) else None
     })
 
 if __name__ == "__main__":

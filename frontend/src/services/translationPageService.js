@@ -1,9 +1,8 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const fetchUrlContent = async (url) => {
-  const response = await fetch(`${API_URL}/fetch-url`, {
+  const response = await apiFetch(`${API_URL}/fetch-url`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
   });
 

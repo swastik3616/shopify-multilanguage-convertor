@@ -62,6 +62,14 @@ class ShopifyStore(db.Model):
         db.Text,
         nullable=False
     )
+    installation_date = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('shop', name='uq_shop'),
+    )
 
 class AppSetting(db.Model):
     __tablename__ = "app_settings"

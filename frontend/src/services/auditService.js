@@ -1,9 +1,6 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const getAuditHistory = async () => {
-  const response = await fetch(
-    `${API_URL}/audit-history`
-  );
-
+  const response = await apiFetch(`${API_URL}/audit-history`);
   return response.json();
 };

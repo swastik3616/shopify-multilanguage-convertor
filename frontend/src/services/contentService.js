@@ -1,20 +1,19 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const getContents = async (page = null) => {
   const url = page ? `${API_URL}/contents?page=${encodeURIComponent(page)}` : `${API_URL}/contents`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   return response.json();
 };
 
 export const getContentsStoreStatus = async () => {
-  const response = await fetch(`${API_URL}/contents/store-status`);
+  const response = await apiFetch(`${API_URL}/contents/store-status`);
   return response.json();
 };
 
 export const syncContentsFromShopify = async (page) => {
-  const response = await fetch(`${API_URL}/contents/sync`, {
+  const response = await apiFetch(`${API_URL}/contents/sync`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ page }),
   });
 
@@ -22,9 +21,8 @@ export const syncContentsFromShopify = async (page) => {
 };
 
 export const createContent = async (payload) => {
-  const response = await fetch(`${API_URL}/contents`, {
+  const response = await apiFetch(`${API_URL}/contents`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -32,9 +30,8 @@ export const createContent = async (payload) => {
 };
 
 export const importContentToLibrary = async (payload) => {
-  const response = await fetch(`${API_URL}/contents/import`, {
+  const response = await apiFetch(`${API_URL}/contents/import`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -42,9 +39,8 @@ export const importContentToLibrary = async (payload) => {
 };
 
 export const fetchUrlContent = async (url) => {
-  const response = await fetch(`${API_URL}/fetch-url`, {
+  const response = await apiFetch(`${API_URL}/fetch-url`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
   });
 
@@ -52,9 +48,8 @@ export const fetchUrlContent = async (url) => {
 };
 
 export const updateContent = async (contentId, payload) => {
-  const response = await fetch(`${API_URL}/contents/${contentId}`, {
+  const response = await apiFetch(`${API_URL}/contents/${contentId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -62,7 +57,7 @@ export const updateContent = async (contentId, payload) => {
 };
 
 export const deleteContent = async (contentId) => {
-  const response = await fetch(`${API_URL}/contents/${contentId}`, {
+  const response = await apiFetch(`${API_URL}/contents/${contentId}`, {
     method: "DELETE",
   });
 
@@ -70,9 +65,8 @@ export const deleteContent = async (contentId) => {
 };
 
 export const translateContent = async (contentId, targetLanguage) => {
-  const response = await fetch(`${API_URL}/contents/${contentId}/translate`, {
+  const response = await apiFetch(`${API_URL}/contents/${contentId}/translate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ target_language: targetLanguage }),
   });
 
@@ -80,9 +74,8 @@ export const translateContent = async (contentId, targetLanguage) => {
 };
 
 export const updateTranslation = async (translationId, translatedText) => {
-  const response = await fetch(`${API_URL}/translations/${translationId}`, {
+  const response = await apiFetch(`${API_URL}/translations/${translationId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ translated_text: translatedText }),
   });
 
@@ -90,7 +83,7 @@ export const updateTranslation = async (translationId, translatedText) => {
 };
 
 export const deleteTranslation = async (translationId) => {
-  const response = await fetch(`${API_URL}/translations/${translationId}`, {
+  const response = await apiFetch(`${API_URL}/translations/${translationId}`, {
     method: "DELETE",
   });
 

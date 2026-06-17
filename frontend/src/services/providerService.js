@@ -1,16 +1,13 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const getProviderSettings = async () => {
-  const response = await fetch(`${API_URL}/get-provider`);
+  const response = await apiFetch(`${API_URL}/get-provider`);
   return response.json();
 };
 
 export const saveProvider = async (payload) => {
-  const response = await fetch(`${API_URL}/save-provider`, {
+  const response = await apiFetch(`${API_URL}/save-provider`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
 

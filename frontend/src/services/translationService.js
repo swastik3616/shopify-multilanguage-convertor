@@ -1,16 +1,10 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const translateText = async (payload) => {
-  const response = await fetch(
-    `${API_URL}/translate`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await apiFetch(`${API_URL}/translate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
   return response.json();
 };

@@ -1,16 +1,10 @@
-const API_URL = "/api";
+import { API_URL, apiFetch } from "./apiClient";
 
 export const saveLanguages = async (payload) => {
-  const response = await fetch(
-    `${API_URL}/save-languages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await apiFetch(`${API_URL}/save-languages`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
   return response.json();
 };
