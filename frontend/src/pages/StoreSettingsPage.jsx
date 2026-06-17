@@ -19,14 +19,15 @@ function StoreSettingsPage() {
         if (check && check.connected) {
           alert("Token validated: OK");
         } else {
-          alert(`Token validation failed: ${check?.message || check?.response || 'unknown'}`);
+          alert(`Token validation failed: ${check?.message || JSON.stringify(check?.response) || 'unknown'}`);
         }
       } catch (err) {
         console.error("Validation after save failed:", err);
+        alert(`Validation after save failed: ${err.message || err}`);
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to save store settings");
+      alert(`Failed to save store settings: ${error.message || error}`);
     }
   };
 
@@ -40,7 +41,7 @@ function StoreSettingsPage() {
       }
     } catch (err) {
       console.error(err);
-      alert("Token validation request failed");
+      alert(`Token validation request failed: ${err.message || err}`);
     }
   };
 

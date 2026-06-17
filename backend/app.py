@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, jsonify, make_response, request, redirect
 from flask_cors import CORS
 import os
@@ -6,25 +9,22 @@ import json
 import re
 from database import db
 from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
-from dotenv import load_dotenv
 from datetime import datetime
 
 app = Flask(__name__)
 
 db_url = os.getenv("DATABASE_URL", "sqlite:///translator.db")
+
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db.init_app(app)
 
 with app.app_context():
     db.create_all()
-
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type"]}})
-
-load_dotenv()
 
 def get_setting(key, default_value):
     setting = AppSetting.query.filter_by(key=key).first()
