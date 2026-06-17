@@ -1,15 +1,14 @@
-export const API_URL = import.meta.env.VITE_API_URL || "/api";
+export const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://shopify-multilanguage-convertor.onrender.com";
 
 function getShopFromQuery() {
   try {
     const params = new URLSearchParams(window.location.search);
+
     const shop = params.get("shop");
     if (shop) return shop;
-    // fallback: host param is present in embedded apps; sometimes shop is in parent URL
-    const host = params.get("host");
-    if (host) {
-      return null;
-    }
+
     return localStorage.getItem("shopify_shop") || null;
   } catch (e) {
     return localStorage.getItem("shopify_shop") || null;
@@ -18,38 +17,61 @@ function getShopFromQuery() {
 
 export function persistShopFromQuery() {
   const shop = getShopFromQuery();
+
   if (shop) {
-    try { localStorage.setItem("shopify_shop", shop); } catch (e) {}
+    try {
+      localStorage.setItem("shopify_shop", shop);
+    } catch (e) {}
   }
+
   return shop;
 }
 
 export async function apiFetch(path, options = {}) {
   const shop = getShopFromQuery() || persistShopFromQuery();
+
   options.headers = options.headers || {};
+
   if (options.body && !options.headers["Content-Type"]) {
     options.headers["Content-Type"] = "application/json";
   }
+
   if (shop) {
     options.headers["X-Shopify-Shop-Domain"] = shop;
   } else {
-    console.warn("apiFetch: missing shop domain; requests may fallback to legacy store settings.");
+    console.warn(
+      "apiFetch: missing shop domain; requests may fallback to legacy store settings."
+    );
   }
 
-  // Path is already fully constructed (e.g. "/api/shopify/check-token"), use as-is
-  const response = await fetch(path, options);
+  const url = `${API_URL}${path}`;
+
+  console.log("API Request:", url);
+
+  const response = await fetch(url, options);
+
   const contentType = response.headers.get("content-type") || "";
 
   if (!response.ok) {
     const body = await response.text();
-    const message = `API request failed ${response.status} ${response.statusText}. URL=${path}. shop=${shop || "<none>"}. Body=${body.slice(0, 500)}`;
-    throw new Error(message);
+
+    throw new Error(
+      `API request failed ${response.status} ${response.statusText}
+       URL=${url}
+       SHOP=${shop || "<none>"}
+       BODY=${body}`
+    );
   }
 
   if (!contentType.includes("application/json")) {
     const body = await response.text();
-    const message = `Expected JSON response but got ${contentType}. URL=${path}. shop=${shop || "<none>"}. Body=${body.slice(0, 500)}`;
-    throw new Error(message);
+
+    throw new Error(
+      `Expected JSON but got ${contentType}
+       URL=${url}
+       SHOP=${shop || "<none>"}
+       BODY=${body}`
+    );
   }
 
   return response;

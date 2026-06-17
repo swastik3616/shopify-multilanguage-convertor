@@ -1,7 +1,7 @@
-import { API_URL, apiFetch } from "./apiClient";
+import { apiFetch } from "./apiClient";
 
 export const saveStoreSettings = async (data) => {
-  const response = await apiFetch(`${API_URL}/save-store-settings`, {
+  const response = await apiFetch("/save-store-settings", {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -10,6 +10,7 @@ export const saveStoreSettings = async (data) => {
 };
 
 export const checkShopifyToken = async () => {
-  const response = await apiFetch(`${API_URL}/shopify/check-token`);
+  const response = await apiFetch("/shopify/check-token");
+
   return response.json();
 };
