@@ -1083,18 +1083,16 @@ def stores():
 
 @app.route("/debug-store")
 def debug_store():
-    shop = get_shop_from_request()
-    store = get_current_store(shop)
+    stores = ShopifyStore.query.all()
 
-    if not store:
-        return jsonify({"found": False})
-
-    return jsonify({
-        "found": True,
-        "shop": store.shop,
-        "token": store.access_token,
-        "installed_at": None
-    })
+    return jsonify([
+        {
+            "id": s.id,
+            "shop": s.shop,
+            "token": s.access_token[:10] + "..."
+        }
+        for s in stores
+    ])
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
