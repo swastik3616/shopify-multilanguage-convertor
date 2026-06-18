@@ -1,6 +1,5 @@
 from dotenv import load_dotenv
 load_dotenv()
-
 from flask import Flask, jsonify, make_response, request, redirect
 from flask_cors import CORS
 import os
@@ -83,13 +82,6 @@ def get_current_store(shop=None):
 
 
 def get_shopify_credentials(shop=None):
-    """Resolve store URL and access token for a given shop (or request).
-
-    Preference order:
-      1) OAuth-saved ShopifyStore row for the provided shop
-      2) Manual store setting (legacy)
-    """
-
     def _clean_token(t):
         if not t:
             return ""
@@ -654,21 +646,13 @@ def fetch_url_content():
         url = f"https://{url}"
 
     try:
-        # A browser-like User-Agent matters here -- the default python-requests
-        # UA gets blocked outright by a lot of storefront bot protection
-        # (Cloudflare, Shopify's own anti-scraping, etc.), which otherwise
-        # looks like a generic "unable to fetch" failure with no clear cause.
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"
         }
         resp = requests.get(url, headers=headers, timeout=12)
         resp.raise_for_status()
-
-        # Return the raw HTML instead of regex-stripped, truncated text --
-        # the frontend now parses this client-side into heading/paragraph/
-        # image-alt sections, which needs the actual tags to detect headings.
         html = resp.text
-        MAX_HTML_LENGTH = 500_000  # guard against pathologically large pages
+        MAX_HTML_LENGTH = 500_000  
         if len(html) > MAX_HTML_LENGTH:
             html = html[:MAX_HTML_LENGTH]
 
