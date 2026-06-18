@@ -11,14 +11,7 @@
   </button>
 
   <div class="lang-dropdown" id="lang-dropdown" hidden>
-    <div class="lang-option" data-value="English">🇺🇸 English</div>
-    <div class="lang-option" data-value="French">🇫🇷 French</div>
-    <div class="lang-option" data-value="German">🇩🇪 German</div>
-    <div class="lang-option" data-value="Spanish">🇪🇸 Spanish</div>
-    <div class="lang-option" data-value="Hindi">🇮🇳 Hindi</div>
-    <div class="lang-option" data-value="Arabic">🇸🇦 Arabic</div>
-    <div class="lang-option" data-value="Japanese">🇯🇵 Japanese</div>
-    <div class="lang-option" data-value="Portuguese">🇧🇷 Portuguese</div>
+    <!-- options injected by JS after fetching /get-languages -->
   </div>
 
   <!-- Loading overlay -->
@@ -163,10 +156,20 @@
 
 <script>
 (function () {
-  const BACKEND_URL = 'https://shopify-multilanguage-convertor.onrender.com/bulk-translate';
+  const BACKEND     = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
   const BATCH_SIZE  = 80;
-  const TIMEOUT_MS  = 55000; // 55s — tolerates Render cold-start (up to ~50s)
+  const TIMEOUT_MS  = 55000;
+
+  const FLAG_MAP = {
+    English:'🇺🇸', French:'🇫🇷', German:'🇩🇪', Spanish:'🇪🇸',
+    Hindi:'🇮🇳', Marathi:'🇮🇳', Arabic:'🇸🇦', Japanese:'🇯🇵',
+    Portuguese:'🇧🇷', Italian:'🇮🇹', Chinese:'🇨🇳', Korean:'🇰🇷',
+    Russian:'🇷🇺', Dutch:'🇳🇱', Turkish:'🇹🇷', Polish:'🇵🇱',
+    Thai:'🇹🇭', Vietnamese:'🇻🇳', Greek:'🇬🇷', Swedish:'🇸🇪',
+  };
+
+  const DEFAULT_TARGETS = ['French','German','Spanish','Hindi','Arabic','Japanese','Portuguese','Marathi'];
 
   // ── DOM refs ──
   const wrapper     = document.getElementById('lang-switcher-wrapper');
@@ -176,7 +179,6 @@
   const overlay     = document.getElementById('lang-loading-overlay');
   const loadingText = document.getElementById('lang-loading-text');
   const toast       = document.getElementById('lang-toast');
-  const options     = document.querySelectorAll('.lang-option');
 
   // ── Helpers ──
   function showToast(msg, type = 'success', ms = 3500) {
@@ -187,13 +189,14 @@
   }
 
   function setLoading(active, msg = 'Translating page…') {
-    overlay.hidden    = !active;
+    overlay.hidden          = !active;
     loadingText.textContent = msg;
-    btn.disabled      = active;
+    btn.disabled            = active;
   }
 
   function markActive(language) {
-    options.forEach(o => {
+    // Query dynamically — options are built after language fetch
+    dropdown.querySelectorAll('.lang-option').forEach(o => {
       o.classList.toggle('active', o.dataset.value === language);
     });
     currentLbl.textContent = language;
@@ -213,6 +216,55 @@
       btn.setAttribute('aria-expanded', 'false');
     }
   });
+
+  // ── Build dropdown from language array ──
+  function buildDropdown(targets) {
+    dropdown.innerHTML = '';
+    // English always first — reloads page to restore original text
+    ['English'].concat(targets).forEach(function (lang) {
+      const el = document.createElement('div');
+      el.className = 'lang-option';
+      el.dataset.value = lang;
+      el.textContent = `${FLAG_MAP[lang] || '🌐'} ${lang}`;
+      dropdown.appendChild(el);
+      el.addEventListener('click', handleOptionClick);
+    });
+    console.log('[LangSwitcher] Dropdown built:', targets);
+  }
+
+  async function handleOptionClick() {
+    const lang = this.dataset.value;
+    dropdown.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+    if (lang === 'English') {
+      markActive('English');
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+      return;
+    }
+    markActive(lang);
+    setLoading(true, 'Warming up server…');
+    try {
+      try { await fetchWithTimeout(`${BACKEND}/wake`, { method: 'GET' }, 55000); } catch (_) {}
+      setLoading(true, `Translating page to ${lang}…`);
+      await translatePage(lang);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Fetch languages from backend ──
+  async function initLanguages() {
+    let targets = [];
+    try {
+      const res = await fetch(`${BACKEND}/get-languages`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.targets && data.targets.length > 0) targets = data.targets;
+      }
+    } catch (e) { /* use defaults */ }
+    buildDropdown(targets.length ? targets : DEFAULT_TARGETS);
+  }
 
   // ── Fetch with timeout ──
   async function fetchWithTimeout(url, options, ms) {
@@ -286,10 +338,10 @@
         }
 
         const data = await res.json();
+        console.log(`[LangSwitcher] Batch ${batchIdx}: ${data.cache_hits ?? '?'} cached, ${data.api_calls ?? '?'} new`);
 
         if (data.translations && data.translations.length === batchTexts.length) {
           batchNodes.forEach((n, j) => { n.nodeValue = data.translations[j]; });
-          console.log(`[LangSwitcher] Batch ${batchIdx}/${totalBatches} done.`);
         } else {
           console.error(`[LangSwitcher] Batch ${batchIdx} bad response:`, data);
           showToast('Unexpected response from server. Some text may not be translated.', 'warning', 5000);
@@ -310,64 +362,26 @@
     showToast(`Page translated to ${targetLanguage} ✓`, 'success');
   }
 
-  // ── Option click handler ──
-  options.forEach(function (opt) {
-    opt.addEventListener('click', async function () {
-      const lang = opt.dataset.value;
-      dropdown.hidden = true;
-      btn.setAttribute('aria-expanded', 'false');
-
-      if (lang === 'English') {
-        // Reload the page to restore the original English content
-        markActive('English');
-        localStorage.removeItem(STORAGE_KEY);
-        location.reload();
-        return;
-      }
-
-      markActive(lang);
-      setLoading(true, 'Warming up server…');
-
-      try {
-        // Pre-warm the Render instance (handles cold-start delay)
-        try {
-          await fetchWithTimeout(
-            'https://shopify-multilanguage-convertor.onrender.com/wake',
-            { method: 'GET' },
-            55000
-          );
-        } catch (_) { /* ignore — proceed anyway */ }
-
-        setLoading(true, `Translating page to ${lang}…`);
-        await translatePage(lang);
-      } finally {
-        setLoading(false);
-      }
-    });
-  });
+  // ── Option click handler moved into buildDropdown / handleOptionClick above ──
 
   // ── Auto-restore saved language on page load ──
-  // IMPORTANT: Liquid blocks inject AFTER DOMContentLoaded fires.
-  // Must check readyState first, otherwise the listener never runs.
   async function autoRestoreLanguage() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && saved !== 'English') {
       markActive(saved);
       setLoading(true, `Restoring ${saved} translation…`);
-      try {
-        await translatePage(saved);
-      } finally {
-        setLoading(false);
-      }
+      try { await translatePage(saved); } finally { setLoading(false); }
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', autoRestoreLanguage);
-  } else {
-    // DOM already parsed — run immediately (this is the normal case for Liquid blocks)
-    autoRestoreLanguage();
-  }
+  // ── Init: fetch languages then restore ──
+  initLanguages().then(function () {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', autoRestoreLanguage);
+    } else {
+      autoRestoreLanguage();
+    }
+  });
 
 })();
 </script>

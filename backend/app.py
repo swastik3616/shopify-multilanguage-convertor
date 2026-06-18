@@ -545,11 +545,28 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
             response_text = res.json()["content"][0]["text"].strip()
             
         elif provider == "groq":
+            import time as _time
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
             payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            response_text = res.json()["choices"][0]["message"]["content"].strip()
+            # Retry up to 3 times with exponential back-off on 429 rate-limit responses
+            _last_res = None
+            for _attempt in range(3):
+                res = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers, json=payload
+                )
+                if res.status_code == 429:
+                    _wait = 2 ** _attempt  # 1 s, 2 s, 4 s
+                    print(f"[Groq] 429 rate-limit — retrying in {_wait}s (attempt {_attempt + 1}/3)")
+                    _time.sleep(_wait)
+                    _last_res = res
+                    continue
+                res.raise_for_status()
+                response_text = res.json()["choices"][0]["message"]["content"].strip()
+                break
+            else:
+                _body = _last_res.text if _last_res else "unknown"
+                raise Exception(f"Groq rate limit exceeded after 3 retries: {_body}")
             
         elif provider == "ollama":
             url = "http://localhost:11434/api/generate"
@@ -576,11 +593,11 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
 def bulk_translate():
     if request.method == 'OPTIONS':
         return '', 204
-        
+
     data = request.json
     texts = data.get("texts", [])
     target_language = data.get("target_language", "")
-    
+
     if not texts or not target_language:
         return jsonify({"success": False, "message": "Missing texts or language"}), 400
 
@@ -589,32 +606,63 @@ def bulk_translate():
     model = provider_settings.get("model", "gpt-3.5-turbo")
     api_key = provider_settings["api_keys"].get(provider, "")
 
-    # Convert array to dict with numeric keys
-    source_texts_dict = {str(i): text for i, text in enumerate(texts)}
+    # ── Step 1: Translation Cache Lookup ──────────────────────────────────
+    # Check the DB for each text before calling the AI provider.
+    # Only texts that have never been translated are sent to the AI.
+    cached_map = {}        # original_index → translated_text  (cache hits)
+    uncached_indices = []  # original positions that need a fresh AI call
 
-    try:
-        translated_dict = get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language)
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+    for i, text in enumerate(texts):
+        existing = Translation.query.filter_by(
+            source_text=text,
+            target_language=target_language
+        ).first()
+        if existing:
+            cached_map[i] = existing.translated_text
+        else:
+            uncached_indices.append(i)
 
-    # Build the final array and save to DB
-    translated_texts = []
-    for i in range(len(texts)):
-        key = str(i)
-        source = texts[i]
-        translated = translated_dict.get(key, source) # fallback to original if missing
-        translated_texts.append(translated)
-        
-        # Save to DB for history
-        db.session.add(Translation(
-            source_text=source,
-            target_language=target_language,
-            translated_text=translated
-        ))
-    
-    db.session.commit()
+    cache_hits = len(texts) - len(uncached_indices)
+    print(f"[bulk-translate] cache={cache_hits}/{len(texts)} hits | "
+          f"need_ai={len(uncached_indices)} | lang='{target_language}'")
 
-    return jsonify({"translations": translated_texts})
+    # ── Step 2: Call AI only for uncached texts ───────────────────────────
+    if uncached_indices:
+        # Build a compact dict (sequential keys) for the AI call
+        uncached_dict = {
+            str(j): texts[orig_idx]
+            for j, orig_idx in enumerate(uncached_indices)
+        }
+
+        try:
+            translated_dict = get_bulk_provider_response(
+                provider, model, api_key, uncached_dict, target_language
+            )
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
+
+        # Map AI results back to original positions and persist to DB
+        for j, orig_idx in enumerate(uncached_indices):
+            source = texts[orig_idx]
+            translated = translated_dict.get(str(j), source)  # fallback to source
+            cached_map[orig_idx] = translated
+
+            db.session.add(Translation(
+                source_text=source,
+                target_language=target_language,
+                translated_text=translated
+            ))
+
+        db.session.commit()
+
+    # ── Step 3: Rebuild final ordered list ───────────────────────────────
+    translated_texts = [cached_map.get(i, texts[i]) for i in range(len(texts))]
+
+    return jsonify({
+        "translations": translated_texts,
+        "cache_hits": cache_hits,
+        "api_calls": len(uncached_indices)
+    })
 
 @app.route("/translate", methods=["POST", "OPTIONS"])
 def translate_text():
