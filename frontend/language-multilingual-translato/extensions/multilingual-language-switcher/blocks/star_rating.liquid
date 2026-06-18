@@ -347,7 +347,9 @@
   });
 
   // ── Auto-restore saved language on page load ──
-  document.addEventListener('DOMContentLoaded', async function () {
+  // IMPORTANT: Liquid blocks inject AFTER DOMContentLoaded fires.
+  // Must check readyState first, otherwise the listener never runs.
+  async function autoRestoreLanguage() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && saved !== 'English') {
       markActive(saved);
@@ -358,7 +360,14 @@
         setLoading(false);
       }
     }
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoRestoreLanguage);
+  } else {
+    // DOM already parsed — run immediately (this is the normal case for Liquid blocks)
+    autoRestoreLanguage();
+  }
 
 })();
 </script>
