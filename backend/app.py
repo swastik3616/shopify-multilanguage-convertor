@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from flask import Flask, jsonify, make_response, request, redirect
 from flask_cors import CORS
+from flask import after_this_request
 import os
 import requests
 import json
@@ -11,7 +12,16 @@ from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)
+
+# Allow all origins — required so Shopify storefronts (any *.myshopify.com domain)
+# can call the backend directly from theme scripts.
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    allow_headers=["Content-Type", "X-Shopify-Shop-Domain", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    supports_credentials=False,
+)
 
 db_url = os.getenv("DATABASE_URL", "sqlite:///translator.db")
 
@@ -347,6 +357,14 @@ def home():
     return jsonify({
         "message": "Shopify Translator Backend Running"
     })
+
+@app.route("/wake", methods=["GET", "OPTIONS"])
+def wake():
+    """Lightweight endpoint used by the storefront language switcher to pre-warm
+    the Render instance before the first bulk-translate call.
+    Render free tier can take 30-60 seconds on cold start; hitting /wake first
+    lets the user see an immediate spinner rather than a silent freeze."""
+    return jsonify({"status": "awake"})
 
 @app.route("/save-languages", methods=["POST", "OPTIONS"])
 def save_languages():
