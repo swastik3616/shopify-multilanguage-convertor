@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "license": "UNLICENSED",
   "dependencies": {
-    "preact": "^10.10.x",
-    "preact-iso": "^2.9.1",
-    "@preact/signals": "^2.3.x",
-    "@shopify/ui-extensions": "rc"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-reconciler": "^0.29.0",
+    "@shopify/ui-extensions": "^2024.4.0",
+    "@shopify/ui-extensions-react": "^2024.4.0"
   }
 }
