@@ -7,6 +7,7 @@ import os
 import requests
 import json
 import re
+from sqlalchemy import func
 from database import db
 from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
 from datetime import datetime
@@ -1003,6 +1004,95 @@ def translate_content(content_id):
     db.session.commit()
 
     return jsonify({"success": True, "translated_text": translated_text})
+
+@app.route('/api/dashboard', methods=['GET', 'OPTIONS'])
+def api_dashboard():
+    """Aggregate endpoint for the app-home Shopify extension dashboard."""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # ── Counts ──
+        total_translations = Translation.query.count()
+        lang_settings      = get_setting("language_settings", {})
+        targets            = lang_settings.get("targets", [])
+
+        # ── Provider ──
+        provider_settings = get_setting("provider_settings", get_default_provider_settings())
+        provider = provider_settings.get("provider", "Not configured")
+
+        # ── Store connection ──
+        store_setting = get_setting("store_setting", {})
+        store_url     = store_setting.get("store_url", "")
+        store_status  = "Not configured"
+        if store_url:
+            try:
+                token = store_setting.get("access_token", "")
+                r = requests.get(
+                    f"https://{store_url}/admin/api/2024-01/shop.json",
+                    headers={"X-Shopify-Access-Token": token},
+                    timeout=5
+                )
+                store_status = "Connected" if r.status_code == 200 else "Token error"
+            except Exception:
+                store_status = "Unreachable"
+
+        # ── Content counts ──
+        page_count = db.session.query(PageContent.page).distinct().count()
+
+        # Most translated language
+        most_used_row = (
+            db.session.query(Translation.target_language, func.count(Translation.id).label('cnt'))
+            .group_by(Translation.target_language)
+            .order_by(func.count(Translation.id).desc())
+            .first()
+        )
+        most_used_lang = most_used_row[0] if most_used_row else (targets[0] if targets else "—")
+
+        # ── Recent activity (last 5 audit logs) ──
+        logs = AuditLog.query.order_by(AuditLog.id.desc()).limit(5).all()
+        recent_activity = [
+            {
+                "id":     log.id,
+                "action": log.action,
+                "time":   log.created_at.strftime("%b %d, %H:%M") if log.created_at else "—",
+                "status": "Success"
+            }
+            for log in logs
+        ]
+
+        return jsonify({
+            "overview": {
+                "totalProducts":      "—",
+                "totalPages":         page_count,
+                "totalCollections":   "—",
+                "activeLanguages":    len(targets),
+                "translationRequests": total_translations,
+                "status":             "Healthy"
+            },
+            "analytics": {
+                "translatedProducts":  "—",
+                "translatedPages":     page_count,
+                "mostUsedLanguage":    most_used_lang,
+                "successRate":         "—"
+            },
+            "extension": {
+                "switcherStatus": "Active",
+                "connection":     "Connected",
+                "lastSync":       "—"
+            },
+            "settings": {
+                "currentProvider":  provider,
+                "backend":         "Online",
+                "storeConnection": store_status
+            },
+            "recentActivity": recent_activity
+        })
+
+    except Exception as e:
+        print(f"[api/dashboard] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/analytics', methods=['GET'])
 def analytics():

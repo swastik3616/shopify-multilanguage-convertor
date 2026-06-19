@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { useLocation } from 'preact-iso';
 
-const DASHBOARD_ENDPOINT = '/api/dashboard';
+const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
+const DASHBOARD_ENDPOINT = `${BACKEND}/api/dashboard`;
 
 const INITIAL_DASHBOARD_STATE = {
   overview: null,
