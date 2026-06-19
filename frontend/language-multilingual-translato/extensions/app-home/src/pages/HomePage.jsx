@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 
 const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
 const VERCEL  = 'https://shopify-multilanguage-convertor-plugin.vercel.app';
