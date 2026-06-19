@@ -54,10 +54,10 @@ function App() {
   const recentActivity = data?.recentActivity?.length
     ? data.recentActivity
     : [
-        { id: 1, action: "Translated Homepage", time: "2 mins ago" },
-        { id: 2, action: "Added German Language", time: "1 hr ago" },
-        { id: 3, action: "Provider updated", time: "3 hrs ago" },
-      ];
+      { id: 1, action: "Translated Homepage", time: "2 mins ago" },
+      { id: 2, action: "Added German Language", time: "1 hr ago" },
+      { id: 3, action: "Provider updated", time: "3 hrs ago" },
+    ];
 
   return (
     <BlockStack gap="base">
