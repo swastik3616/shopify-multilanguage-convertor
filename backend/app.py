@@ -145,7 +145,7 @@ def fetch_shopify_pages():
             "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{store_url}/admin/api/2024-01/pages.json"
+        url = f"https://{store_url}/admin/api/2026-04/pages.json"
         res = requests.get(url, headers=headers, timeout=10)
         if not res.ok:
             print(f"Shopify pages request failed: {res.status_code} {res.text}")
@@ -173,7 +173,7 @@ def fetch_shopify_products(limit=5):
             "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{store_url}/admin/api/2024-01/products.json?limit={limit}&fields=id,title,body_html,handle"
+        url = f"https://{store_url}/admin/api/2026-04/products.json?limit={limit}&fields=id,title,body_html,handle"
         res = requests.get(url, headers=headers, timeout=10)
         if not res.ok:
             print(f"Shopify products request failed: {res.status_code} {res.text}")
@@ -201,7 +201,7 @@ def fetch_shopify_collections(limit=5):
             "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{store_url}/admin/api/2024-01/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
+        url = f"https://{store_url}/admin/api/2026-04/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
         res = requests.get(url, headers=headers, timeout=10)
         if not res.ok:
             print(f"Shopify collections request failed: {res.status_code} {res.text}")
@@ -235,7 +235,7 @@ def shopify_check_token():
 
     try:
         headers = {"X-Shopify-Access-Token": access_token}
-        res = requests.get(f"https://{store_url}/admin/api/2024-01/shop.json", headers=headers, timeout=10)
+        res = requests.get(f"https://{store_url}/admin/api/2026-04/shop.json", headers=headers, timeout=10)
         body = None
         try:
             body = res.json()
@@ -1029,7 +1029,7 @@ def api_dashboard():
             try:
                 token = store_setting.get("access_token", "")
                 r = requests.get(
-                    f"https://{store_url}/admin/api/2024-01/shop.json",
+                    f"https://{store_url}/admin/api/2026-04/shop.json",
                     headers={"X-Shopify-Access-Token": token},
                     timeout=5
                 )
