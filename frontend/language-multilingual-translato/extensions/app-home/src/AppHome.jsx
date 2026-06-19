@@ -1,5 +1,4 @@
-import { render, h } from 'preact';
-import { useState } from 'preact/hooks';
+import { render, h, Component } from 'preact';
 import { LocationProvider, ErrorBoundary, Router, Route } from 'preact-iso';
 
 import HomePage from './pages/HomePage.jsx';
@@ -64,54 +63,64 @@ const SYSTEM_ITEMS = [
   { label: 'Settings',        icon: 'settings',        href: `${VERCEL}/settings`               },
 ];
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
+// ─── NavItem (class component — no hooks) ────────────────────────────────────
 
-function NavItem({ item, active, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  const isActive = active === item.label;
+class NavItem extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hovered: false };
+  }
 
-  const style = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '8px 14px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: isActive ? 600 : 400,
-    color: isActive ? '#008060' : hovered ? '#0f172a' : '#475569',
-    background: isActive ? '#e6f4f0' : hovered ? '#f8fafc' : 'transparent',
-    transition: 'all 0.15s',
-    border: 'none',
-    width: '100%',
-    textAlign: 'left',
-    textDecoration: 'none',
-    boxSizing: 'border-box',
-  };
+  render() {
+    const { item, active, onClick } = this.props;
+    const { hovered } = this.state;
+    const isActive = active === item.label;
 
-  const handleClick = (e) => {
-    e.preventDefault();
-    if (item.internal) {
-      onClick(item.label);
-    } else {
-      window.open(item.href, '_blank');
-    }
-  };
+    const style = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      padding: '8px 14px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '13px',
+      fontWeight: isActive ? 600 : 400,
+      color: isActive ? '#008060' : hovered ? '#0f172a' : '#475569',
+      background: isActive ? '#e6f4f0' : hovered ? '#f8fafc' : 'transparent',
+      transition: 'all 0.15s',
+      border: 'none',
+      width: '100%',
+      textAlign: 'left',
+      textDecoration: 'none',
+      boxSizing: 'border-box',
+    };
 
-  return (
-    <button
-      style={style}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={handleClick}
-    >
-      <span style={{ color: isActive ? '#008060' : '#94a3b8', flexShrink: 0 }}>
-        <Icon d={ICONS[item.icon]} size={15} />
-      </span>
-      {item.label}
-    </button>
-  );
+    const handleClick = (e) => {
+      e.preventDefault();
+      if (item.internal) {
+        onClick(item.label);
+      } else {
+        window.open(item.href, '_blank');
+      }
+    };
+
+    return (
+      <button
+        style={style}
+        onMouseEnter={() => this.setState({ hovered: true })}
+        onMouseLeave={() => this.setState({ hovered: false })}
+        onClick={handleClick}
+      >
+        <span style={{ color: isActive ? '#008060' : '#94a3b8', flexShrink: 0 }}>
+          <Icon d={ICONS[item.icon]} size={15} />
+        </span>
+        {item.label}
+      </button>
+    );
+  }
 }
+
+// ─── Sidebar (stateless) ─────────────────────────────────────────────────────
 
 function Sidebar({ active, onNavigate }) {
   return (
@@ -171,7 +180,7 @@ function Sidebar({ active, onNavigate }) {
   );
 }
 
-// ─── Top Bar ─────────────────────────────────────────────────────────────────
+// ─── Top Bar (stateless) ─────────────────────────────────────────────────────
 
 function TopBar() {
   return (
@@ -244,34 +253,45 @@ function TopBar() {
   );
 }
 
-// ─── App shell ───────────────────────────────────────────────────────────────
+// ─── App shell (class component — no hooks) ───────────────────────────────────
 
-function App() {
-  const [activePage, setActivePage] = useState('Dashboard');
+class App extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { activePage: 'Dashboard' };
+    this.handleNavigate = this.handleNavigate.bind(this);
+  }
 
-  return (
-    <LocationProvider>
-      <div style={{
-        display: 'flex',
-        height: '100vh',
-        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-        background: '#f8fafc',
-        overflow: 'hidden',
-      }}>
-        <Sidebar active={activePage} onNavigate={setActivePage} />
+  handleNavigate(page) {
+    this.setState({ activePage: page });
+  }
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <TopBar />
-          <main style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
-            <ErrorBoundary>
-              <Router>
-                <Route path="/" component={HomePage} />
-                <Route default component={NotFoundPage} />
-              </Router>
-            </ErrorBoundary>
-          </main>
+  render() {
+    const { activePage } = this.state;
+    return (
+      <LocationProvider>
+        <div style={{
+          display: 'flex',
+          height: '100vh',
+          fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+          background: '#f8fafc',
+          overflow: 'hidden',
+        }}>
+          <Sidebar active={activePage} onNavigate={this.handleNavigate} />
+
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <TopBar />
+            <main style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
+              <ErrorBoundary>
+                <Router>
+                  <Route path="/" component={HomePage} />
+                  <Route default component={NotFoundPage} />
+                </Router>
+              </ErrorBoundary>
+            </main>
+          </div>
         </div>
-      </div>
-    </LocationProvider>
-  );
+      </LocationProvider>
+    );
+  }
 }
