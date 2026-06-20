@@ -5,5 +5,12 @@
       "polaris-icon.png",
       "preact-logo.png"
     ]
+  },
+  "admin.app.tools.data": {
+    "assets": [
+      "graphql-logo.png",
+      "polaris-icon.png",
+      "preact-logo.png"
+    ]
   }
 }

@@ -1,4 +1,4 @@
-api_version = "2026-07"
+api_version = "2025-10"
 
 [[extensions]]
 # Change the merchant-facing name of the extension in locales/en.default.json
@@ -10,5 +10,5 @@ type = "ui_extension"
 
 [[extensions.targeting]]
 module = "./src/AppHome.jsx"
-target = "admin.app.home.render"
+target = "admin.app.tools.data"
 assets = "./assets"

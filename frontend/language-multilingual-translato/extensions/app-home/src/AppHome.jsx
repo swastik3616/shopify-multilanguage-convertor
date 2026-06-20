@@ -9,7 +9,7 @@ import {
   Link,
 } from "@shopify/ui-extensions-react/admin";
 
-export default reactExtension("admin.app.home.render", () => <App />);
+export default reactExtension("admin.app.tools.data", () => <App />);
 
 const BACKEND = "https://shopify-multilanguage-convertor.onrender.com";
 const VERCEL = "https://shopify-multilanguage-convertor-plugin.vercel.app";
