@@ -4,11 +4,11 @@ import '@shopify/ui-extensions';
 declare module './src/tools.js' {
   interface MultilingualTranslatorInput {
     /**
-     * The content to translate
+     * The content key or text to retrieve a translation for
      */
     content: string;
     /**
-     * The target language code (e.g. fr, es, de)
+     * ISO language code of the target language (e.g. fr, es, de)
      */
     target_language: string;
     [k: string]: unknown;
@@ -17,7 +17,7 @@ declare module './src/tools.js' {
   type MultilingualTranslatorOutput = unknown;
   interface ShopifyTools {
     /**
-     * Translate Shopify store content into multiple languages
+     * Fetches translated content for a specific language from the store's translation data. Returns translated text for products, pages, or other store content.
      */
     register(
       name: 'multilingual_translator',

@@ -3,7 +3,7 @@ api_version = "2025-10"
 [[extensions]]
 name = "t:name"
 handle = "app-home"
-description = "Multilingual translation tool for your Shopify store"
+description = "Retrieves translated store content for a specified target language"
 uid = "83247469-d4a8-2612-c903-5468f6914aaa918849e8"
 type = "ui_extension"
 

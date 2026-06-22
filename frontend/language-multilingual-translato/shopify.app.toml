@@ -52,4 +52,4 @@ type = "metaobject_reference<$app:faq>"
   admin = "merchant_read_write"
 
 [sidekick]
-extensions_summary = "Read FAQ entries stored in the app"
+extensions_summary = "Read translation data for store content across configured languages"
