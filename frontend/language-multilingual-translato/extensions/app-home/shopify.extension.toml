@@ -11,3 +11,6 @@ type = "ui_extension"
 module = "./src/tools.js"
 target = "admin.app.tools.data"
 tools = "./src/tools.json"
+
+[extensions.capabilities]
+network_access = true
