@@ -1,0 +1,21 @@
+[
+  {
+    "$schema": "https://extensions.shopifycdn.com/shopifycloud/schemas/v1/tool.json",
+    "name": "multilingual_translator",
+    "description": "Translate Shopify store content into multiple languages",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "The content to translate"
+        },
+        "target_language": {
+          "type": "string",
+          "description": "The target language code (e.g. fr, es, de)"
+        }
+      },
+      "required": ["content", "target_language"]
+    }
+  }
+]

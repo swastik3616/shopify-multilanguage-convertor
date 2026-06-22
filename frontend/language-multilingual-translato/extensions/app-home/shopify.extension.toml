@@ -1,14 +1,13 @@
 api_version = "2025-10"
 
 [[extensions]]
-# Change the merchant-facing name of the extension in locales/en.default.json
 name = "t:name"
 handle = "app-home"
-
+description = "Multilingual translation tool for your Shopify store"
 uid = "83247469-d4a8-2612-c903-5468f6914aaa918849e8"
 type = "ui_extension"
 
 [[extensions.targeting]]
-module = "./src/AppHome.jsx"
+module = "./src/tools.js"
 target = "admin.app.tools.data"
-assets = "./assets"
+tools = "./src/tools.json"
