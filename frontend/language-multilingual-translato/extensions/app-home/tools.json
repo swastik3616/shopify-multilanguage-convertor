@@ -1,0 +1,21 @@
+[
+  {
+    "$schema": "https://extensions.shopifycdn.com/shopifycloud/schemas/v1/tool.json",
+    "name": "multilingual_translator",
+    "description": "Fetches translated content for a specific language from the store's translation data. Returns translated text for products, pages, or other store content.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "The content key or text to retrieve a translation for"
+        },
+        "target_language": {
+          "type": "string",
+          "description": "ISO language code of the target language (e.g. fr, es, de)"
+        }
+      },
+      "required": ["content", "target_language"]
+    }
+  }
+]
