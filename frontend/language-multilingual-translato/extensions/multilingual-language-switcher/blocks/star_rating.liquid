@@ -321,7 +321,7 @@
 
       try {
         const res = await fetchWithTimeout(
-          '${BACKEND}/translate',
+          `${BACKEND}/translate`,
           {
             method : 'POST',
             headers: { 'Content-Type': 'application/json' },
