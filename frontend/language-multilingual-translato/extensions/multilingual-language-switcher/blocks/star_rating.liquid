@@ -1,29 +1,25 @@
-<div class="lang-switcher-wrapper" id="lang-switcher-wrapper">
-  <button class="lang-switcher-btn" id="lang-switcher-btn" aria-label="Change language">
-    English
-  </button>
-</div>
-
-<script>
 (function() {
   const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
-  
+
   const btn = document.getElementById('lang-switcher-btn');
-  
+
   btn.addEventListener('click', async function() {
     console.log('[Test] Button clicked');
-    
+
     try {
       const res = await fetch(`${BACKEND}/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts: ['Hello'], target_language: 'French' })
+        body: JSON.stringify({ 
+          source_text: 'Hello', 
+          target_language: 'French' 
+        })
       });
-      
+
       console.log('[Test] Response status:', res.status);
       const data = await res.json();
       console.log('[Test] Response data:', data);
-      
+
     } catch(e) {
       console.error('[Test] Error:', e);
     }
