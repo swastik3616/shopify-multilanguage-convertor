@@ -1,329 +1,178 @@
-<div class="lang-switcher-wrapper" id="lang-switcher-wrapper">
-  <button class="lang-switcher-btn" id="lang-switcher-btn" aria-label="Change language">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-    </svg>
-    <span id="lang-current-label">English</span>
-    <svg class="lang-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>
+<div id="lsw" style="position:fixed;bottom:24px;right:24px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  
+  <!-- Main Button -->
+  <button id="lsw-btn" style="display:flex;align-items:center;gap:8px;padding:12px 20px;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;border:none;border-radius:50px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 4px 24px rgba(0,0,0,0.25);transition:all 0.2s ease;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    <span id="lsw-label">English</span>
+    <svg id="lsw-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s ease;"><polyline points="6 9 12 15 18 9"/></svg>
   </button>
 
-  <div class="lang-dropdown" id="lang-dropdown" hidden></div>
-
-  <div class="lang-loading-overlay" id="lang-loading-overlay" hidden>
-    <div class="lang-loading-box">
-      <div class="lang-spinner"></div>
-      <p id="lang-loading-text">Translating page…</p>
-      <button id="lang-cancel-btn" style="margin-top:8px;padding:6px 16px;border:1px solid #ccc;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>
-    </div>
+  <!-- Dropdown -->
+  <div id="lsw-dropdown" hidden style="position:absolute;bottom:calc(100% + 12px);right:0;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.15);overflow:hidden;min-width:200px;border:1px solid rgba(0,0,0,0.06);">
+    <div style="padding:12px 16px;background:#f8f9fa;border-bottom:1px solid #eee;font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;">Select Language</div>
+    <div id="lsw-options"></div>
   </div>
 
-  <div class="lang-toast" id="lang-toast" hidden></div>
+  <!-- Status bar -->
+  <div id="lsw-status" hidden style="position:fixed;bottom:80px;right:24px;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center;gap:10px;min-width:200px;z-index:99999;">
+    <div id="lsw-spinner" style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:lswSpin 0.75s linear infinite;flex-shrink:0;"></div>
+    <span id="lsw-status-text">Translating...</span>
+  </div>
+
 </div>
 
 <style>
-  .lang-switcher-wrapper {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 99999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
-  .lang-switcher-btn {
+  @keyframes lswSpin { to { transform: rotate(360deg); } }
+  #lsw-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+  #lsw-btn:active { transform: scale(0.97); }
+  .lsw-opt {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: #1a1a2e;
-    color: #fff;
-    border: none;
-    border-radius: 50px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-    white-space: nowrap;
-  }
-  .lang-switcher-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
-    background: #16213e;
-  }
-  .lang-switcher-btn:active { transform: scale(0.97); }
-  .lang-chevron { transition: transform 0.2s ease; }
-  .lang-switcher-btn[aria-expanded="true"] .lang-chevron { transform: rotate(180deg); }
-  .lang-dropdown {
-    position: absolute;
-    bottom: calc(100% + 10px);
-    right: 0;
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-    overflow: hidden;
-    min-width: 180px;
-    animation: langDropIn 0.18s ease;
-  }
-  @keyframes langDropIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .lang-option {
-    padding: 11px 18px;
+    gap: 10px;
+    padding: 11px 16px;
     cursor: pointer;
     font-size: 14px;
     color: #222;
     transition: background 0.15s;
+    border-bottom: 1px solid #f0f0f0;
   }
-  .lang-option:hover { background: #f3f4f6; }
-  .lang-option.active { background: #e8f4ff; font-weight: 700; color: #0057b8; }
-  .lang-loading-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999998;
-    backdrop-filter: blur(2px);
-  }
-  .lang-loading-box {
-    background: #fff;
-    border-radius: 16px;
-    padding: 32px 40px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
-  }
-  .lang-loading-box p { margin: 0; font-size: 15px; color: #333; font-weight: 600; }
-  .lang-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #e5e7eb;
-    border-top-color: #1a1a2e;
-    border-radius: 50%;
-    animation: langSpin 0.75s linear infinite;
-  }
-  @keyframes langSpin { to { transform: rotate(360deg); } }
-  .lang-toast {
-    position: fixed;
-    bottom: 90px;
-    right: 24px;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #fff;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-    z-index: 999999;
-    animation: langToastIn 0.25s ease;
-  }
-  @keyframes langToastIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .lang-toast.success { background: #16a34a; }
-  .lang-toast.error   { background: #dc2626; }
-  .lang-toast.warning { background: #d97706; }
+  .lsw-opt:last-child { border-bottom: none; }
+  .lsw-opt:hover { background: #f3f4f6; }
+  .lsw-opt.active { background: #eef4ff; color: #0057b8; font-weight: 600; }
+  .lsw-opt-flag { font-size: 18px; }
+  .lsw-opt-name { flex: 1; }
+  .lsw-opt-check { color: #0057b8; font-size: 16px; display: none; }
+  .lsw-opt.active .lsw-opt-check { display: block; }
 </style>
 
 <script>
-(function () {
-  const BACKEND     = 'https://shopify-multilanguage-convertor.onrender.com';
+(function() {
+  const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
-  let cancelTranslation = false;
 
-  const FLAG_MAP = {
-    English:'🇺🇸', French:'🇫🇷', German:'🇩🇪', Spanish:'🇪🇸',
-    Hindi:'🇮🇳', Marathi:'🇮🇳', Arabic:'🇸🇦', Japanese:'🇯🇵',
-    Portuguese:'🇧🇷', Italian:'🇮🇹', Chinese:'🇨🇳', Korean:'🇰🇷',
-    Russian:'🇷🇺', Dutch:'🇳🇱', Turkish:'🇹🇷', Polish:'🇵🇱',
-    Thai:'🇹🇭', Vietnamese:'🇻🇳', Greek:'🇬🇷', Swedish:'🇸🇪',
-  };
+  const LANGUAGES = [
+    { lang: 'English',    flag: '🇺🇸' },
+    { lang: 'French',     flag: '🇫🇷' },
+    { lang: 'German',     flag: '🇩🇪' },
+    { lang: 'Spanish',    flag: '🇪🇸' },
+    { lang: 'Hindi',      flag: '🇮🇳' },
+    { lang: 'Arabic',     flag: '🇸🇦' },
+    { lang: 'Japanese',   flag: '🇯🇵' },
+    { lang: 'Portuguese', flag: '🇧🇷' },
+    { lang: 'Marathi',    flag: '🇮🇳' },
+  ];
 
-  const DEFAULT_TARGETS = ['French','German','Spanish','Hindi','Arabic','Japanese','Portuguese','Marathi'];
+  const btn      = document.getElementById('lsw-btn');
+  const dropdown = document.getElementById('lsw-dropdown');
+  const label    = document.getElementById('lsw-label');
+  const chevron  = document.getElementById('lsw-chevron');
+  const status   = document.getElementById('lsw-status');
+  const statusTxt = document.getElementById('lsw-status-text');
+  const optCont  = document.getElementById('lsw-options');
 
-  const wrapper     = document.getElementById('lang-switcher-wrapper');
-  const btn         = document.getElementById('lang-switcher-btn');
-  const dropdown    = document.getElementById('lang-dropdown');
-  const currentLbl  = document.getElementById('lang-current-label');
-  const overlay     = document.getElementById('lang-loading-overlay');
-  const loadingText = document.getElementById('lang-loading-text');
-  const toast       = document.getElementById('lang-toast');
-
-  document.getElementById('lang-cancel-btn').addEventListener('click', function() {
-    cancelTranslation = true;
-    setLoading(false);
-    showToast('Translation cancelled.', 'warning');
+  // Build dropdown
+  LANGUAGES.forEach(function(item) {
+    const el = document.createElement('div');
+    el.className = 'lsw-opt';
+    el.dataset.lang = item.lang;
+    el.innerHTML = `
+      <span class="lsw-opt-flag">${item.flag}</span>
+      <span class="lsw-opt-name">${item.lang}</span>
+      <span class="lsw-opt-check">✓</span>
+    `;
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      handleSelect(item.lang);
+    });
+    optCont.appendChild(el);
   });
 
-  function showToast(msg, type = 'success', ms = 3500) {
-    toast.textContent = msg;
-    toast.className   = `lang-toast ${type}`;
-    toast.hidden      = false;
-    setTimeout(() => { toast.hidden = true; }, ms);
-  }
-
-  function setLoading(active, msg = 'Translating page…') {
-    overlay.hidden          = !active;
-    loadingText.textContent = msg;
-    btn.disabled            = active;
-  }
-
-  function markActive(language) {
-    dropdown.querySelectorAll('.lang-option').forEach(o => {
-      o.classList.toggle('active', o.dataset.value === language);
-    });
-    currentLbl.textContent = language;
-    localStorage.setItem(STORAGE_KEY, language);
-  }
-
-  btn.addEventListener('click', function () {
+  // Toggle dropdown
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
     const open = !dropdown.hidden;
     dropdown.hidden = open;
-    btn.setAttribute('aria-expanded', String(!open));
+    chevron.style.transform = open ? '' : 'rotate(180deg)';
   });
 
-  document.addEventListener('click', function (e) {
-    if (!wrapper.contains(e.target)) {
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#lsw')) {
       dropdown.hidden = true;
-      btn.setAttribute('aria-expanded', 'false');
+      chevron.style.transform = '';
     }
   });
 
-  function buildDropdown(targets) {
-    dropdown.innerHTML = '';
-    ['English'].concat(targets).forEach(function (lang) {
-      const el = document.createElement('div');
-      el.className = 'lang-option';
-      el.dataset.value = lang;
-      el.textContent = `${FLAG_MAP[lang] || '🌐'} ${lang}`;
-      dropdown.appendChild(el);
-      el.addEventListener('click', handleOptionClick);
+  function setActive(lang) {
+    document.querySelectorAll('.lsw-opt').forEach(function(o) {
+      o.classList.toggle('active', o.dataset.lang === lang);
     });
-    console.log('[LangSwitcher] Dropdown built:', targets);
+    label.textContent = lang;
   }
 
-  async function handleOptionClick() {
-    const lang = this.dataset.value;
+  async function handleSelect(lang) {
     dropdown.hidden = true;
-    btn.setAttribute('aria-expanded', 'false');
+    chevron.style.transform = '';
 
     if (lang === 'English') {
-      markActive('English');
       localStorage.removeItem(STORAGE_KEY);
+      setActive('English');
       location.reload();
       return;
     }
 
-    cancelTranslation = false;
-    markActive(lang);
-    setLoading(true, `Translating page to ${lang}…`);
-
-    try {
-      await translatePage(lang);
-      if (!cancelTranslation) {
-        showToast(`Page translated to ${lang} ✓`, 'success');
-      }
-    } catch(e) {
-      console.error('[LangSwitcher] Error:', e);
-      showToast('Translation failed. Please try again.', 'error');
-    } finally {
-      setLoading(false);
-    }
+    setActive(lang);
+    localStorage.setItem(STORAGE_KEY, lang);
+    await runTranslation(lang);
   }
 
-  async function translateOne(text, language) {
-    const res = await fetch(`${BACKEND}/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source_text: text, target_language: language })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.translated_text;
-  }
-
-  async function translatePage(targetLanguage) {
+  async function runTranslation(lang) {
     const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          const tag = node.parentElement && node.parentElement.tagName;
-          const text = node.nodeValue.trim();
-          if (!text) return NodeFilter.FILTER_REJECT;
-          if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE'].includes(tag)) return NodeFilter.FILTER_REJECT;
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
+      document.body, NodeFilter.SHOW_TEXT,
+      { acceptNode(n) {
+        const tag = n.parentElement && n.parentElement.tagName;
+        if (!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE'].includes(tag)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }}
     );
 
     const nodes = [], texts = [];
-    let node;
-    while ((node = walker.nextNode())) {
-      nodes.push(node);
-      texts.push(node.nodeValue.trim());
-    }
+    let n;
+    while ((n = walker.nextNode())) { nodes.push(n); texts.push(n.nodeValue.trim()); }
 
-    if (texts.length === 0) {
-      showToast('No text found on this page.', 'warning');
-      return;
-    }
-
-    console.log(`[LangSwitcher] Translating ${texts.length} nodes to "${targetLanguage}"`);
+    console.log(`[LSW] Translating ${texts.length} nodes to ${lang}`);
+    status.hidden = false;
 
     for (let i = 0; i < nodes.length; i++) {
-      if (cancelTranslation) {
-        cancelTranslation = false;
-        console.log('[LangSwitcher] Translation cancelled by user.');
-        break;
-      }
-      loadingText.textContent = `Translating… ${i + 1} / ${texts.length}`;
+      statusTxt.textContent = `Translating ${i + 1} of ${texts.length}...`;
       try {
-        const translated = await translateOne(texts[i], targetLanguage);
-        nodes[i].nodeValue = translated;
+        const res = await fetch(`${BACKEND}/translate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_text: texts[i], target_language: lang })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          nodes[i].nodeValue = data.translated_text;
+        }
       } catch(e) {
-        console.error(`[LangSwitcher] Failed node ${i}:`, e);
+        console.error(`[LSW] Node ${i} failed:`, e);
       }
     }
+
+    status.hidden = true;
+    statusTxt.textContent = 'Translating...';
+    console.log('[LSW] Done!');
   }
 
-  async function initLanguages() {
-    let targets = [];
-    try {
-      const res = await fetch(`${BACKEND}/get-languages`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.targets && data.targets.length > 0) targets = data.targets;
-      }
-    } catch (e) { /* use defaults */ }
-    buildDropdown(targets.length ? targets : DEFAULT_TARGETS);
+  // Auto restore saved language
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved && saved !== 'English') {
+    setActive(saved);
+    runTranslation(saved);
+  } else {
+    setActive('English');
   }
-
-  async function autoRestoreLanguage() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    console.log('[LangSwitcher] Saved language:', saved);
-    if (!saved || saved === 'English') {
-      console.log('[LangSwitcher] No saved language, skipping restore.');
-      return;
-    }
-    markActive(saved);
-    setLoading(true, `Restoring ${saved} translation…`);
-    try { await translatePage(saved); } finally { setLoading(false); }
-  }
-
-  initLanguages().then(function () {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', autoRestoreLanguage);
-    } else {
-      autoRestoreLanguage();
-    }
-  });
 
 })();
 </script>
