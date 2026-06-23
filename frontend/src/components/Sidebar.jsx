@@ -9,7 +9,8 @@ import {
   BarChart3,
   Settings,
   History,
-  Store
+  Store,
+  Search
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -23,6 +24,7 @@ function Sidebar() {
     { name: "Providers", path: "/providers", icon: Plug },
     { name: "Translations", path: "/translations", icon: ArrowRightLeft },
     { name: "Live Translation", path: "/live-translation", icon: Globe },
+    { name: "SEO Manager", path: "/seo", icon: Search },
     { name: "Jobs", path: "/jobs", icon: ListTodo },
     { name: "Analytics", path: "/analytics", icon: BarChart3 },
     { name: "Audit History", path: "/audit-history", icon: History },

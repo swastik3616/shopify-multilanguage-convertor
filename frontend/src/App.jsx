@@ -12,6 +12,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AuditHistoryPage from "./pages/AuditHistoryPage";
 import StoreSettingsPage from "./pages/StoreSettingsPage";
+import SeoPage from "./pages/SeoPage";
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
           <Route path="/providers" element={<ProvidersPage />} />
           <Route path="/translations" element={<TranslationsPage />} />
           <Route path="/live-translation" element={<TranslationPage />} />
+          <Route path="/seo" element={<SeoPage />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
