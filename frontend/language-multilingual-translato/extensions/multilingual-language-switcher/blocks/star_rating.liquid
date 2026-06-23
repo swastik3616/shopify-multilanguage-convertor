@@ -16,6 +16,7 @@
     <div class="lang-loading-box">
       <div class="lang-spinner"></div>
       <p id="lang-loading-text">Translating page…</p>
+      <button id="lang-cancel-btn" style="margin-top:8px;padding:6px 16px;border:1px solid #ccc;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>
     </div>
   </div>
 
@@ -134,6 +135,7 @@
 (function () {
   const BACKEND     = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
+  let cancelTranslation = false;
 
   const FLAG_MAP = {
     English:'🇺🇸', French:'🇫🇷', German:'🇩🇪', Spanish:'🇪🇸',
@@ -152,6 +154,12 @@
   const overlay     = document.getElementById('lang-loading-overlay');
   const loadingText = document.getElementById('lang-loading-text');
   const toast       = document.getElementById('lang-toast');
+
+  document.getElementById('lang-cancel-btn').addEventListener('click', function() {
+    cancelTranslation = true;
+    setLoading(false);
+    showToast('Translation cancelled.', 'warning');
+  });
 
   function showToast(msg, type = 'success', ms = 3500) {
     toast.textContent = msg;
@@ -212,12 +220,15 @@
       return;
     }
 
+    cancelTranslation = false;
     markActive(lang);
     setLoading(true, `Translating page to ${lang}…`);
 
     try {
       await translatePage(lang);
-      showToast(`Page translated to ${lang} ✓`, 'success');
+      if (!cancelTranslation) {
+        showToast(`Page translated to ${lang} ✓`, 'success');
+      }
     } catch(e) {
       console.error('[LangSwitcher] Error:', e);
       showToast('Translation failed. Please try again.', 'error');
@@ -267,6 +278,11 @@
     console.log(`[LangSwitcher] Translating ${texts.length} nodes to "${targetLanguage}"`);
 
     for (let i = 0; i < nodes.length; i++) {
+      if (cancelTranslation) {
+        cancelTranslation = false;
+        console.log('[LangSwitcher] Translation cancelled by user.');
+        break;
+      }
       loadingText.textContent = `Translating… ${i + 1} / ${texts.length}`;
       try {
         const translated = await translateOne(texts[i], targetLanguage);
@@ -290,16 +306,16 @@
   }
 
   async function autoRestoreLanguage() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      console.log('[LangSwitcher] Saved language:', saved);
-      if (!saved || saved === 'English') {
-        console.log('[LangSwitcher] No saved language, skipping restore.');
-        return;
-      }
-      markActive(saved);
-      setLoading(true, `Restoring ${saved} translation…`);
-      try { await translatePage(saved); } finally { setLoading(false); }
+    const saved = localStorage.getItem(STORAGE_KEY);
+    console.log('[LangSwitcher] Saved language:', saved);
+    if (!saved || saved === 'English') {
+      console.log('[LangSwitcher] No saved language, skipping restore.');
+      return;
     }
+    markActive(saved);
+    setLoading(true, `Restoring ${saved} translation…`);
+    try { await translatePage(saved); } finally { setLoading(false); }
+  }
 
   initLanguages().then(function () {
     if (document.readyState === 'loading') {
