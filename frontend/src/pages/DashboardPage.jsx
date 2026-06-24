@@ -1,15 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import StatCard from "../components/StatCard";
-import { Languages, Plug, ArrowRightLeft, ListTodo, MoreVertical, AlertTriangle } from "lucide-react";
+import { Languages, Plug, ArrowRightLeft, Clock, MoreVertical, AlertTriangle } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-
-const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
+import { apiFetch } from "../services/apiClient";
 
 async function fetchDashboard() {
-  const res = await fetch(`${BACKEND}/api/dashboard`, {
+  const res = await apiFetch("/api/dashboard", {
     headers: { Accept: 'application/json' },
   });
-  if (!res.ok) throw new Error(`Dashboard fetch failed (${res.status})`);
   const p = await res.json();
   return {
     overview:       p?.overview       ?? null,
@@ -78,10 +76,10 @@ function DashboardPage() {
         trend: "-3 today"
       },
       {
-        title: "Jobs",
-        value: o?.pendingJobs ?? "0",
-        icon: ListTodo,
-        trend: "None pending"
+        title: "Installation",
+        value: o?.installationTime ?? "N/A",
+        icon: Clock,
+        trend: "Date & Time"
       },
     ];
   }, [data]);

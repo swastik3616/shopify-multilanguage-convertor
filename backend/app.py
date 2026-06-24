@@ -353,6 +353,47 @@ def seed_shopify_page_contents(page):
 
 
 
+@app.route("/api/dashboard", methods=["GET", "OPTIONS"])
+def get_dashboard_stats():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    # Languages count
+    lang_settings = get_setting("language_settings", {})
+    targets = lang_settings.get("targets", [])
+    active_languages = len(targets)
+    if lang_settings.get("source"):
+        active_languages += 1
+        
+    # Providers count
+    provider_settings = get_setting("provider_settings", get_default_provider_settings())
+    api_keys = provider_settings.get("api_keys", {})
+    active_providers = sum(1 for key, val in api_keys.items() if val)
+    
+    # Translations count
+    translation_count = Translation.query.count()
+    
+    # Installation time
+    first_log = AuditLog.query.order_by(AuditLog.created_at.asc()).first()
+    if first_log and first_log.created_at:
+        install_time = first_log.created_at.strftime("%Y-%m-%d %H:%M")
+    else:
+        install_time = "N/A"
+        
+    return jsonify({
+        "overview": {
+            "activeLanguages": active_languages,
+            "providers": active_providers,
+            "translationRequests": translation_count,
+            "installationTime": install_time
+        },
+        "analytics": {
+             "volumeByDay": [0,0,0,0,0,0,translation_count]
+        },
+        "recentActivity": []
+    })
+
+
 @app.route("/")
 def home():
     return jsonify({
