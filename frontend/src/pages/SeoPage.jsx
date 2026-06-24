@@ -224,7 +224,7 @@ function SeoPage() {
                         <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                         <div className="mt-1 flex flex-col gap-1 text-xs text-slate-500">
                           <p><span className="font-medium">SEO Title:</span> {item.originalMetaTitle || "None"}</p>
-                          <p className="truncate"><span className="font-medium">SEO Desc:</span> {item.originalMetaDescription || "None"}</p>
+                          <p className="truncate"><span className="font-medium">Meta Description:</span> {item.originalMetaDescription || "None"}</p>
                         </div>
                       </button>
                     </li>
