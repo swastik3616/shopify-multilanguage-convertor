@@ -45,16 +45,19 @@ function SeoPage() {
     loadStoreStatus();
   }, []);
 
+  const [errorMsg, setErrorMsg] = useState(null);
+
   const fetchResources = async () => {
     if (!storeConnected) return;
     setIsLoading(true);
     setSelectedResource(null);
+    setErrorMsg(null);
     try {
       const data = await getSeoResources(resourceType);
       setResources(data.resources || []);
     } catch (error) {
       console.error(error);
-      alert(error.message || "Failed to fetch resources");
+      setErrorMsg(error.message || "Failed to fetch resources. Please check your store settings.");
     } finally {
       setIsLoading(false);
     }
@@ -171,6 +174,11 @@ function SeoPage() {
               {isLoading ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                </div>
+              ) : errorMsg ? (
+                <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center text-red-500">
+                  <Globe className="mb-3 h-8 w-8 text-red-300" />
+                  <p className="text-sm font-medium text-red-900">{errorMsg}</p>
                 </div>
               ) : filteredResources.length > 0 ? (
                 <ul className="divide-y divide-slate-100">
