@@ -1403,13 +1403,27 @@ def update_original_seo():
           }
         }
         """
+        
+        metafields = []
+        if meta_title:
+            metafields.append({
+                "namespace": "global",
+                "key": "title_tag",
+                "type": "single_line_text_field",
+                "value": meta_title
+            })
+        if meta_desc:
+            metafields.append({
+                "namespace": "global",
+                "key": "description_tag",
+                "type": "single_line_text_field",
+                "value": meta_desc
+            })
+            
         variables = {
             "id": resource_id,
             "page": {
-                "seo": {
-                    "title": meta_title,
-                    "description": meta_desc
-                }
+                "metafields": metafields
             }
         }
 
