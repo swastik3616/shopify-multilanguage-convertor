@@ -776,8 +776,10 @@ def delete_translation(translation_id):
     
     return jsonify({"success": True, "message": "Translation deleted"})
 
-@app.route("/contents/store-status", methods=["GET"])
+@app.route("/contents/store-status", methods=["GET", "OPTIONS"])
 def get_contents_store_status():
+    if request.method == 'OPTIONS':
+        return '', 204
     store_url, access_token = get_shopify_credentials()
     return jsonify({
         "connected": bool(store_url and access_token),
@@ -819,8 +821,10 @@ def sync_contents():
     })
 
 
-@app.route("/contents", methods=["GET"])
+@app.route("/contents", methods=["GET", "OPTIONS"])
 def get_contents():
+    if request.method == 'OPTIONS':
+        return '', 204
     page = request.args.get("page")
     if page:
         if page in ["home", "product", "collection"]:
