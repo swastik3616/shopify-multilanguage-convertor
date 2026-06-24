@@ -1335,6 +1335,12 @@ def get_seo_resources():
             
         return jsonify({"success": True, "resources": resources})
         
+    except requests.exceptions.RequestException as e:
+        status_code = e.response.status_code if e.response else 500
+        print("GraphQL HTTP Error:", str(e))
+        if status_code == 401:
+             return jsonify({"success": False, "message": "Shopify store authentication failed. The access token may be invalid or expired. Please update it in Store Settings."}), 401
+        return jsonify({"success": False, "message": str(e)}), status_code
     except Exception as e:
         print("GraphQL Error:", str(e))
         return jsonify({"success": False, "message": str(e)}), 500

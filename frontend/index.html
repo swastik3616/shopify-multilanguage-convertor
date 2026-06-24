@@ -10,6 +10,13 @@
         var urlParams = new URLSearchParams(window.location.search);
         var shop = urlParams.get('shop') || localStorage.getItem('shopify_shop');
         var host = urlParams.get('host') || localStorage.getItem('shopify_host');
+        
+        // Fallback for local development / outside iframe testing to prevent App Bridge crash
+        if (!shop) {
+          shop = '0jeqkm-rp.myshopify.com';
+          host = btoa(shop + '/admin');
+        }
+
         if (shop) localStorage.setItem('shopify_shop', shop);
         if (host) localStorage.setItem('shopify_host', host);
         if ((!urlParams.get('shop') && shop) || (!urlParams.get('host') && host)) {
