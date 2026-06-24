@@ -36,7 +36,7 @@
 
 
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50 transition-colors duration-200;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -49,17 +49,17 @@
     @apply bg-[#008060] text-white hover:bg-[#006e52] shadow-sm;
   }
   .btn-secondary {
-    @apply bg-white text-slate-900 border border-slate-200 hover:bg-slate-100;
+    @apply bg-white text-slate-900 border border-slate-200 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-50 dark:border-slate-800 dark:hover:bg-slate-800;
   }
   .btn-ghost {
-    @apply hover:bg-slate-100 hover:text-slate-900;
+    @apply hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50;
   }
   
   .input-field {
-    @apply flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008060] focus-visible:border-[#008060] disabled:cursor-not-allowed disabled:opacity-50 transition-colors;
+    @apply flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008060] focus-visible:border-[#008060] disabled:cursor-not-allowed disabled:opacity-50 transition-colors dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:placeholder:text-slate-400;
   }
 
   .card-container {
-    @apply rounded-xl border border-slate-200 bg-white text-slate-950 shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white text-slate-950 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50;
   }
 }
