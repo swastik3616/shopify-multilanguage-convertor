@@ -1269,7 +1269,7 @@ def get_seo_resources():
     if not store_url or not access_token:
         return jsonify({"success": False, "message": "Store not connected"}), 400
 
-    graphql_type = "PRODUCT" if resource_type == "products" else "ONLINE_STORE_PAGE"
+    graphql_type = "PRODUCT" if resource_type == "products" else "PAGE"
     
     query = """
     query {
