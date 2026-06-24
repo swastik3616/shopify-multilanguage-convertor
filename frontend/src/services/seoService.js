@@ -12,3 +12,11 @@ export const translateSeoResource = async (payload) => {
   });
   return response.json();
 };
+
+export const updateOriginalSeo = async (payload) => {
+  const response = await apiFetch(`/api/seo-update-original`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.json();
+};

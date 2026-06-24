@@ -1350,6 +1350,97 @@ def get_seo_resources():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+@app.route("/api/seo-update-original", methods=["POST", "OPTIONS"])
+def update_original_seo():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.json
+    resource_id = data.get("resourceId")
+    meta_title = data.get("metaTitle", "")
+    meta_desc = data.get("metaDescription", "")
+    
+    if not resource_id:
+        return jsonify({"success": False, "message": "resourceId is required"}), 400
+        
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
+        return jsonify({"success": False, "message": "Store not connected"}), 400
+
+    headers = {
+        "X-Shopify-Access-Token": access_token,
+        "Content-Type": "application/json"
+    }
+    
+    is_product = "Product" in resource_id
+    
+    if is_product:
+        mutation = """
+        mutation productUpdate($input: ProductInput!) {
+          productUpdate(input: $input) {
+            userErrors {
+              message
+            }
+          }
+        }
+        """
+        variables = {
+            "input": {
+                "id": resource_id,
+                "seo": {
+                    "title": meta_title,
+                    "description": meta_desc
+                }
+            }
+        }
+    else:
+        mutation = """
+        mutation pageUpdate($id: ID!, $page: PageUpdateInput!) {
+          pageUpdate(id: $id, page: $page) {
+            userErrors {
+              message
+            }
+          }
+        }
+        """
+        variables = {
+            "id": resource_id,
+            "page": {
+                "seo": {
+                    "title": meta_title,
+                    "description": meta_desc
+                }
+            }
+        }
+
+    try:
+        res = requests.post(f"https://{store_url}/admin/api/2026-04/graphql.json", headers=headers, json={"query": mutation, "variables": variables})
+        res.raise_for_status()
+        data = res.json()
+        
+        if "errors" in data:
+            return jsonify({"success": False, "message": f"Shopify GraphQL Error: {data['errors'][0].get('message', 'Unknown error')}"}), 400
+            
+        # Parse user errors based on mutation type
+        mutation_name = "productUpdate" if is_product else "pageUpdate"
+        user_errors = data.get("data", {}).get(mutation_name, {}).get("userErrors", [])
+        
+        if user_errors:
+            return jsonify({"success": False, "message": user_errors[0].get("message", "Update failed")}), 400
+            
+        return jsonify({"success": True})
+        
+    except requests.exceptions.RequestException as e:
+        status_code = e.response.status_code if e.response else 500
+        print("GraphQL HTTP Error:", str(e))
+        if status_code == 401:
+             return jsonify({"success": False, "message": "Shopify store authentication failed. The access token may be invalid or expired. Please update it in Store Settings."}), 401
+        return jsonify({"success": False, "message": str(e)}), status_code
+    except Exception as e:
+        print("GraphQL Error:", str(e))
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @app.route("/api/seo-translate", methods=["POST", "OPTIONS"])
 def translate_seo():
     if request.method == 'OPTIONS':

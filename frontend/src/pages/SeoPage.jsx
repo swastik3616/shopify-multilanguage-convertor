@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Globe, Save, Loader2, Store } from "lucide-react";
-import { getSeoResources, translateSeoResource } from "../services/seoService";
+import { getSeoResources, translateSeoResource, updateOriginalSeo } from "../services/seoService";
 import { getContentsStoreStatus } from "../services/contentService";
 import { Link } from "react-router-dom";
 
@@ -26,6 +26,11 @@ function SeoPage() {
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   
+  // Original SEO editing state
+  const [originalTitle, setOriginalTitle] = useState("");
+  const [originalDescription, setOriginalDescription] = useState("");
+  const [isSavingOriginal, setIsSavingOriginal] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -73,6 +78,31 @@ function SeoPage() {
     setSelectedResource(resource);
     setMetaTitle("");
     setMetaDescription("");
+    setOriginalTitle(resource.originalMetaTitle || "");
+    setOriginalDescription(resource.originalMetaDescription || "");
+  };
+
+  const handleSaveOriginal = async () => {
+    if (!selectedResource) return;
+    
+    setIsSavingOriginal(true);
+    try {
+      const payload = {
+        resourceId: selectedResource.id,
+        metaTitle: originalTitle,
+        metaDescription: originalDescription
+      };
+
+      await updateOriginalSeo(payload);
+      alert("Original SEO metadata successfully updated in Shopify!");
+      // Optionally refresh the list to reflect changes in the sidebar
+      fetchResources();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Failed to update original SEO metadata");
+    } finally {
+      setIsSavingOriginal(false);
+    }
   };
 
   const handleSaveTranslation = async () => {
@@ -236,39 +266,81 @@ function SeoPage() {
                   </select>
                 </div>
 
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      SEO Page Title
-                    </label>
-                    <div className="mb-2 p-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600">
-                      <p className="text-xs text-slate-400 mb-1 uppercase tracking-wide font-semibold">Original</p>
-                      {selectedResource.originalMetaTitle || <span className="italic text-slate-400">Empty</span>}
+                <div className="space-y-6">
+                  {/* ORIGINAL SEO EDITOR */}
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2">
+                      Original Metadata (Shopify)
+                    </h3>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Original SEO Title</label>
+                        <input
+                          type="text"
+                          className="input-field w-full text-sm bg-white"
+                          placeholder="Store's original SEO title"
+                          value={originalTitle}
+                          onChange={(e) => setOriginalTitle(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Original Meta Description</label>
+                        <textarea
+                          rows={2}
+                          className="input-field w-full text-sm bg-white resize-none"
+                          placeholder="Store's original meta description"
+                          value={originalDescription}
+                          onChange={(e) => setOriginalDescription(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="pt-2">
+                        <button
+                          className="btn btn-secondary w-full sm:w-auto px-4 py-1.5 text-xs flex items-center justify-center gap-1"
+                          onClick={handleSaveOriginal}
+                          disabled={isSavingOriginal || (!originalTitle && !originalDescription)}
+                        >
+                          {isSavingOriginal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                          {isSavingOriginal ? "Updating..." : "Update Original in Shopify"}
+                        </button>
+                      </div>
                     </div>
-                    <input
-                      type="text"
-                      className="input-field w-full"
-                      placeholder="Enter translated SEO title"
-                      value={metaTitle}
-                      onChange={(e) => setMetaTitle(e.target.value)}
-                    />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      SEO Meta Description
-                    </label>
-                    <div className="mb-2 p-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600">
-                      <p className="text-xs text-slate-400 mb-1 uppercase tracking-wide font-semibold">Original</p>
-                      {selectedResource.originalMetaDescription || <span className="italic text-slate-400">Empty</span>}
+                  {/* TRANSLATION EDITOR */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <h3 className="text-sm font-semibold text-[#008060] mb-3 uppercase tracking-wide flex items-center gap-2">
+                      Translation ({targetLanguage})
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                          Translated SEO Title
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field w-full"
+                          placeholder={`Enter ${targetLanguage} SEO title`}
+                          value={metaTitle}
+                          onChange={(e) => setMetaTitle(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                          Translated Meta Description
+                        </label>
+                        <textarea
+                          rows={3}
+                          className="input-field w-full resize-none"
+                          placeholder={`Enter ${targetLanguage} meta description`}
+                          value={metaDescription}
+                          onChange={(e) => setMetaDescription(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <textarea
-                      rows={3}
-                      className="input-field w-full resize-none"
-                      placeholder="Enter translated SEO description"
-                      value={metaDescription}
-                      onChange={(e) => setMetaDescription(e.target.value)}
-                    />
                   </div>
                 </div>
 
