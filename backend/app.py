@@ -1300,7 +1300,11 @@ def get_seo_resources():
         res.raise_for_status()
         data = res.json()
         
-        edges = data.get("data", {}).get("translatableResources", {}).get("edges", [])
+        if "errors" in data:
+            return jsonify({"success": False, "message": f"Shopify GraphQL Error: {data['errors'][0].get('message', 'Unknown error')}"}), 400
+            
+        graphql_data = data.get("data") or {}
+        edges = graphql_data.get("translatableResources", {}).get("edges", [])
         resources = []
         
         for edge in edges:
