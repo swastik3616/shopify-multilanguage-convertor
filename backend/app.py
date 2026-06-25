@@ -654,13 +654,25 @@ def bulk_translate():
     cached_map = {}        # original_index → translated_text  (cache hits)
     uncached_indices = []  # original positions that need a fresh AI call
 
+    # Optimize: Fetch all existing translations in batched queries instead of 1-by-1
+    db_cache = {}
+    chunk_size = 500
+    
+    # We use a set to avoid querying duplicate texts multiple times in the IN clause
+    unique_texts = list(set(texts))
+    
+    for i in range(0, len(unique_texts), chunk_size):
+        chunk = unique_texts[i:i + chunk_size]
+        existing = Translation.query.filter(
+            Translation.target_language == target_language,
+            Translation.source_text.in_(chunk)
+        ).all()
+        for t in existing:
+            db_cache[t.source_text] = t.translated_text
+
     for i, text in enumerate(texts):
-        existing = Translation.query.filter_by(
-            source_text=text,
-            target_language=target_language
-        ).first()
-        if existing:
-            cached_map[i] = existing.translated_text
+        if text in db_cache:
+            cached_map[i] = db_cache[text]
         else:
             uncached_indices.append(i)
 
