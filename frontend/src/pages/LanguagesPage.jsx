@@ -52,8 +52,11 @@ const handleSave = async () => {
               onChange={(e) => setSourceLanguage(e.target.value)}
             >
               <option>English</option>
-              <option>Hindi</option>
               <option>French</option>
+              <option>German</option>
+              <option>Spanish</option>
+              <option>Hindi</option>
+              <option>Japanese</option>
             </select>
             <p className="text-xs text-slate-500 mt-2">The default language of your store.</p>
           </div>
@@ -61,7 +64,7 @@ const handleSave = async () => {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-3">Target Languages</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {["Hindi", "Marathi", "French", "German"].map((lang) => (
+              {["French", "German", "Spanish", "Hindi", "Arabic", "Japanese", "Portuguese", "Marathi", "Italian", "Chinese", "Korean"].map((lang) => (
                 <label key={lang} className="relative flex items-start p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
                   <div className="flex items-center h-5">
                     <input

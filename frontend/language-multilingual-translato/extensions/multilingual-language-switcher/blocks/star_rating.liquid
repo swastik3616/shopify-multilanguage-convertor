@@ -61,11 +61,11 @@
 </style>
 
 <script>
-(function() {
+(async function() {
   const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
 
-  const LANGUAGES = [
+  const ALL_LANGUAGES = [
     { lang: 'English',    flag: '🇺🇸' },
     { lang: 'French',     flag: '🇫🇷' },
     { lang: 'German',     flag: '🇩🇪' },
@@ -75,6 +75,9 @@
     { lang: 'Japanese',   flag: '🇯🇵' },
     { lang: 'Portuguese', flag: '🇧🇷' },
     { lang: 'Marathi',    flag: '🇮🇳' },
+    { lang: 'Italian',    flag: '🇮🇹' },
+    { lang: 'Chinese',    flag: '🇨🇳' },
+    { lang: 'Korean',     flag: '🇰🇷' }
   ];
 
   const btn      = document.getElementById('lsw-btn');
@@ -85,8 +88,23 @@
   const statusTxt = document.getElementById('lsw-status-text');
   const optCont  = document.getElementById('lsw-options');
 
+  let activeLanguages = ALL_LANGUAGES;
+
+  try {
+    const res = await fetch(`${BACKEND}/get-languages`);
+    if (res.ok) {
+      const data = await res.json();
+      const selectedLangs = [data.source, ...(data.targets || [])].filter(Boolean);
+      if (selectedLangs.length > 0) {
+        activeLanguages = ALL_LANGUAGES.filter(item => selectedLangs.includes(item.lang));
+      }
+    }
+  } catch (e) {
+    console.error('[LSW] Failed to fetch configured languages:', e);
+  }
+
   // Build dropdown
-  LANGUAGES.forEach(function(item) {
+  activeLanguages.forEach(function(item) {
     const el = document.createElement('div');
     el.className = 'lsw-opt';
     el.dataset.lang = item.lang;
