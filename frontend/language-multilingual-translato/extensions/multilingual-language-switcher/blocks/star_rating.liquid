@@ -175,22 +175,25 @@
 
     console.log(`[LSW] Translating ${texts.length} nodes to ${lang}`);
     status.hidden = false;
+    statusTxt.textContent = `Translating...`;
 
-    for (let i = 0; i < nodes.length; i++) {
-      statusTxt.textContent = `Translating ${i + 1} of ${texts.length}...`;
-      try {
-        const res = await fetch(`${BACKEND}/translate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source_text: texts[i], target_language: lang })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          nodes[i].nodeValue = data.translated_text;
+    try {
+      const res = await fetch(`${BACKEND}/bulk-translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts: texts, target_language: lang })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const translations = data.translations;
+        for (let i = 0; i < nodes.length; i++) {
+          if (translations && translations[i]) {
+            nodes[i].nodeValue = translations[i];
+          }
         }
-      } catch(e) {
-        console.error(`[LSW] Node ${i} failed:`, e);
       }
+    } catch(e) {
+      console.error(`[LSW] Bulk translation failed:`, e);
     }
 
     status.hidden = true;

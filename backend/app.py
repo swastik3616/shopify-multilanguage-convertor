@@ -718,6 +718,16 @@ def translate_text():
     if not source_text or not target_language:
         return jsonify({"success": False, "message": "Missing text or language"}), 400
 
+    # 1. Check if translation exists in the database
+    existing = Translation.query.filter_by(
+        source_text=source_text,
+        target_language=target_language
+    ).first()
+
+    if existing:
+        return jsonify({"translated_text": existing.translated_text})
+
+    # 2. If not in DB, use AI provider to translate
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
