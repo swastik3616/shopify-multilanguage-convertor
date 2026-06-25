@@ -1,5 +1,5 @@
-<div id="lsw" style="position:fixed;bottom:24px;right:24px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <button id="lsw-btn" 
+<div id="lsw-embed" style="position:fixed;bottom:24px;right:24px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <button id="lsw-embed-btn" 
   style="display:flex;align-items:center;gap:8px;padding:12px 20px;
   background:linear-gradient(135deg,#1a1a2e,#16213e);
   color:#fff;border:none;border-radius:50px;cursor:pointer;font-size:14px;font-weight:600;
@@ -8,36 +8,36 @@
     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" 
     cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 
     10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-    <span id="lsw-label">English</span>
-    <svg id="lsw-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s ease;"><polyline points="6 9 12 15 18 9"/></svg>
+    <span id="lsw-embed-label">English</span>
+    <svg id="lsw-embed-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s ease;"><polyline points="6 9 12 15 18 9"/></svg>
   </button>
 
   <!-- Dropdown -->
-  <div id="lsw-dropdown" hidden style="position:absolute;
+  <div id="lsw-embed-dropdown" hidden style="position:absolute;
   bottom:calc(100% + 12px);right:0;background:#fff;border-radius:16px;
   box-shadow:0 8px 40px rgba(0,0,0,0.15);overflow:hidden;min-width:200px;
   border:1px solid rgba(0,0,0,0.06);">
     <div style="padding:12px 16px;background:#f8f9fa;border-bottom:1px solid #eee;
     font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;">Select Language</div>
-    <div id="lsw-options"></div>
+    <div id="lsw-embed-options"></div>
   </div>
 
   <!-- Status bar -->
-  <div id="lsw-status" hidden style="position:fixed;bottom:80px;right:24px;
+  <div id="lsw-embed-status" hidden style="position:fixed;bottom:80px;right:24px;
   background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:12px 20px;border-radius:12px;
-  font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;
+  font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:none;
   align-items:center;gap:10px;min-width:200px;z-index:99999;">
-    <div id="lsw-spinner" style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);
+    <div id="lsw-embed-spinner" style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);
     border-top-color:#fff;border-radius:50%;animation:lswSpin 0.75s linear infinite;flex-shrink:0;"></div>
-    <span id="lsw-status-text">Translating...</span>
+    <span id="lsw-embed-status-text">Translating...</span>
   </div>
 </div>
 
 <style>
   @keyframes lswSpin { to { transform: rotate(360deg); } }
-  #lsw-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
-  #lsw-btn:active { transform: scale(0.97); }
-  .lsw-opt {
+  #lsw-embed-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+  #lsw-embed-btn:active { transform: scale(0.97); }
+  .lsw-embed-opt {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -48,13 +48,13 @@
     transition: background 0.15s;
     border-bottom: 1px solid #f0f0f0;
   }
-  .lsw-opt:last-child { border-bottom: none; }
-  .lsw-opt:hover { background: #f3f4f6; }
-  .lsw-opt.active { background: #eef4ff; color: #0057b8; font-weight: 600; }
-  .lsw-opt-flag { font-size: 18px; }
-  .lsw-opt-name { flex: 1; }
-  .lsw-opt-check { color: #0057b8; font-size: 16px; display: none; }
-  .lsw-opt.active .lsw-opt-check { display: block; }
+  .lsw-embed-opt:last-child { border-bottom: none; }
+  .lsw-embed-opt:hover { background: #f3f4f6; }
+  .lsw-embed-opt.active { background: #eef4ff; color: #0057b8; font-weight: 600; }
+  .lsw-embed-opt-flag { font-size: 18px; }
+  .lsw-embed-opt-name { flex: 1; }
+  .lsw-embed-opt-check { color: #0057b8; font-size: 16px; display: none; }
+  .lsw-embed-opt.active .lsw-embed-opt-check { display: block; }
 </style>
 
 <script>
@@ -77,13 +77,13 @@
     { lang: 'Korean',     flag: '🇰🇷' }
   ];
 
-  const btn      = document.getElementById('lsw-btn');
-  const dropdown = document.getElementById('lsw-dropdown');
-  const label    = document.getElementById('lsw-label');
-  const chevron  = document.getElementById('lsw-chevron');
-  const status   = document.getElementById('lsw-status');
-  const statusTxt = document.getElementById('lsw-status-text');
-  const optCont  = document.getElementById('lsw-options');
+  const btn      = document.getElementById('lsw-embed-btn');
+  const dropdown = document.getElementById('lsw-embed-dropdown');
+  const label    = document.getElementById('lsw-embed-label');
+  const chevron  = document.getElementById('lsw-embed-chevron');
+  const status   = document.getElementById('lsw-embed-status');
+  const statusTxt = document.getElementById('lsw-embed-status-text');
+  const optCont  = document.getElementById('lsw-embed-options');
 
   let activeLanguages = ALL_LANGUAGES;
 
@@ -103,12 +103,12 @@
   // Build dropdown
   activeLanguages.forEach(function(item) {
     const el = document.createElement('div');
-    el.className = 'lsw-opt';
+    el.className = 'lsw-embed-opt';
     el.dataset.lang = item.lang;
     el.innerHTML = `
-      <span class="lsw-opt-flag">${item.flag}</span>
-      <span class="lsw-opt-name">${item.lang}</span>
-      <span class="lsw-opt-check">✓</span>
+      <span class="lsw-embed-opt-flag">${item.flag}</span>
+      <span class="lsw-embed-opt-name">${item.lang}</span>
+      <span class="lsw-embed-opt-check">✓</span>
     `;
     el.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -126,7 +126,7 @@
   });
 
   document.addEventListener('click', function(e) {
-    if (!e.target.closest('#lsw')) {
+    if (!e.target.closest('#lsw-embed')) {
       dropdown.hidden = true;
       chevron.style.transform = '';
     }
@@ -171,7 +171,7 @@
     while ((n = walker.nextNode())) { nodes.push(n); texts.push(n.nodeValue.trim()); }
 
     console.log(`[LSW] Translating ${texts.length} nodes to ${lang}`);
-    status.hidden = false;
+    status.style.display = 'flex';
     statusTxt.textContent = `Translating...`;
 
     try {
@@ -193,7 +193,7 @@
       console.error(`[LSW] Bulk translation failed:`, e);
     }
 
-    status.hidden = true;
+    status.style.display = 'none';
     statusTxt.textContent = 'Translating...';
     console.log('[LSW] Done!');
   }
