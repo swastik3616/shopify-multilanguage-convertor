@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import StatCard from "../components/StatCard";
 import { Languages, Plug, ArrowRightLeft, Clock, MoreVertical, AlertTriangle } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -33,6 +34,7 @@ function Skeleton({ className }) {
 }
 
 function DashboardPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -86,11 +88,7 @@ function DashboardPage() {
 
   const recentActivity = useMemo(() => {
     if (data?.recentActivity?.length) return data.recentActivity;
-    return [
-      { id: 1, action: 'Translated Homepage', time: 'English to French • 2 mins ago', icon: ArrowRightLeft, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-100' },
-      { id: 2, action: 'Added German Language', time: 'Settings updated • 1 hr ago', icon: Languages, iconColor: 'text-blue-600', iconBg: 'bg-blue-100' },
-      { id: 3, action: 'Provider updated', time: 'OpenAI API Key changed • 3 hrs ago', icon: Plug, iconColor: 'text-amber-600', iconBg: 'bg-amber-100' },
-    ];
+    return [];
   }, [data]);
 
   const chartData = useMemo(() => {
@@ -108,7 +106,7 @@ function DashboardPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Dashboard</h1>
-        <button className="btn btn-primary px-4 py-2" onClick={() => window.open('https://shopify-multilanguage-convertor-plugin.vercel.app/translations', '_blank')}>
+        <button className="btn btn-primary px-4 py-2" onClick={() => navigate('/translations')}>
           + New Translation
         </button>
       </div>

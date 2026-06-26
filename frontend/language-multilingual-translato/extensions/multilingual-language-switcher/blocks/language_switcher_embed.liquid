@@ -133,7 +133,7 @@
   });
 
   function setActive(lang) {
-    document.querySelectorAll('.lsw-opt').forEach(function(o) {
+    document.querySelectorAll('.lsw-embed-opt').forEach(function(o) {
       o.classList.toggle('active', o.dataset.lang === lang);
     });
     label.textContent = lang;
@@ -194,7 +194,6 @@
     }
 
     status.style.display = 'none';
-    statusTxt.textContent = 'Translating...';
     console.log('[LSW] Done!');
   }
 
