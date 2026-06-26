@@ -275,7 +275,12 @@ function SeoPage() {
                     
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Original SEO Title</label>
+                        <div className="flex justify-between items-end mb-1">
+                          <label className="block text-xs font-medium text-slate-500">Original SEO Title</label>
+                          <span className={`text-[10px] ${originalTitle.length > 60 ? 'text-red-400' : 'text-slate-400'}`}>
+                            {originalTitle.length} / 60
+                          </span>
+                        </div>
                         <input
                           type="text"
                           className="input-field w-full text-sm bg-white"
@@ -286,7 +291,12 @@ function SeoPage() {
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Original Meta Description</label>
+                        <div className="flex justify-between items-end mb-1">
+                          <label className="block text-xs font-medium text-slate-500">Original Meta Description</label>
+                          <span className={`text-[10px] ${originalDescription.length > 160 ? 'text-red-400' : 'text-slate-400'}`}>
+                            {originalDescription.length} / 160
+                          </span>
+                        </div>
                         <textarea
                           rows={2}
                           className="input-field w-full text-sm bg-white resize-none"
@@ -316,9 +326,14 @@ function SeoPage() {
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                          Translated SEO Title
-                        </label>
+                        <div className="flex justify-between items-end mb-1">
+                          <label className="block text-sm font-medium text-slate-700">
+                            Translated SEO Title
+                          </label>
+                          <span className={`text-xs ${metaTitle.length > 60 ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
+                            {metaTitle.length} / 60
+                          </span>
+                        </div>
                         <input
                           type="text"
                           className="input-field w-full"
@@ -329,9 +344,14 @@ function SeoPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                          Translated Meta Description
-                        </label>
+                        <div className="flex justify-between items-end mb-1">
+                          <label className="block text-sm font-medium text-slate-700">
+                            Translated Meta Description
+                          </label>
+                          <span className={`text-xs ${metaDescription.length > 160 ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
+                            {metaDescription.length} / 160
+                          </span>
+                        </div>
                         <textarea
                           rows={3}
                           className="input-field w-full resize-none"
