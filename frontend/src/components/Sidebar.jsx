@@ -5,7 +5,6 @@ import {
   Plug,
   ArrowRightLeft,
   Globe,
-  ListTodo,
   BarChart3,
   Settings,
   History,
@@ -25,7 +24,6 @@ function Sidebar() {
     { name: "Translations", path: "/translations", icon: ArrowRightLeft },
     { name: "Live Translation", path: "/live-translation", icon: Globe },
     { name: "SEO Manager", path: "/seo", icon: Search },
-    { name: "Jobs", path: "/jobs", icon: ListTodo },
     { name: "Analytics", path: "/analytics", icon: BarChart3 },
     { name: "Audit History", path: "/audit-history", icon: History },
   ];

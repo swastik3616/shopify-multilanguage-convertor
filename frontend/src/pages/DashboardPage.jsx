@@ -187,6 +187,10 @@ function DashboardPage() {
                   </div>
                 </div>
               ))
+            ) : recentActivity.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-sm text-slate-500">
+                No recent activity to show
+              </div>
             ) : (
               recentActivity.map((item, index) => {
                 const Icon = item.icon || ArrowRightLeft;
