@@ -29,8 +29,7 @@ function Sidebar() {
   ];
 
   const contentLinks = [
-    { name: "Translations", path: "/translations", icon: ArrowRightLeft },
-    { name: "Live Translation", path: "/live-translation", icon: Globe },
+    { name: "Translations", path: "/translations", icon: Globe },
   ];
 
   const seoLinks = [
