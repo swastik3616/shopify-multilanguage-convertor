@@ -13,9 +13,6 @@ from model import Translation, PageContent, AuditLog, ShopifyStore, AppSetting
 from datetime import datetime
 
 app = Flask(__name__)
-
-# Allow all origins — required so Shopify storefronts (any *.myshopify.com domain)
-# can call the backend directly from theme scripts.
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
