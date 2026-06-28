@@ -8,7 +8,7 @@
     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" 
     cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 
     10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-    <span id="lsw-embed-label">English</span>
+    <span id="lsw-embed-label">Loading...</span>
     <svg id="lsw-embed-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s ease;"><polyline points="6 9 12 15 18 9"/></svg>
   </button>
 
@@ -85,12 +85,20 @@
   const statusTxt = document.getElementById('lsw-embed-status-text');
   const optCont  = document.getElementById('lsw-embed-options');
 
+  // sourceLanguage: the store's original language (fetched from backend)
+  // Falls back to 'English' if backend is unreachable
+  let sourceLanguage = 'English';
   let activeLanguages = ALL_LANGUAGES;
 
   try {
     const res = await fetch(`${BACKEND}/get-languages`);
     if (res.ok) {
       const data = await res.json();
+      // Set the dynamic source language
+      if (data.source) {
+        sourceLanguage = data.source;
+      }
+      // Build the list: source language first, then targets only
       const selectedLangs = [data.source, ...(data.targets || [])].filter(Boolean);
       if (selectedLangs.length > 0) {
         activeLanguages = ALL_LANGUAGES.filter(item => selectedLangs.includes(item.lang));
@@ -143,9 +151,10 @@
     dropdown.hidden = true;
     chevron.style.transform = '';
 
-    if (lang === 'English') {
+    // If the user selects the source language, reset page to original
+    if (lang === sourceLanguage) {
       localStorage.removeItem(STORAGE_KEY);
-      setActive('English');
+      setActive(sourceLanguage);
       location.reload();
       return;
     }
@@ -199,11 +208,12 @@
 
   // Auto restore saved language
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved && saved !== 'English') {
+  if (saved && saved !== sourceLanguage) {
     setActive(saved);
     runTranslation(saved);
   } else {
-    setActive('English');
+    // No saved preference — show the store's source language as active
+    setActive(sourceLanguage);
   }
 
 })();
