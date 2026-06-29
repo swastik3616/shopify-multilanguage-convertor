@@ -387,21 +387,10 @@ def get_dashboard_stats():
         label = day.strftime("%a %d").replace(" 0", " ")  # e.g. "Mon 23"
         day_labels.append(label)
 
-        day_start = datetime(day.year, day.month, day.day, 0, 0, 0)
-        day_end   = datetime(day.year, day.month, day.day, 23, 59, 59)
-
-        try:
-            count = Translation.query.filter(
-                Translation.created_at >= day_start,
-                Translation.created_at <= day_end
-            ).count()
-        except Exception:
-            # created_at column may not exist yet in older DB — fall back to 0
-            # MUST rollback otherwise Postgres aborts the transaction for subsequent queries
-            db.session.rollback()
-            count = 0
-
-        volume_by_day.append(count)
+        # Since the Translation table lacks a created_at column on Render,
+        # we cannot query translations per day without a database migration.
+        # Returning 0 to keep the dashboard running without 500 errors.
+        volume_by_day.append(0)
 
     # ── Recent activity (last 8 audit log entries) ───────────────────────────
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()
