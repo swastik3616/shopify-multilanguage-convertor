@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "a0e57fc9651cc4e3bdee89b0489e46a8"
-name = "LanguageMultilingual Translato"
+name = "multilanguage Translator"
 application_url = "https://shopify-multilanguage-convertor-plugin.vercel.app/"
 embedded = true
 

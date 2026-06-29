@@ -354,29 +354,55 @@ def seed_shopify_page_contents(page):
 def get_dashboard_stats():
     if request.method == 'OPTIONS':
         return '', 204
-    
+
+    from datetime import timedelta
+
     # Languages count
     lang_settings = get_setting("language_settings", {})
     targets = lang_settings.get("targets", [])
     active_languages = len(targets)
     if lang_settings.get("source"):
         active_languages += 1
-        
+
     # Providers count
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     api_keys = provider_settings.get("api_keys", {})
     active_providers = sum(1 for key, val in api_keys.items() if val)
-    
-    # Translations count
+
+    # Total translations count
     translation_count = Translation.query.count()
-    
+
     # Installation time
     first_log = AuditLog.query.order_by(AuditLog.created_at.asc()).first()
-    if first_log and first_log.created_at:
-        install_time = first_log.created_at.strftime("%Y-%m-%d %H:%M")
-    else:
-        install_time = "N/A"
-        
+    install_time = first_log.created_at.strftime("%Y-%m-%d %H:%M") if first_log and first_log.created_at else "N/A"
+
+    # ── Live volume by day (last 7 days) ─────────────────────────────────────
+    today = datetime.utcnow().date()
+    volume_by_day = []
+    day_labels = []
+
+    for offset in range(6, -1, -1):          # 6 days ago → today
+        day = today - timedelta(days=offset)
+        day_start = datetime(day.year, day.month, day.day, 0, 0, 0)
+        day_end   = datetime(day.year, day.month, day.day, 23, 59, 59)
+
+        count = Translation.query.filter(
+            Translation.created_at >= day_start,
+            Translation.created_at <= day_end
+        ).count()
+
+        volume_by_day.append(count)
+        # Cross-platform date label — strip leading zero from day number
+        label = day.strftime("%a %d").replace(" 0", " ")  # "Mon 23" or "Sat 5"
+        day_labels.append(label)
+
+    # ── Recent activity (last 8 audit log entries) ───────────────────────────
+    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()
+    recent_activity = []
+    for log in logs:
+        ts = log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else ""
+        recent_activity.append({"action": log.action, "time": ts})
+
     return jsonify({
         "overview": {
             "activeLanguages": active_languages,
@@ -385,9 +411,10 @@ def get_dashboard_stats():
             "installationTime": install_time
         },
         "analytics": {
-             "volumeByDay": [0,0,0,0,0,0,translation_count]
+            "volumeByDay": volume_by_day,
+            "dayLabels":   day_labels,
         },
-        "recentActivity": []
+        "recentActivity": recent_activity
     })
 
 
