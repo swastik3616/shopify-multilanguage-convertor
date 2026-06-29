@@ -206,15 +206,11 @@
     console.log('[LSW] Done!');
   }
 
-  // Auto restore saved language
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved && saved !== sourceLanguage) {
-    setActive(saved);
-    runTranslation(saved);
-  } else {
-    // No saved preference — show the store's source language as active
-    setActive(sourceLanguage);
-  }
+  // Always start in the source language — clear any stale saved preference.
+  // The store should open in its original language on every fresh page load.
+  // Users must consciously pick a language from the switcher each session.
+  localStorage.removeItem(STORAGE_KEY);
+  setActive(sourceLanguage);
 
 })();
 </script>
