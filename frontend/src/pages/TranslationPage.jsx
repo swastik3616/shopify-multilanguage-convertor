@@ -490,7 +490,7 @@ export default function TranslationPage() {
 
         {/* Sections */}
         {hasContent ? (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6 items-start">
             {sections.map((section,index)=>(
               <SectionRow
                 key={section.id}
