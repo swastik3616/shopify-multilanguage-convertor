@@ -397,6 +397,8 @@ def get_dashboard_stats():
             ).count()
         except Exception:
             # created_at column may not exist yet in older DB — fall back to 0
+            # MUST rollback otherwise Postgres aborts the transaction for subsequent queries
+            db.session.rollback()
             count = 0
 
         volume_by_day.append(count)
