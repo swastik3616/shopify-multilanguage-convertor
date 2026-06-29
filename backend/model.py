@@ -22,6 +22,12 @@ class Translation(db.Model):
         nullable=False
     )
 
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=True          # nullable so existing rows don't break
+    )
+
 
 class PageContent(db.Model):
     __tablename__ = "page_contents"

@@ -383,18 +383,23 @@ def get_dashboard_stats():
 
     for offset in range(6, -1, -1):          # 6 days ago → today
         day = today - timedelta(days=offset)
+        # Cross-platform date label — strip leading zero from day number
+        label = day.strftime("%a %d").replace(" 0", " ")  # e.g. "Mon 23"
+        day_labels.append(label)
+
         day_start = datetime(day.year, day.month, day.day, 0, 0, 0)
         day_end   = datetime(day.year, day.month, day.day, 23, 59, 59)
 
-        count = Translation.query.filter(
-            Translation.created_at >= day_start,
-            Translation.created_at <= day_end
-        ).count()
+        try:
+            count = Translation.query.filter(
+                Translation.created_at >= day_start,
+                Translation.created_at <= day_end
+            ).count()
+        except Exception:
+            # created_at column may not exist yet in older DB — fall back to 0
+            count = 0
 
         volume_by_day.append(count)
-        # Cross-platform date label — strip leading zero from day number
-        label = day.strftime("%a %d").replace(" 0", " ")  # "Mon 23" or "Sat 5"
-        day_labels.append(label)
 
     # ── Recent activity (last 8 audit log entries) ───────────────────────────
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()
