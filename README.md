@@ -72,6 +72,7 @@ Translations are intelligently cached in a PostgreSQL database, so repeated requ
 - **Masonry Grid Layout:** The Translation Workspace has been upgraded to a responsive, masonry-style grid layout, making it much easier to view and translate multiple sections simultaneously on large monitors.
 - **Storefront Auto-Translate Fix:** Fixed a critical bug in the storefront `language_switcher_embed.liquid` extension that forcefully translated the store to a target language on every page load. The store now respects the native source language initially.
 - **Live Dashboard Analytics:** The admin dashboard now displays real, dynamic database queries for translation volumes over the last 7 days and a live activity feed pulling directly from the Audit Logs, complete with PostgreSQL transaction safety fallback for legacy schemas.
+- **Backend Modular Refactoring:** The monolithic `app.py` (1,600+ lines) has been split into clean, focused modules using **Flask Blueprints**. All routes are now in a dedicated `routes/` folder, and shared logic lives in a `utils/` folder — making the codebase far easier to debug and extend.
 
 ---
 
@@ -106,18 +107,30 @@ Translations are intelligently cached in a PostgreSQL database, so repeated requ
 shopify-multilingual-translator/
 │
 ├── backend/                              # Python Flask API
-│   ├── app.py                            # All API routes, business logic
-│   ├── model.py                          # SQLAlchemy database models
-│   ├── database.py                       # Database initialization
+│   ├── app.py                            # Entry point — initializes app & registers blueprints
+│   ├── database.py                       # SQLAlchemy database initialization
+│   ├── model.py                          # Database models (Translation, PageContent, AuditLog, etc.)
 │   ├── requirements.txt                  # Python dependencies
-│   └── .env                              # Environment variables (not committed)
+│   │
+│   ├── routes/                           # API route blueprints (one file per feature)
+│   │   ├── auth_routes.py                # /install, /auth/callback, /shopify/check-token
+│   │   ├── translation_routes.py         # /translate, /bulk-translate, /translations CRUD
+│   │   ├── content_routes.py             # /contents, /contents/sync, /contents/import
+│   │   ├── settings_routes.py            # /save-languages, /save-provider, /save-store-settings
+│   │   ├── dashboard_routes.py           # /api/dashboard, /analytics, /audit-history
+│   │   └── seo_routes.py                 # /api/seo-resources, /api/seo-translate
+│   │
+│   └── utils/                            # Shared helper functions (not routes)
+│       ├── ai_provider.py                # LLM logic — OpenAI, Gemini, Claude, Groq, Ollama
+│       ├── shopify_client.py             # Shopify REST API fetching + HTML text extraction
+│       └── helpers.py                    # get_setting, set_setting, get_shopify_credentials, etc.
 │
 ├── frontend/                             # React Admin Dashboard (Vite)
 │   ├── src/
 │   │   ├── pages/
 │   │   │   ├── DashboardPage.jsx         # Overview stats & recent activity
 │   │   │   ├── LanguagesPage.jsx         # Source & target language configuration
-│   │   │   ├── TranslationPage.jsx       # URL fetch + side-by-side translation
+│   │   │   ├── TranslationPage.jsx       # URL fetch + side-by-side translation workspace
 │   │   │   ├── TranslationsPage.jsx      # View, edit & manage translations
 │   │   │   ├── ProvidersPage.jsx         # AI provider & API key management
 │   │   │   ├── SeoPage.jsx               # SEO meta translation via GraphQL

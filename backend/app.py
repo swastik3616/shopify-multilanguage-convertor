@@ -8,12 +8,12 @@ import os
 from database import db
 
 # ── Import Blueprints ────────────────────────────────────────────────────────
-from routes.auth_routes        import auth_bp
+from routes.auth_routes import auth_bp
 from routes.translation_routes import translation_bp
-from routes.content_routes     import content_bp
-from routes.settings_routes    import settings_bp
-from routes.dashboard_routes   import dashboard_bp
-from routes.seo_routes         import seo_bp
+from routes.content_routes import content_bp
+from routes.settings_routes import settings_bp
+from routes.dashboard_routes import dashboard_bp
+from routes.seo_routes import seo_bp
 
 # ── App Factory ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
