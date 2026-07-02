@@ -47,6 +47,15 @@ export const fetchUrlContent = async (url) => {
   return response.json();
 };
 
+export const fetchAndParseUrl = async (url, page) => {
+  const response = await apiFetch(`${API_URL}/contents/fetch-and-parse`, {
+    method: "POST",
+    body: JSON.stringify({ url, page }),
+  });
+
+  return response.json();
+};
+
 export const updateContent = async (contentId, payload) => {
   const response = await apiFetch(`${API_URL}/contents/${contentId}`, {
     method: "PUT",

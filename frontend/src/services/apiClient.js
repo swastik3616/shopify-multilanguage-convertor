@@ -66,14 +66,20 @@ export async function apiFetch(path, options = {}) {
   const contentType = response.headers.get("content-type") || "";
 
   if (!response.ok) {
-    const body = await response.text();
+    const bodyText = await response.text();
+    let errorMessage = `API request failed ${response.status} ${response.statusText}`;
+    
+    try {
+      const jsonBody = JSON.parse(bodyText);
+      if (jsonBody.message) {
+        errorMessage = jsonBody.message;
+      }
+    } catch (e) {
+      // Not JSON, fallback to detailed text
+      errorMessage = `API request failed ${response.status} ${response.statusText}\nURL=${url}\nBODY=${bodyText}`;
+    }
 
-    throw new Error(
-      `API request failed ${response.status} ${response.statusText}
-       URL=${url}
-       SHOP=${shop || "<none>"}
-       BODY=${body}`
-    );
+    throw new Error(errorMessage);
   }
 
   if (!contentType.includes("application/json")) {

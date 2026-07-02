@@ -216,6 +216,82 @@ def get_contents_store_status():
     })
 
 
+@content_bp.route("/contents/fetch-and-parse", methods=["POST", "OPTIONS"])
+def fetch_and_parse_url():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    data = request.json or {}
+    url = data.get("url", "").strip()
+    page = data.get("page", "other").strip()
+
+    if not url:
+        return jsonify({"success": False, "message": "URL is required"}), 400
+
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            return jsonify({"success": False, "message": f"Failed to fetch {url}. Status: {resp.status_code}"}), 400
+        html = resp.text
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error fetching url: {str(e)}"}), 400
+
+    soup = BeautifulSoup(html, "html.parser")
+    target_tags = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "button", "a", "span", "label"]
+    
+    imported = 0
+    title_tag = soup.find("title")
+    if title_tag and title_tag.text:
+        text = title_tag.get_text(strip=True)
+        if text:
+            existing = PageContent.query.filter_by(page=page, key="meta_title").first()
+            if existing:
+                existing.source_text = text
+            else:
+                db.session.add(PageContent(page=page, key="meta_title", source_text=text, html_tag="title", section_id="META"))
+            imported += 1
+
+    sections = soup.find_all("div", id=re.compile(r"^shopify-section-"))
+    if not sections:
+        body = soup.find("body")
+        if body:
+            sections = [body]
+        else:
+            sections = [soup]
+    
+    for section_idx, section in enumerate(sections):
+        if not section:
+            continue
+        section_id = section.get("id") or "main_body"
+        
+        for elem_idx, element in enumerate(section.find_all(target_tags)):
+            text = element.get_text(separator=" ", strip=True)
+            if not text or len(text) < 2:
+                continue
+            
+            html_tag = element.name.lower()
+            key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"
+            
+            existing = PageContent.query.filter_by(page=page, key=key).first()
+            if existing:
+                existing.source_text = text
+                existing.html_tag = html_tag
+                existing.section_id = section_id
+            else:
+                db.session.add(PageContent(
+                    page=page,
+                    key=key,
+                    source_text=text,
+                    html_tag=html_tag,
+                    section_id=section_id
+                ))
+            imported += 1
+
+    db.session.commit()
+    return jsonify({"success": True, "message": f"Extracted and saved {imported} elements.", "imported": imported})
+
+
 @content_bp.route("/contents/sync", methods=["POST", "OPTIONS"])
 def sync_contents():
     if request.method == "OPTIONS":

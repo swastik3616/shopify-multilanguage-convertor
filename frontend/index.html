@@ -1,36 +1,39 @@
 <!doctype html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="shopify-api-key" content="a0e57fc9651cc4e3bdee89b0489e46a8" />
     <script>
-      (function() {
-        var urlParams = new URLSearchParams(window.location.search);
-        var shop = urlParams.get('shop') || localStorage.getItem('shopify_shop');
-        var host = urlParams.get('host') || localStorage.getItem('shopify_host');
-        
-        // Fallback for local development / outside iframe testing to prevent App Bridge crash
-        if (!shop) {
-          shop = '0jeqkm-rp.myshopify.com';
-          host = btoa(shop + '/admin');
-        }
+        (function () {
+            var urlParams = new URLSearchParams(window.location.search);
+            var shop = urlParams.get('shop') || localStorage.getItem('shopify_shop');
+            var host = urlParams.get('host') || localStorage.getItem('shopify_host');
 
-        if (shop) localStorage.setItem('shopify_shop', shop);
-        if (host) localStorage.setItem('shopify_host', host);
-        if ((!urlParams.get('shop') && shop) || (!urlParams.get('host') && host)) {
-          if (shop) urlParams.set('shop', shop);
-          if (host) urlParams.set('host', host);
-          window.history.replaceState({}, document.title, window.location.pathname + '?' + urlParams.toString());
-        }
-      })();
+            // Fallback for local development / outside iframe testing to prevent App Bridge crash
+            if (!shop) {
+                shop = '0jeqkm-rp.myshopify.com';
+                host = btoa(shop + '/admin');
+            }
+
+            if (shop) localStorage.setItem('shopify_shop', shop);
+            if (host) localStorage.setItem('shopify_host', host);
+            if ((!urlParams.get('shop') && shop) || (!urlParams.get('host') && host)) {
+                if (shop) urlParams.set('shop', shop);
+                if (host) urlParams.set('host', host);
+                window.history.replaceState({}, document.title, window.location.pathname + '?' + urlParams.toString());
+            }
+        })();
     </script>
     <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     <title>frontend</title>
-  </head>
-  <body>
+</head>
+
+<body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
+
 </html>
