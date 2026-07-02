@@ -130,22 +130,9 @@ function LanguagesPage() {
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Source Language
             </label>
-            <select
-              className="input-field w-full md:max-w-md"
-              value={sourceLanguage}
-              onChange={(e) => {
-                const newSource = e.target.value;
-                setSourceLanguage(newSource);
-                // If the new source was previously a target, remove it
-                setTargetLanguages((prev) => prev.filter((l) => l !== newSource));
-              }}
-            >
-              {ALL_SOURCE_LANGUAGES.map((lang) => (
-                <option key={lang} value={lang}>
-                  {lang}
-                </option>
-              ))}
-            </select>
+            <div className="input-field w-full md:max-w-md flex items-center bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200">
+              English (Default)
+            </div>
             <p className="text-xs text-slate-500 mt-2">
               This is the original language your store content is written in. It will always be available on your storefront.
             </p>

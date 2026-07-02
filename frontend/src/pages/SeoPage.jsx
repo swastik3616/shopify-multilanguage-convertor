@@ -25,6 +25,12 @@ function SeoPage() {
   const [originalDescription, setOriginalDescription] = useState("");
   const [isSavingOriginal, setIsSavingOriginal] = useState(false);
 
+  // Translation state
+  const [targetLang, setTargetLang] = useState("Hindi");
+  const [translatedTitle, setTranslatedTitle] = useState("");
+  const [translatedDescription, setTranslatedDescription] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -72,6 +78,8 @@ function SeoPage() {
     setSelectedResource(resource);
     setOriginalTitle(resource.originalMetaTitle || "");
     setOriginalDescription(resource.originalMetaDescription || "");
+    setTranslatedTitle("");
+    setTranslatedDescription("");
   };
 
   const handleSaveOriginal = async () => {
@@ -87,13 +95,35 @@ function SeoPage() {
 
       await updateOriginalSeo(payload);
       alert("Original SEO metadata successfully updated in Shopify!");
-      // Optionally refresh the list to reflect changes in the sidebar
       fetchResources();
     } catch (error) {
       console.error(error);
       alert(error.message || "Failed to update original SEO metadata");
     } finally {
       setIsSavingOriginal(false);
+    }
+  };
+
+  const handleTranslate = async () => {
+    if (!selectedResource) return;
+    setIsTranslating(true);
+    try {
+      const payload = {
+        resourceId: selectedResource.id,
+        resourceType: resourceType,
+        targetLanguage: targetLang,
+        metaTitle: originalTitle,
+        metaDescription: originalDescription,
+      };
+      const data = await translateSeoResource(payload);
+      setTranslatedTitle(data.translatedMetaTitle || "");
+      setTranslatedDescription(data.translatedMetaDescription || "");
+      alert("Successfully translated and saved to Shopify!");
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Translation failed");
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -266,6 +296,69 @@ function SeoPage() {
                       >
                         {isSavingOriginal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                         {isSavingOriginal ? "Updating..." : "Update Original in Shopify"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TRANSLATED SEO EDITOR */}
+                <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-emerald-800 uppercase tracking-wide flex items-center gap-2">
+                      Translate Metadata
+                    </h3>
+                    <select
+                      className="input-field h-8 py-0 px-2 text-xs w-32 border-emerald-200"
+                      value={targetLang}
+                      onChange={(e) => setTargetLang(e.target.value)}
+                    >
+                      {Object.keys(LANGUAGE_LOCALES).map(lang => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between items-end mb-1">
+                        <label className="block text-xs font-medium text-emerald-700">Translated SEO Title</label>
+                        <span className={`text-[10px] ${translatedTitle.length > 60 ? 'text-red-400' : 'text-emerald-500'}`}>
+                          {translatedTitle.length} / 60
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        className="input-field w-full text-sm bg-white border-emerald-200"
+                        placeholder="AI will generate this..."
+                        value={translatedTitle}
+                        onChange={(e) => setTranslatedTitle(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <div className="flex justify-between items-end mb-1">
+                        <label className="block text-xs font-medium text-emerald-700">Translated Meta Description</label>
+                        <span className={`text-[10px] ${translatedDescription.length > 160 ? 'text-red-400' : 'text-emerald-500'}`}>
+                          {translatedDescription.length} / 160
+                        </span>
+                      </div>
+                      <textarea
+                        rows={2}
+                        className="input-field w-full text-sm bg-white resize-none border-emerald-200"
+                        placeholder="AI will generate this..."
+                        value={translatedDescription}
+                        onChange={(e) => setTranslatedDescription(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="pt-2">
+                      <button
+                        className="btn btn-primary bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto px-4 py-1.5 text-xs flex items-center justify-center gap-1"
+                        onClick={handleTranslate}
+                        disabled={isTranslating}
+                      >
+                        {isTranslating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Globe className="h-3 w-3" />}
+                        {isTranslating ? "Translating..." : "Translate & Save"}
                       </button>
                     </div>
                   </div>
