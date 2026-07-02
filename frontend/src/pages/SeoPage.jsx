@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Globe, Save, Loader2, Store } from "lucide-react";
 import { getSeoResources, translateSeoResource, updateOriginalSeo } from "../services/seoService";
 import { getContentsStoreStatus } from "../services/contentService";
+import { translateText } from "../services/translationService";
 import { Link } from "react-router-dom";
 
 // Mapping languages to Shopify ISO locales
@@ -108,16 +109,37 @@ function SeoPage() {
     if (!selectedResource) return;
     setIsTranslating(true);
     try {
+      // 1. Actually translate the original content to the target language
+      let newTitle = translatedTitle;
+      let newDesc = translatedDescription;
+      
+      if (originalTitle && !translatedTitle) {
+        const rTitle = await translateText({ source_text: originalTitle, target_language: targetLang });
+        newTitle = rTitle.translated_text || originalTitle;
+      }
+      
+      if (originalDescription && !translatedDescription) {
+        const rDesc = await translateText({ source_text: originalDescription, target_language: targetLang });
+        newDesc = rDesc.translated_text || originalDescription;
+      }
+      
+      setTranslatedTitle(newTitle);
+      setTranslatedDescription(newDesc);
+
+      // 2. Map target language to Shopify locale
+      const locale = LANGUAGE_LOCALES[targetLang] || "es";
+
+      // 3. Save to Shopify
       const payload = {
         resourceId: selectedResource.id,
-        resourceType: resourceType,
-        targetLanguage: targetLang,
-        metaTitle: originalTitle,
-        metaDescription: originalDescription,
+        locale: locale,
+        metaTitle: newTitle,
+        metaDescription: newDesc,
+        titleDigest: selectedResource.titleDigest,
+        descriptionDigest: selectedResource.descriptionDigest
       };
-      const data = await translateSeoResource(payload);
-      setTranslatedTitle(data.translatedMetaTitle || "");
-      setTranslatedDescription(data.translatedMetaDescription || "");
+      
+      await translateSeoResource(payload);
       alert("Successfully translated and saved to Shopify!");
     } catch (error) {
       console.error(error);
@@ -329,7 +351,7 @@ function SeoPage() {
                       <input
                         type="text"
                         className="input-field w-full text-sm bg-white border-emerald-200"
-                        placeholder="AI will generate this..."
+                        placeholder="Click translate to generate..."
                         value={translatedTitle}
                         onChange={(e) => setTranslatedTitle(e.target.value)}
                       />
@@ -345,7 +367,7 @@ function SeoPage() {
                       <textarea
                         rows={2}
                         className="input-field w-full text-sm bg-white resize-none border-emerald-200"
-                        placeholder="AI will generate this..."
+                        placeholder="Click translate to generate..."
                         value={translatedDescription}
                         onChange={(e) => setTranslatedDescription(e.target.value)}
                       />
