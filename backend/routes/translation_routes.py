@@ -166,6 +166,32 @@ def get_translations():
         "translated_text": item.translated_text
     } for item in records])
 
+@translation_bp.route("/translations/manual", methods=["POST", "OPTIONS"])
+def create_manual_translation():
+    if request.method == "OPTIONS":
+        return "", 204
+    data = request.json
+    source_text = data.get("source_text")
+    target_language = data.get("target_language")
+    translated_text = data.get("translated_text")
+    
+    if not source_text or not target_language or not translated_text:
+        return jsonify({"success": False, "message": "Missing fields"}), 400
+        
+    existing = Translation.query.filter_by(source_text=source_text, target_language=target_language).first()
+    if existing:
+        existing.translated_text = translated_text
+        db.session.commit()
+        return jsonify({"success": True, "id": existing.id})
+        
+    new_t = Translation(source_text=source_text, target_language=target_language, translated_text=translated_text)
+    db.session.add(new_t)
+    db.session.commit()
+    db.session.add(AuditLog(action=f"Manual Translation Created: {new_t.id}"))
+    db.session.commit()
+    return jsonify({"success": True, "id": new_t.id})
+
+
 
 @translation_bp.route("/translations/<int:translation_id>", methods=["PUT", "OPTIONS"])
 def update_translation(translation_id):

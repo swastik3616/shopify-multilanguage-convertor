@@ -82,6 +82,19 @@ export const updateTranslation = async (translationId, translatedText) => {
   return response.json();
 };
 
+export const createManualTranslation = async (sourceText, targetLanguage, translatedText) => {
+  const response = await apiFetch(`${API_URL}/translations/manual`, {
+    method: "POST",
+    body: JSON.stringify({
+      source_text: sourceText,
+      target_language: targetLanguage,
+      translated_text: translatedText
+    }),
+  });
+
+  return response.json();
+};
+
 export const deleteTranslation = async (translationId) => {
   const response = await apiFetch(`${API_URL}/translations/${translationId}`, {
     method: "DELETE",
