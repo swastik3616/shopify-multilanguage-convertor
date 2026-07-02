@@ -1,76 +1,246 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
-  Search, Languages, FileText, Trash2, RefreshCw,
-  Store, Globe, ChevronRight, Save, Loader2, X, Edit3, Check
+  Search, Languages, FileText, RefreshCw, Store,
+  Globe, Save, Loader2, X, Edit3, Check, Trash2, Zap
 } from "lucide-react";
 import { getTranslations } from "../services/translationHistoryService";
 import {
   getContents, getContentsStoreStatus, syncContentsFromShopify,
-  createContent, updateContent, deleteContent, fetchUrlContent,
-  importContentToLibrary, translateContent, updateTranslation,
-  deleteTranslation, createManualTranslation,
+  deleteContent, fetchUrlContent, importContentToLibrary,
+  translateContent, updateContent, updateTranslation,
+  createManualTranslation,
 } from "../services/contentService";
 
 const TARGET_LANGUAGES = ["Hindi", "Marathi", "French", "German", "Spanish", "Italian"];
+const LANG_FLAGS = { Hindi:"🇮🇳", Marathi:"🇮🇳", French:"🇫🇷", German:"🇩🇪", Spanish:"🇪🇸", Italian:"🇮🇹" };
 
-const LANG_FLAGS = {
-  Hindi: "🇮🇳", Marathi: "🇮🇳", French: "🇫🇷",
-  German: "🇩🇪", Spanish: "🇪🇸", Italian: "🇮🇹",
-};
+/* ─────────────────────────────────────────────
+   Single row card: one content item
+───────────────────────────────────────────── */
+function ContentRow({ item, targetLanguage, allTranslations, onDelete, onContentSaved, onTranslationSaved }) {
+  const existing = allTranslations.find(
+    h => h.source_text === item.source_text && h.target_language === targetLanguage
+  );
 
-function TranslationsPage() {
-  const [contents, setContents] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [pageFilter, setPageFilter] = useState("home");
-  const [selectedContent, setSelectedContent] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [translatedText, setTranslatedText]   = useState(existing?.translated_text || "");
+  const [isTranslating, setIsTranslating]     = useState(false);
+  const [isEditingOrig, setIsEditingOrig]     = useState(false);
+  const [editOrig, setEditOrig]               = useState(item.source_text);
+  const [isSavingOrig, setIsSavingOrig]       = useState(false);
+  const [isEditingTrans, setIsEditingTrans]   = useState(false);
+  const [editTrans, setEditTrans]             = useState("");
+  const [isSavingTrans, setIsSavingTrans]     = useState(false);
+
+  // sync when language or translations list changes
+  useEffect(() => {
+    const found = allTranslations.find(
+      h => h.source_text === item.source_text && h.target_language === targetLanguage
+    );
+    setTranslatedText(found?.translated_text || "");
+    setIsEditingTrans(false);
+  }, [targetLanguage, allTranslations, item.source_text]);
+
+  const handleAITranslate = async () => {
+    setIsTranslating(true);
+    try {
+      const result = await translateContent(item.id, targetLanguage);
+      if (!result.success) throw new Error(result.message || "Failed");
+      setTranslatedText(result.translated_text || "");
+      onTranslationSaved();
+    } catch (e) { alert(e.message || "Translation error"); }
+    finally { setIsTranslating(false); }
+  };
+
+  const handleSaveTrans = async () => {
+    if (!editTrans.trim()) return;
+    setIsSavingTrans(true);
+    try {
+      if (existing) {
+        await updateTranslation(existing.id, editTrans);
+      } else {
+        await createManualTranslation(item.source_text, targetLanguage, editTrans);
+      }
+      setTranslatedText(editTrans);
+      setIsEditingTrans(false);
+      onTranslationSaved();
+    } catch (e) { alert(e.message || "Save failed"); }
+    finally { setIsSavingTrans(false); }
+  };
+
+  const handleSaveOrig = async () => {
+    if (!editOrig.trim()) return;
+    setIsSavingOrig(true);
+    try {
+      const result = await updateContent(item.id, { page: item.page, key: item.key, source_text: editOrig });
+      if (!result.success) throw new Error(result.message);
+      setIsEditingOrig(false);
+      onContentSaved();
+    } catch (e) { alert(e.message || "Save failed"); }
+    finally { setIsSavingOrig(false); }
+  };
+
+  return (
+    <div className="grid grid-cols-2 divide-x divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+
+      {/* ── Left: Original ── */}
+      <div className="flex flex-col p-4">
+        {/* header */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            <FileText className="h-3 w-3" />
+            {item.key}
+          </span>
+          <div className="flex items-center gap-2">
+            {!isEditingOrig ? (
+              <button
+                onClick={() => { setIsEditingOrig(true); setEditOrig(item.source_text); }}
+                className="text-[11px] text-slate-400 hover:text-[#008060] font-medium flex items-center gap-0.5 transition-colors"
+              >
+                <Edit3 className="h-3 w-3" /> Edit
+              </button>
+            ) : (
+              <>
+                <button onClick={() => setIsEditingOrig(false)} className="text-[11px] text-slate-400 hover:text-slate-600 flex items-center gap-0.5">
+                  <X className="h-3 w-3" /> Cancel
+                </button>
+                <button onClick={handleSaveOrig} disabled={isSavingOrig} className="text-[11px] text-[#008060] hover:text-[#006e52] font-semibold flex items-center gap-0.5">
+                  {isSavingOrig ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Save
+                </button>
+              </>
+            )}
+            <button onClick={() => onDelete(item.id)} className="text-[11px] text-red-400 hover:text-red-600 flex items-center gap-0.5">
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* body */}
+        {isEditingOrig ? (
+          <textarea
+            className="input-field w-full resize-none text-sm leading-relaxed flex-1"
+            rows={4}
+            value={editOrig}
+            onChange={e => setEditOrig(e.target.value)}
+            autoFocus
+          />
+        ) : (
+          <p className="text-sm text-slate-700 leading-relaxed flex-1">{item.source_text}</p>
+        )}
+
+        <p className="text-[10px] text-slate-300 mt-3 text-right">{item.source_text.length} chars · {item.page}</p>
+      </div>
+
+      {/* ── Right: Translation ── */}
+      <div className="flex flex-col p-4 bg-gradient-to-br from-emerald-50/40 to-white">
+        {/* header */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+            <Globe className="h-3 w-3" />
+            {LANG_FLAGS[targetLanguage]} {targetLanguage}
+          </span>
+          <div className="flex items-center gap-2">
+            {translatedText && !isEditingTrans && (
+              <button
+                onClick={() => { setIsEditingTrans(true); setEditTrans(translatedText); }}
+                className="text-[11px] text-slate-400 hover:text-[#008060] font-medium flex items-center gap-0.5 transition-colors"
+              >
+                <Edit3 className="h-3 w-3" /> Edit
+              </button>
+            )}
+            {isEditingTrans && (
+              <>
+                <button onClick={() => setIsEditingTrans(false)} className="text-[11px] text-slate-400 hover:text-slate-600 flex items-center gap-0.5">
+                  <X className="h-3 w-3" /> Cancel
+                </button>
+                <button onClick={handleSaveTrans} disabled={isSavingTrans} className="text-[11px] text-[#008060] hover:text-[#006e52] font-semibold flex items-center gap-0.5">
+                  {isSavingTrans ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Save
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleAITranslate}
+              disabled={isTranslating}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-[#008060] hover:bg-[#006e52] px-2 py-0.5 rounded-full transition-colors disabled:opacity-60"
+            >
+              {isTranslating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              {isTranslating ? "…" : translatedText ? "Re-translate" : "Translate"}
+            </button>
+          </div>
+        </div>
+
+        {/* body */}
+        {isEditingTrans ? (
+          <textarea
+            className="input-field w-full resize-none text-sm leading-relaxed flex-1"
+            rows={4}
+            value={editTrans}
+            onChange={e => setEditTrans(e.target.value)}
+            autoFocus
+          />
+        ) : translatedText ? (
+          <p className="text-sm text-slate-700 leading-relaxed flex-1">{translatedText}</p>
+        ) : (
+          <div className="flex-1 flex flex-col">
+            <div className="flex-1 rounded-lg border border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs text-center p-3 mb-2">
+              <span>Click <strong className="text-slate-400">Translate</strong> for AI or type below</span>
+            </div>
+            <div className="flex gap-2">
+              <textarea
+                rows={2}
+                className="input-field flex-1 resize-none text-sm"
+                placeholder={`Type ${targetLanguage} translation…`}
+                value={editTrans}
+                onChange={e => setEditTrans(e.target.value)}
+              />
+              <button
+                disabled={isSavingTrans || !editTrans.trim()}
+                onClick={handleSaveTrans}
+                className="btn btn-primary px-3 self-stretch text-xs flex items-center gap-1"
+              >
+                {isSavingTrans ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {translatedText && (
+          <p className="text-[10px] text-slate-300 mt-3 text-right">{translatedText.length} chars</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Page
+───────────────────────────────────────────── */
+export default function TranslationsPage() {
+  const [contents, setContents]         = useState([]);
+  const [history, setHistory]           = useState([]);
+  const [pageFilter, setPageFilter]     = useState("home");
   const [targetLanguage, setTargetLanguage] = useState("Hindi");
-
-  // translation state
-  const [translatedText, setTranslatedText] = useState("");
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isEditingTranslation, setIsEditingTranslation] = useState(false);
-  const [editText, setEditText] = useState("");
-  const [isSavingTranslation, setIsSavingTranslation] = useState(false);
-
-  // original edit state
-  const [isEditingOriginal, setIsEditingOriginal] = useState(false);
-  const [editOriginalText, setEditOriginalText] = useState("");
-  const [isSavingOriginal, setIsSavingOriginal] = useState(false);
-
-  // sync / store
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [searchTerm, setSearchTerm]     = useState("");
+  const [isSyncing, setIsSyncing]       = useState(false);
+  const [syncMessage, setSyncMessage]   = useState("");
   const [storeConnected, setStoreConnected] = useState(false);
-  const [storeUrl, setStoreUrl] = useState("");
-  const [syncMessage, setSyncMessage] = useState("");
-  const [importUrl, setImportUrl] = useState("");
+  const [storeUrl, setStoreUrl]         = useState("");
+  const [importUrl, setImportUrl]       = useState("");
   const [isImportingUrl, setIsImportingUrl] = useState(false);
 
   const loadContents = async (page = "home") => {
-    try {
-      const data = await getContents(page);
-      setContents(data);
-    } catch (e) { console.error(e); }
+    try { setContents(await getContents(page)); } catch (e) { console.error(e); }
   };
-
   const loadTranslations = async () => {
-    try {
-      const data = await getTranslations();
-      setHistory(data);
-    } catch (e) { console.error(e); }
+    try { setHistory(await getTranslations()); } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
     loadContents(pageFilter);
-    loadTranslations();
-    setSelectedContent(null);
-    setTranslatedText("");
-    setIsEditingTranslation(false);
-    setIsEditingOriginal(false);
   }, [pageFilter]);
 
   useEffect(() => {
+    loadTranslations();
     (async () => {
       try {
         const s = await getContentsStoreStatus();
@@ -80,477 +250,178 @@ function TranslationsPage() {
     })();
   }, []);
 
-  // When language changes, look up existing translation
-  useEffect(() => {
-    if (!selectedContent) return;
-    const existing = history.find(
-      h => h.source_text === selectedContent.source_text && h.target_language === targetLanguage
-    );
-    setTranslatedText(existing?.translated_text || "");
-    setIsEditingTranslation(false);
-  }, [targetLanguage, selectedContent, history]);
-
-  const handleSelectContent = (content) => {
-    setSelectedContent(content);
-    setIsEditingOriginal(false);
-    setIsEditingTranslation(false);
-    const existing = history.find(
-      h => h.source_text === content.source_text && h.target_language === targetLanguage
-    );
-    setTranslatedText(existing?.translated_text || "");
-  };
-
-  const handleSyncFromShopify = async () => {
-    if (!["home", "product", "collection"].includes(pageFilter)) {
-      setSyncMessage("Only home, product, and collection pages can be synced.");
-      return;
+  const handleSync = async () => {
+    if (!["home","product","collection"].includes(pageFilter)) {
+      setSyncMessage("Only home, product, collection can be synced."); return;
     }
     setIsSyncing(true); setSyncMessage("");
     try {
-      const result = await syncContentsFromShopify(pageFilter);
-      if (!result.success) throw new Error(result.message || "Sync failed.");
-      setSyncMessage(result.message);
+      const r = await syncContentsFromShopify(pageFilter);
+      if (!r.success) throw new Error(r.message);
+      setSyncMessage(r.message);
       await loadContents(pageFilter);
-    } catch (e) {
-      setSyncMessage(e.message || "Unable to sync.");
-    } finally { setIsSyncing(false); }
+    } catch (e) { setSyncMessage(e.message || "Sync error"); }
+    finally { setIsSyncing(false); }
   };
 
-  const handleAITranslate = async () => {
-    if (!selectedContent) return;
-    setIsTranslating(true);
-    try {
-      const result = await translateContent(selectedContent.id, targetLanguage);
-      if (!result.success) throw new Error(result.message || "Translation failed.");
-      setTranslatedText(result.translated_text || "");
-      await loadTranslations();
-    } catch (e) {
-      alert(e.message || "Translation error.");
-    } finally { setIsTranslating(false); }
-  };
-
-  const handleSaveTranslation = async () => {
-    if (!editText.trim()) return;
-    setIsSavingTranslation(true);
-    try {
-      const existing = history.find(
-        h => h.source_text === selectedContent.source_text && h.target_language === targetLanguage
-      );
-      if (existing) {
-        await updateTranslation(existing.id, editText);
-      } else {
-        await createManualTranslation(selectedContent.source_text, targetLanguage, editText);
-      }
-      setTranslatedText(editText);
-      setIsEditingTranslation(false);
-      await loadTranslations();
-    } catch (e) {
-      alert(e.message || "Save failed.");
-    } finally { setIsSavingTranslation(false); }
-  };
-
-  const handleSaveOriginal = async () => {
-    if (!editOriginalText.trim() || !selectedContent) return;
-    setIsSavingOriginal(true);
-    try {
-      const result = await updateContent(selectedContent.id, {
-        page: selectedContent.page,
-        key: selectedContent.key,
-        source_text: editOriginalText,
-      });
-      if (!result.success) throw new Error(result.message);
-      await loadContents(pageFilter);
-      setSelectedContent(prev => ({ ...prev, source_text: editOriginalText }));
-      setIsEditingOriginal(false);
-    } catch (e) {
-      alert(e.message || "Save failed.");
-    } finally { setIsSavingOriginal(false); }
-  };
-
-  const handleDeleteContent = async (contentId) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Delete this content item?")) return;
     try {
-      await deleteContent(contentId);
-      if (selectedContent?.id === contentId) {
-        setSelectedContent(null);
-        setTranslatedText("");
-      }
+      await deleteContent(id);
       await loadContents(pageFilter);
-    } catch (e) { alert(e.message || "Delete failed."); }
+    } catch (e) { alert(e.message); }
   };
 
   const filteredContents = useMemo(() => {
     const q = searchTerm.toLowerCase();
     return contents.filter(
-      item =>
-        item.page.toLowerCase().includes(q) ||
-        item.key.toLowerCase().includes(q) ||
-        item.source_text.toLowerCase().includes(q)
+      c => c.key.toLowerCase().includes(q) || c.source_text.toLowerCase().includes(q)
     );
   }, [contents, searchTerm]);
 
-  const existingTranslation = history.find(
-    h => selectedContent && h.source_text === selectedContent.source_text && h.target_language === targetLanguage
-  );
+  // Translate ALL
+  const [isBulkTranslating, setIsBulkTranslating] = useState(false);
+  const handleTranslateAll = async () => {
+    if (!filteredContents.length) return;
+    setIsBulkTranslating(true);
+    try {
+      for (const item of filteredContents) {
+        const already = history.find(h => h.source_text === item.source_text && h.target_language === targetLanguage);
+        if (!already) await translateContent(item.id, targetLanguage);
+      }
+      await loadTranslations();
+    } catch (e) { alert(e.message || "Bulk translate error"); }
+    finally { setIsBulkTranslating(false); }
+  };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] min-h-[680px] flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-8">
 
       {/* ── Top bar ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Translation Workspace</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Edit original content and manage translations side-by-side.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Each section shows <strong>original</strong> on the left and <strong>translation</strong> on the right.</p>
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
-          {/* Sync */}
           <button
             className="btn btn-secondary h-9 gap-1.5 px-3 text-sm"
-            onClick={handleSyncFromShopify}
-            disabled={isSyncing || !["home", "product", "collection"].includes(pageFilter)}
+            onClick={handleSync}
+            disabled={isSyncing || !["home","product","collection"].includes(pageFilter)}
           >
             <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
             {isSyncing ? "Syncing…" : "Sync Shopify"}
           </button>
 
-          {/* Import URL */}
           <div className="flex gap-1.5">
-            <input
-              type="text"
-              placeholder="Import from URL…"
-              className="input-field h-9 w-52 text-sm"
-              value={importUrl}
-              onChange={e => setImportUrl(e.target.value)}
-            />
-            <button
-              className="btn btn-primary h-9 px-3 text-sm"
-              disabled={isImportingUrl}
-              onClick={async () => {
-                if (!importUrl.trim()) return alert("Enter a URL.");
-                setIsImportingUrl(true);
-                try {
-                  let url = importUrl.trim();
-                  if (!url.startsWith("http")) url = `https://${url}`;
-                  const fetched = await fetchUrlContent(url);
-                  if (!fetched?.success) throw new Error(fetched?.message || "Failed");
-                  let key = url;
-                  try { const u = new URL(url); key = u.pathname !== "/" ? u.pathname.replace(/\//g, "_") : u.hostname; } catch {}
-                  const imported = await importContentToLibrary({ page: pageFilter || "other", key: key.slice(0, 200), source_text: fetched.text || "" });
-                  if (!imported?.success) throw new Error(imported?.message || "Import failed");
-                  await loadContents(pageFilter);
-                  setImportUrl("");
-                  alert("Imported!");
-                } catch (err) { alert(err.message || String(err)); }
-                finally { setIsImportingUrl(false); }
-              }}
-            >
+            <input type="text" placeholder="Import from URL…" className="input-field h-9 w-48 text-sm" value={importUrl} onChange={e => setImportUrl(e.target.value)} />
+            <button className="btn btn-secondary h-9 px-3 text-sm" disabled={isImportingUrl} onClick={async () => {
+              if (!importUrl.trim()) return alert("Enter a URL.");
+              setIsImportingUrl(true);
+              try {
+                let url = importUrl.trim();
+                if (!url.startsWith("http")) url = `https://${url}`;
+                const fetched = await fetchUrlContent(url);
+                if (!fetched?.success) throw new Error(fetched?.message || "Failed");
+                let key = url;
+                try { const u = new URL(url); key = u.pathname !== "/" ? u.pathname.replace(/\//g,"_") : u.hostname; } catch {}
+                const imp = await importContentToLibrary({ page: pageFilter||"other", key: key.slice(0,200), source_text: fetched.text||"" });
+                if (!imp?.success) throw new Error(imp?.message || "Import failed");
+                await loadContents(pageFilter);
+                setImportUrl("");
+              } catch (err) { alert(err.message || String(err)); }
+              finally { setIsImportingUrl(false); }
+            }}>
               {isImportingUrl ? "Importing…" : "Import"}
             </button>
           </div>
 
-          {/* Page filter */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Page</label>
-            <select className="input-field h-9 min-w-[130px] text-sm" value={pageFilter} onChange={e => setPageFilter(e.target.value)}>
+            <select className="input-field h-9 min-w-[120px] text-sm" value={pageFilter} onChange={e => setPageFilter(e.target.value)}>
               {["home","product","checkout","collection","other"].map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
-          {/* Search */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Language</label>
+            <select className="input-field h-9 min-w-[130px] text-sm" value={targetLanguage} onChange={e => setTargetLanguage(e.target.value)}>
+              {TARGET_LANGUAGES.map(l => <option key={l} value={l}>{LANG_FLAGS[l]} {l}</option>)}
+            </select>
+          </div>
+
           <div className="relative">
             <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
             <Search className="absolute left-2.5 bottom-2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search…"
-              className="input-field pl-9 h-9 w-52 text-sm"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+            <input type="text" placeholder="Search content…" className="input-field pl-9 h-9 w-48 text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
         </div>
       </div>
 
-      {/* store info */}
+      {/* Store notice */}
       {!storeConnected && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 flex items-center gap-2">
           <Store className="h-4 w-4 shrink-0 text-amber-600" />
-          <p>No Shopify store connected. <Link to="/store-settings" className="font-semibold underline">Store Settings</Link> → add URL + token → sync content.</p>
+          No Shopify store connected. <Link to="/store-settings" className="font-semibold underline ml-1">Store Settings</Link>
         </div>
       )}
-      {syncMessage && (
-        <p className="text-sm text-[#008060] font-medium">{syncMessage}</p>
+      {syncMessage && <p className="text-sm text-[#008060] font-medium">{syncMessage}</p>}
+
+      {/* ── Column headers ── */}
+      {filteredContents.length > 0 && (
+        <div className="grid grid-cols-2 gap-0 px-1">
+          <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-l-lg border border-slate-200 border-r-0">
+            <FileText className="h-4 w-4 text-slate-500" />
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Original Content</span>
+            <span className="ml-auto text-xs text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">{filteredContents.length} items</span>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-r-lg border border-emerald-200 border-l-0">
+            <Globe className="h-4 w-4 text-[#008060]" />
+            <span className="text-xs font-bold uppercase tracking-widest text-[#008060]">{LANG_FLAGS[targetLanguage]} {targetLanguage} Translation</span>
+            <button
+              onClick={handleTranslateAll}
+              disabled={isBulkTranslating}
+              className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-[#008060] hover:bg-[#006e52] px-2.5 py-1 rounded-full transition-colors disabled:opacity-60"
+            >
+              {isBulkTranslating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              {isBulkTranslating ? "Translating all…" : "Translate All"}
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* ── Main 3-column grid ── */}
-      <div className="grid flex-1 min-h-0 grid-cols-[280px_1fr_1fr] gap-4">
-
-        {/* Col 1 – Content list */}
-        <section className="card-container flex flex-col min-h-0 overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-            <FileText className="h-4 w-4 text-[#008060]" />
-            <div>
-              <h2 className="font-semibold text-slate-900 text-sm">Content Items</h2>
-              <p className="text-[11px] text-slate-400">{filteredContents.length} items</p>
-            </div>
-          </div>
-
-          <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-50">
-            {filteredContents.length === 0 ? (
-              <li className="flex flex-col items-center justify-center h-full py-12 text-center text-slate-400 px-4">
-                <Search className="h-8 w-8 mb-2 text-slate-200" />
-                <p className="text-sm font-medium text-slate-600">No content found</p>
-                <p className="text-xs mt-1">Sync from Shopify or import a URL</p>
-              </li>
-            ) : filteredContents.map(item => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => handleSelectContent(item)}
-                  className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 flex items-start justify-between gap-2 group ${
-                    selectedContent?.id === item.id ? "bg-emerald-50 border-l-2 border-[#008060]" : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 truncate">{item.key}</p>
-                    <p className="text-sm text-slate-700 line-clamp-2 mt-0.5 leading-snug">{item.source_text}</p>
-                  </div>
-                  <ChevronRight className={`h-4 w-4 shrink-0 mt-0.5 transition-colors ${selectedContent?.id === item.id ? "text-[#008060]" : "text-slate-200 group-hover:text-slate-400"}`} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Col 2 – Original content editor */}
-        <section className="card-container flex flex-col min-h-0 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-slate-400" />
-              <h2 className="font-semibold text-slate-900 text-sm">Original Content</h2>
-            </div>
-            {selectedContent && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {selectedContent.page}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-col flex-1 min-h-0 p-5 overflow-y-auto">
-            {selectedContent ? (
-              <>
-                {/* Key badge */}
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Content Key</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{selectedContent.key}</p>
-                  </div>
-                  <button
-                    className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
-                    onClick={() => handleDeleteContent(selectedContent.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
-                  </button>
-                </div>
-
-                {/* Original text */}
-                <div className="flex flex-col flex-1 min-h-0">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-medium text-slate-500">Source Text</label>
-                    {!isEditingOriginal ? (
-                      <button
-                        className="text-xs text-[#008060] hover:text-[#006e52] font-medium flex items-center gap-1"
-                        onClick={() => { setIsEditingOriginal(true); setEditOriginalText(selectedContent.source_text); }}
-                      >
-                        <Edit3 className="h-3 w-3" /> Edit
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
-                          onClick={() => setIsEditingOriginal(false)}>
-                          <X className="h-3 w-3" /> Cancel
-                        </button>
-                        <button
-                          className="text-xs text-[#008060] hover:text-[#006e52] font-medium flex items-center gap-1"
-                          onClick={handleSaveOriginal}
-                          disabled={isSavingOriginal}
-                        >
-                          {isSavingOriginal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                          Save
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {isEditingOriginal ? (
-                    <textarea
-                      className="input-field flex-1 min-h-0 resize-none text-sm leading-relaxed"
-                      value={editOriginalText}
-                      onChange={e => setEditOriginalText(e.target.value)}
-                      autoFocus
-                    />
-                  ) : (
-                    <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedContent.source_text}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* char count */}
-                <p className="text-[10px] text-slate-400 mt-2 text-right">
-                  {selectedContent.source_text.length} characters
-                </p>
-              </>
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400">
-                <FileText className="h-10 w-10 mb-3 text-slate-200" />
-                <p className="text-sm font-semibold text-slate-600">Select a content item</p>
-                <p className="text-xs mt-1">Pick an item from the list on the left</p>
+      {/* ── Content rows ── */}
+      {filteredContents.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center text-slate-400">
+          <Languages className="h-12 w-12 mb-3 text-slate-200" />
+          <p className="text-base font-semibold text-slate-600">No content for "{pageFilter}"</p>
+          <p className="text-sm mt-1">
+            {["home","product","collection"].includes(pageFilter)
+              ? "Click \"Sync Shopify\" to import content from your store."
+              : "This page type is manual. Switch to home, product, or collection."}
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filteredContents.map((item, index) => (
+            <div key={item.id} className="relative">
+              {/* Section number badge */}
+              <div className="absolute -left-3 top-4 z-10 flex items-center justify-center w-6 h-6 rounded-full bg-slate-700 text-white text-[10px] font-bold shadow-sm">
+                {index + 1}
               </div>
-            )}
-          </div>
-        </section>
-
-        {/* Col 3 – Translation */}
-        <section className="card-container flex flex-col min-h-0 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-[#008060]" />
-              <h2 className="font-semibold text-slate-900 text-sm">Translation</h2>
+              <ContentRow
+                item={item}
+                targetLanguage={targetLanguage}
+                allTranslations={history}
+                onDelete={handleDelete}
+                onContentSaved={() => loadContents(pageFilter)}
+                onTranslationSaved={loadTranslations}
+              />
             </div>
-            {/* Language selector */}
-            <div className="flex items-center gap-2">
-              <Globe className="h-3.5 w-3.5 text-slate-400" />
-              <select
-                className="input-field h-8 text-xs py-0 min-w-[120px]"
-                value={targetLanguage}
-                onChange={e => setTargetLanguage(e.target.value)}
-              >
-                {TARGET_LANGUAGES.map(l => (
-                  <option key={l} value={l}>{LANG_FLAGS[l]} {l}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-col flex-1 min-h-0 p-5 overflow-y-auto">
-            {selectedContent ? (
-              <>
-                {/* Language info row */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{LANG_FLAGS[targetLanguage]}</span>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{targetLanguage}</p>
-                      <p className="text-[10px] text-slate-400">
-                        {existingTranslation ? "Translation saved" : "No translation yet"}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    className="btn btn-primary h-8 px-3 text-xs gap-1.5 flex items-center"
-                    onClick={handleAITranslate}
-                    disabled={isTranslating}
-                  >
-                    {isTranslating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-                    {isTranslating ? "Translating…" : existingTranslation ? "Re-translate" : "AI Translate"}
-                  </button>
-                </div>
-
-                {/* Translation text area */}
-                <div className="flex flex-col flex-1 min-h-0">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-medium text-slate-500">Translated Text</label>
-                    {translatedText && !isEditingTranslation && (
-                      <button
-                        className="text-xs text-[#008060] hover:text-[#006e52] font-medium flex items-center gap-1"
-                        onClick={() => { setIsEditingTranslation(true); setEditText(translatedText); }}
-                      >
-                        <Edit3 className="h-3 w-3" /> Edit
-                      </button>
-                    )}
-                    {isEditingTranslation && (
-                      <div className="flex gap-2">
-                        <button className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
-                          onClick={() => setIsEditingTranslation(false)}>
-                          <X className="h-3 w-3" /> Cancel
-                        </button>
-                        <button
-                          className="text-xs text-[#008060] hover:text-[#006e52] font-medium flex items-center gap-1"
-                          onClick={handleSaveTranslation}
-                          disabled={isSavingTranslation}
-                        >
-                          {isSavingTranslation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                          Save
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {isEditingTranslation ? (
-                    <textarea
-                      className="input-field flex-1 min-h-0 resize-none text-sm leading-relaxed"
-                      value={editText}
-                      onChange={e => setEditText(e.target.value)}
-                      autoFocus
-                    />
-                  ) : translatedText ? (
-                    <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
-                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{translatedText}</p>
-                    </div>
-                  ) : (
-                    <div className="flex-1 min-h-0 rounded-lg border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 text-center p-6">
-                      <Languages className="h-8 w-8 mb-2 text-slate-200" />
-                      <p className="text-sm font-medium text-slate-500">No translation yet</p>
-                      <p className="text-xs mt-1">Click <strong>AI Translate</strong> or edit manually below</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Manual entry if no translation */}
-                {!translatedText && !isEditingTranslation && (
-                  <div className="mt-3 pt-3 border-t border-slate-100">
-                    <p className="text-xs font-medium text-slate-500 mb-1.5">Or type translation manually</p>
-                    <div className="flex gap-2">
-                      <textarea
-                        rows={2}
-                        className="input-field flex-1 resize-none text-sm"
-                        placeholder={`Enter ${targetLanguage} translation…`}
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                      />
-                      <button
-                        className="btn btn-primary px-3 self-stretch flex items-center gap-1 text-xs"
-                        onClick={handleSaveTranslation}
-                        disabled={isSavingTranslation || !editText.trim()}
-                      >
-                        {isSavingTranslation ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {translatedText && (
-                  <p className="text-[10px] text-slate-400 mt-2 text-right">
-                    {translatedText.length} characters
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400">
-                <Globe className="h-10 w-10 mb-3 text-slate-200" />
-                <p className="text-sm font-semibold text-slate-600">Translation will appear here</p>
-                <p className="text-xs mt-1">Select content and choose a language</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-
-export default TranslationsPage;
