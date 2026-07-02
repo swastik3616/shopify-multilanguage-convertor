@@ -38,13 +38,26 @@ def migrate():
             # Postgres/MySQL fallback using SQLAlchemy text
             try:
                 db.session.execute(text("ALTER TABLE page_contents ADD COLUMN html_tag VARCHAR(50);"))
+                db.session.commit()
+                print("Added html_tag")
+            except Exception as e:
+                db.session.rollback()
+
+            try:
                 db.session.execute(text("ALTER TABLE page_contents ADD COLUMN section_id VARCHAR(255);"))
+                db.session.commit()
+                print("Added section_id")
+            except Exception as e:
+                db.session.rollback()
+
+            try:
                 db.session.execute(text("ALTER TABLE page_contents ADD COLUMN resource_id BIGINT;"))
                 db.session.commit()
-                print("Migration complete for non-SQLite DB!")
+                print("Added resource_id")
             except Exception as e:
-                print(f"Migration error (already run?): {e}")
                 db.session.rollback()
+                
+            print("Migration complete for non-SQLite DB!")
 
 if __name__ == "__main__":
     migrate()

@@ -38,6 +38,10 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+    
+    # Auto-run basic migrations to add missing columns if they don't exist
+    from migrate_db import migrate
+    migrate()
 
 # ── Register Blueprints ───────────────────────────────────────────────────────
 app.register_blueprint(auth_bp)
