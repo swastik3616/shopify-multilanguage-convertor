@@ -213,8 +213,34 @@ def translate_seo():
         res.raise_for_status()
         data = res.json()
         user_errors = data.get("data", {}).get("translationsRegister", {}).get("userErrors", [])
+        
         if user_errors:
             error_msg = ", ".join([e["message"] for e in user_errors])
+            # If the error is about the locale not being enabled, try to enable it automatically
+            if "not a valid locale" in error_msg.lower() or "not enabled" in error_msg.lower():
+                enable_mutation = """
+                mutation shopLocaleEnable($locale: String!) {
+                  shopLocaleEnable(locale: $locale) {
+                    userErrors { message }
+                  }
+                }
+                """
+                enable_res = requests.post(url, headers=headers, json={"query": enable_mutation, "variables": {"locale": locale}})
+                enable_data = enable_res.json()
+                enable_errors = enable_data.get("data", {}).get("shopLocaleEnable", {}).get("userErrors", [])
+                
+                if not enable_errors:
+                    # Retry the original translation mutation now that the locale is enabled
+                    retry_res = requests.post(url, headers=headers, json={"query": mutation, "variables": variables})
+                    retry_data = retry_res.json()
+                    retry_user_errors = retry_data.get("data", {}).get("translationsRegister", {}).get("userErrors", [])
+                    if not retry_user_errors:
+                        db.session.add(AuditLog(action=f"SEO Translated {resource_id.split('/')[-1]} to {locale}"))
+                        db.session.commit()
+                        return jsonify({"success": True, "message": f"Translations registered (Auto-enabled {locale} locale)"})
+                    else:
+                        error_msg = ", ".join([e["message"] for e in retry_user_errors])
+
             return jsonify({"success": False, "message": f"GraphQL Error: {error_msg}"}), 400
 
         db.session.add(AuditLog(action=f"SEO Translated {resource_id.split('/')[-1]} to {locale}"))
