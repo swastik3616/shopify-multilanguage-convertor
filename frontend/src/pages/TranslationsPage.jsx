@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
-  Search, Languages, FileText, RefreshCw, Store,
-  Globe, Save, Loader2, X, Edit3, Check, Trash2,
-  Zap, Type, AlignLeft, Package, Tag, DollarSign, LayoutGrid
+  Search, RefreshCw, Store, Globe, Save, Loader2, X, Edit3, Check, Trash2, Zap, LayoutGrid, Layout
 } from "lucide-react";
 import { getTranslations } from "../services/translationHistoryService";
 import {
@@ -15,50 +13,6 @@ import {
 
 const TARGET_LANGUAGES = ["Hindi", "Marathi", "French", "German", "Spanish", "Italian"];
 const LANG_FLAGS = { Hindi:"🇮🇳", Marathi:"🇮🇳", French:"🇫🇷", German:"🇩🇪", Spanish:"🇪🇸", Italian:"🇮🇹" };
-
-// ── Classify a content item into a section type ──────────────────────────────
-function classifyItem(item) {
-  const key = item.key.toLowerCase();
-  const text = item.source_text.trim();
-
-  // Price: looks like a currency amount
-  if (/price|amount|cost|₹|\$|rs\.?/i.test(key) || /^(₹|\$|rs\.?\s*)[\d,]+(\.\d{1,2})?$/i.test(text)) return "prices";
-
-  // Heading tags: h1–h4 in key
-  if (/\bh[1-4]\b/.test(key) || /heading|header|banner_title|hero_title|page_title|section_title/.test(key)) return "headings";
-
-  // Product names/titles
-  if (/(product|item|prod)[_\s]*(name|title)|name.*product|title.*product/.test(key)) return "product_names";
-
-  // Collection names
-  if (/collection[_\s]*(name|title)|category[_\s]*(name|title)/.test(key)) return "collection_names";
-
-  // Descriptions / paragraphs / body
-  if (/desc(ription)?|body|paragraph|para\b|content|about|text|story|detail/.test(key)) return "descriptions";
-
-  // Short text (≤60 chars) that wasn't classified = likely a heading/label
-  if (text.length <= 80) return "headings";
-
-  return "paragraphs";
-}
-
-const SECTIONS = [
-  { id: "headings",        label: "Headings & Titles",       icon: Type,       color: "violet",  desc: "h1, h2, h3, page titles, banners" },
-  { id: "product_names",   label: "Product Names",            icon: Package,    color: "blue",    desc: "product & item names" },
-  { id: "prices",          label: "Prices",                   icon: DollarSign, color: "amber",   desc: "prices, amounts, costs" },
-  { id: "collection_names",label: "Collection & Category Names",icon: Tag,      color: "pink",    desc: "collection & category names" },
-  { id: "descriptions",    label: "Descriptions",             icon: AlignLeft,  color: "emerald", desc: "product descriptions, about sections" },
-  { id: "paragraphs",      label: "Paragraphs & Body Text",   icon: FileText,   color: "slate",   desc: "general body text" },
-];
-
-const COLOR_MAP = {
-  violet:  { section: "bg-violet-50 border-violet-200", badge: "bg-violet-100 text-violet-700", header: "text-violet-700", dot: "bg-violet-400" },
-  blue:    { section: "bg-blue-50 border-blue-200",     badge: "bg-blue-100 text-blue-700",     header: "text-blue-700",   dot: "bg-blue-400" },
-  amber:   { section: "bg-amber-50 border-amber-200",   badge: "bg-amber-100 text-amber-700",   header: "text-amber-700",  dot: "bg-amber-400" },
-  pink:    { section: "bg-pink-50 border-pink-200",     badge: "bg-pink-100 text-pink-700",     header: "text-pink-700",   dot: "bg-pink-400" },
-  emerald: { section: "bg-emerald-50 border-emerald-200",badge:"bg-emerald-100 text-emerald-700",header:"text-emerald-700",dot:"bg-emerald-400" },
-  slate:   { section: "bg-slate-50 border-slate-200",   badge: "bg-slate-100 text-slate-600",   header: "text-slate-600",  dot: "bg-slate-400" },
-};
 
 // ── Single translation row ────────────────────────────────────────────────────
 function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onContentSaved, onTranslationSaved }) {
@@ -119,15 +73,14 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
     finally { setIsSavingOrig(false); }
   };
 
-  const isMultiline = item.source_text.length > 120;
+  const isMultiline = item.source_text.length > 80;
 
   return (
     <div className="grid grid-cols-2 border-b border-slate-100 last:border-b-0 divide-x divide-slate-100 hover:bg-slate-50/50 transition-colors group">
-
       {/* Left: Original */}
-      <div className="flex flex-col px-4 py-3 gap-2">
+      <div className="flex flex-col px-5 py-4 gap-2">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">{item.key}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full truncate">{item.key}</span>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             {!isEditingOrig ? (
               <button onClick={() => { setIsEditingOrig(true); setEditOrig(item.source_text); }}
@@ -147,15 +100,15 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
         </div>
 
         {isEditingOrig ? (
-          <textarea className="input-field resize-none text-sm leading-relaxed w-full" rows={isMultiline ? 4 : 2}
+          <textarea className="input-field resize-none text-sm leading-relaxed w-full mt-1" rows={isMultiline ? 4 : 2}
             value={editOrig} onChange={e => setEditOrig(e.target.value)} autoFocus />
         ) : (
-          <p className={`text-sm text-slate-800 leading-relaxed ${isMultiline ? "" : "font-medium"}`}>{item.source_text}</p>
+          <p className={`text-sm text-slate-800 leading-relaxed mt-1 ${isMultiline ? "" : "font-medium"}`}>{item.source_text}</p>
         )}
       </div>
 
       {/* Right: Translation */}
-      <div className="flex flex-col px-4 py-3 gap-2 bg-emerald-50/30">
+      <div className="flex flex-col px-5 py-4 gap-2 bg-[#f4fbf9]">
         <div className="flex items-start justify-between gap-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">{LANG_FLAGS[targetLanguage]} {targetLanguage}</span>
           <div className="flex items-center gap-2 shrink-0">
@@ -182,13 +135,13 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
         </div>
 
         {isEditingTrans ? (
-          <textarea className="input-field resize-none text-sm leading-relaxed w-full" rows={isMultiline ? 4 : 2}
+          <textarea className="input-field resize-none text-sm leading-relaxed w-full mt-1" rows={isMultiline ? 4 : 2}
             value={editTrans} onChange={e => setEditTrans(e.target.value)} autoFocus />
         ) : translatedText ? (
-          <p className={`text-sm text-slate-700 leading-relaxed ${isMultiline ? "" : "font-medium"}`}>{translatedText}</p>
+          <p className={`text-sm text-emerald-900 leading-relaxed mt-1 ${isMultiline ? "" : "font-medium"}`}>{translatedText}</p>
         ) : (
-          <div className="flex items-center gap-2">
-            <input type="text" className="input-field h-8 flex-1 text-sm" placeholder={`Type ${targetLanguage}…`}
+          <div className="flex items-center gap-2 mt-1">
+            <input type="text" className="input-field h-8 flex-1 text-sm bg-white" placeholder={`Type ${targetLanguage}…`}
               value={editTrans} onChange={e => setEditTrans(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleSaveTrans(); }} />
             {editTrans.trim() && (
@@ -204,10 +157,8 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
 }
 
 // ── Section block ─────────────────────────────────────────────────────────────
-function SectionBlock({ section, items, targetLanguage, allTranslations, onDelete, onContentSaved, onTranslationSaved }) {
+function SectionBlock({ sectionNumber, title, items, targetLanguage, allTranslations, onDelete, onContentSaved, onTranslationSaved }) {
   const [isTranslatingAll, setIsTranslatingAll] = useState(false);
-  const colors = COLOR_MAP[section.color];
-  const Icon = section.icon;
 
   const handleTranslateAll = async () => {
     setIsTranslatingAll(true);
@@ -222,33 +173,33 @@ function SectionBlock({ section, items, targetLanguage, allTranslations, onDelet
   };
 
   return (
-    <div className={`rounded-xl border ${colors.section} overflow-hidden`}>
+    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-8 bg-white">
       {/* Section header */}
-      <div className={`flex items-center justify-between px-5 py-3 ${colors.section} border-b ${colors.section.split(" ")[1]}`}>
-        <div className="flex items-center gap-3">
-          <div className={`p-1.5 rounded-lg bg-white shadow-sm`}>
-            <Icon className={`h-4 w-4 ${colors.header}`} />
+      <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#008060] text-white font-bold shadow-sm">
+            {sectionNumber}
           </div>
           <div>
-            <h2 className={`font-bold text-sm ${colors.header}`}>{section.label}</h2>
-            <p className="text-[11px] text-slate-400">{section.desc} · {items.length} item{items.length !== 1 ? "s" : ""}</p>
+            <h2 className="font-bold text-base text-slate-800">{title}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{items.length} content element{items.length !== 1 ? "s" : ""}</p>
           </div>
         </div>
         <button onClick={handleTranslateAll} disabled={isTranslatingAll}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[#008060] hover:bg-[#006e52] px-3 py-1.5 rounded-full transition-colors disabled:opacity-60">
-          {isTranslatingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-          {isTranslatingAll ? "Translating…" : "Translate All"}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[#008060] hover:bg-[#006e52] px-4 py-2 rounded-lg shadow-sm transition-colors disabled:opacity-60">
+          {isTranslatingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+          {isTranslatingAll ? "Translating Section…" : "Translate Entire Section"}
         </button>
       </div>
 
       {/* Column sub-header */}
-      <div className="grid grid-cols-2 divide-x divide-slate-200 bg-white/60 border-b border-slate-200">
-        <div className="px-4 py-2 flex items-center gap-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Original Text</span>
+      <div className="grid grid-cols-2 divide-x divide-slate-200 bg-white border-b border-slate-100">
+        <div className="px-5 py-2.5 flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Original Website Content</span>
         </div>
-        <div className="px-4 py-2 flex items-center gap-1.5">
-          <Globe className="h-3 w-3 text-emerald-500" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+        <div className="px-5 py-2.5 flex items-center gap-1.5 bg-[#f4fbf9]">
+          <Globe className="h-3.5 w-3.5 text-emerald-500" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
             {LANG_FLAGS[targetLanguage]} {targetLanguage} Translation
           </span>
         </div>
@@ -332,28 +283,50 @@ export default function TranslationsPage() {
     );
   }, [contents, searchTerm]);
 
-  // Group by section type
-  const grouped = useMemo(() => {
-    const map = {};
-    for (const s of SECTIONS) map[s.id] = [];
-    for (const item of filtered) {
-      const type = classifyItem(item);
-      if (map[type]) map[type].push(item);
-      else map["paragraphs"].push(item);
-    }
-    return map;
-  }, [filtered]);
+  // Dynamically group items into website sections based on key prefixes
+  const dynamicSections = useMemo(() => {
+    const groups = {};
+    
+    filtered.forEach(item => {
+      let groupName = "General Content Section";
+      
+      const key = item.key.toLowerCase();
+      const parts = key.split(/[_-]/);
+      
+      if (key.startsWith("featured_product_")) {
+        groupName = `Featured Product Section ${parts[2]}`;
+      } else if (key.startsWith("product_")) {
+        groupName = `Product Details (${parts[1]})`;
+      } else if (key.startsWith("collection_")) {
+        groupName = `Collection (${parts[1]})`;
+      } else if (parts.length > 1) {
+        // Group by the first prefix word (like "hero", "header", "footer")
+        const prefix = parts[0];
+        if (["hero", "header", "footer", "banner", "about", "contact", "main"].includes(prefix)) {
+          groupName = prefix.charAt(0).toUpperCase() + prefix.slice(1) + " Section";
+        }
+      }
+      
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(item);
+    });
 
-  const activeSections = SECTIONS.filter(s => grouped[s.id]?.length > 0);
+    // Convert to array and give them sequential numbers
+    let sectionCount = 1;
+    return Object.keys(groups).sort().map(title => ({
+      title,
+      items: groups[title],
+      sectionNumber: sectionCount++
+    }));
+  }, [filtered]);
 
   return (
     <div className="flex flex-col gap-5 pb-10">
-
       {/* Top bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Translation Workspace</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Content grouped by type — headings, products, descriptions etc. Original left · Translation right.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Translate your website section by section.</p>
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
@@ -421,24 +394,8 @@ export default function TranslationsPage() {
       )}
       {syncMessage && <p className="text-sm text-[#008060] font-medium">{syncMessage}</p>}
 
-      {/* Section summary pills */}
-      {activeSections.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {activeSections.map(s => {
-            const colors = COLOR_MAP[s.color];
-            const Icon = s.icon;
-            return (
-              <span key={s.id} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${colors.section} ${colors.header}`}>
-                <Icon className="h-3 w-3" />
-                {s.label} <span className="opacity-60">({grouped[s.id].length})</span>
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Grouped sections */}
-      {activeSections.length === 0 ? (
+      {/* Render Dynamic Sections */}
+      {dynamicSections.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center text-slate-400">
           <LayoutGrid className="h-12 w-12 mb-3 text-slate-200" />
           <p className="text-base font-semibold text-slate-600">No content for "{pageFilter}"</p>
@@ -449,12 +406,13 @@ export default function TranslationsPage() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {activeSections.map(section => (
+        <div className="flex flex-col">
+          {dynamicSections.map(section => (
             <SectionBlock
-              key={section.id}
-              section={section}
-              items={grouped[section.id]}
+              key={section.title}
+              sectionNumber={section.sectionNumber}
+              title={section.title}
+              items={section.items}
               targetLanguage={targetLanguage}
               allTranslations={history}
               onDelete={handleDelete}
