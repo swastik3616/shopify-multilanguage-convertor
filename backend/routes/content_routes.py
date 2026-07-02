@@ -4,8 +4,42 @@ from model import PageContent, Translation, AuditLog
 from utils.helpers import get_setting, get_default_provider_settings, get_shopify_credentials
 from utils.shopify_client import fetch_shopify_pages, fetch_shopify_products, fetch_shopify_collections, extract_text_from_html
 from utils.ai_provider import get_provider_response
+import requests
 
 content_bp = Blueprint("content_routes", __name__)
+
+def push_update_to_shopify(page, key, text):
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
+        return
+    headers = {"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"}
+    
+    try:
+        if page == "product" and key.startswith("product_"):
+            parts = key.split("_")
+            if len(parts) >= 3:
+                product_id = parts[1]
+                field = parts[2]
+                payload = {"product": {"id": product_id}}
+                if field == "title":
+                    payload["product"]["title"] = text
+                elif field == "desc":
+                    payload["product"]["body_html"] = text
+                requests.put(f"https://{store_url}/admin/api/2026-04/products/{product_id}.json", headers=headers, json=payload, timeout=10)
+        
+        elif page == "collection" and key.startswith("collection_"):
+            parts = key.split("_")
+            if len(parts) >= 3:
+                collection_id = parts[1]
+                field = parts[2]
+                payload = {"custom_collection": {"id": collection_id}}
+                if field == "title":
+                    payload["custom_collection"]["title"] = text
+                elif field == "desc":
+                    payload["custom_collection"]["body_html"] = text
+                requests.put(f"https://{store_url}/admin/api/2026-04/custom_collections/{collection_id}.json", headers=headers, json=payload, timeout=10)
+    except Exception as e:
+        print(f"Error updating Shopify: {e}")
 
 
 def seed_shopify_page_contents(page):
@@ -245,6 +279,9 @@ def update_content(content_id):
     content.key = key
     content.source_text = source_text
     db.session.commit()
+
+    # Push to Shopify so it shows on the website
+    push_update_to_shopify(page, key, source_text)
 
     return jsonify({"success": True, "content": {
         "id": content.id, "page": content.page,

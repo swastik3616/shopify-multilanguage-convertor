@@ -1,0 +1,163 @@
+================================================================================
+  BACKEND STRUCTURE GUIDE
+  Shopify Multilingual Translator
+================================================================================
+
+This file explains what every file in the backend folder does,
+so you can quickly find where to look when debugging or adding features.
+
+--------------------------------------------------------------------------------
+ROOT FILES
+--------------------------------------------------------------------------------
+
+app.py
+  - The main entry point of the Flask application.
+  - Keeps things minimal: sets up Flask, CORS, and the database connection.
+  - Registers all the Blueprints (feature route groups) so Flask knows about them.
+  - Also has 4 tiny utility routes: /, /wake, /stores, /debug-store
+  - Start here if you want to understand the overall structure.
+
+database.py
+  - Creates the SQLAlchemy `db` object.
+  - Just 5 lines. Intentionally minimal.
+  - All other files import `db` from here. Do NOT add anything else here.
+
+model.py
+  - Defines all 5 database tables as Python classes (SQLAlchemy models).
+  - Tables:
+      Translation    → Every translated text (source + language = result)
+      PageContent    → Content items per page (from Shopify or manual)
+      AuditLog       → Log of every major action taken in the app
+      ShopifyStore   → Shopify OAuth stores with their access tokens
+      AppSetting     → Key-value config store (languages, provider, store URL)
+  - Go here if you need to add or change a database column.
+
+requirements.txt
+  - List of all Python packages the backend needs.
+  - Run `pip install -r requirements.txt` to install everything.
+
+.env
+  - NOT committed to Git. Holds your secret keys and database URL.
+  - Variables needed: SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET,
+    SHOPIFY_REDIRECT_URI, SHOPIFY_SCOPES, DATABASE_URL
+
+--------------------------------------------------------------------------------
+routes/ FOLDER — API Endpoints (one file per feature)
+--------------------------------------------------------------------------------
+
+routes/auth_routes.py
+  - Handles everything related to Shopify OAuth and store connection.
+  - Endpoints:
+      GET  /install                → Redirects merchant to Shopify OAuth page
+      GET  /auth/callback          → Exchanges OAuth code for access token, saves store
+      GET  /shopify/check-token    → Tests if the stored access token is valid
+      GET  /shopify/test           → Raw test call to Shopify shop.json
+  - Go here if the app install flow or store connection is broken.
+
+routes/translation_routes.py
+  - Handles all text translation operations and the translation history.
+  - Endpoints:
+      POST /translate              → Translate a single piece of text (with DB cache)
+      POST /bulk-translate         → Translate a batch of texts at once (with DB cache)
+      POST /fetch-url              → Fetch raw HTML from any URL (for Translation Workspace)
+      GET  /translations           → List all saved translation records
+      PUT  /translations/<id>      → Edit a saved translation
+      DELETE /translations/<id>   → Delete a saved translation
+  - Go here if translations are failing, slow, or giving wrong results.
+
+routes/content_routes.py
+  - Manages the content library (used by the "Website Content" page in the dashboard).
+  - Also handles syncing content from the connected Shopify store.
+  - Endpoints:
+      GET  /contents               → List all content items (optionally filtered by page)
+      POST /contents               → Add a new content item manually
+      POST /contents/sync          → Sync content from Shopify (home/product/collection)
+      POST /contents/import        → Import content fetched from a URL
+      PUT  /contents/<id>          → Edit an existing content item
+      DELETE /contents/<id>        → Delete a content item
+      POST /contents/<id>/translate → Translate a specific content item
+      GET  /contents/store-status  → Check if a Shopify store is connected
+  - Go here if syncing from Shopify or managing the content library is broken.
+
+routes/settings_routes.py
+  - Handles saving and loading all merchant configuration settings.
+  - Endpoints:
+      POST /save-languages         → Save which source and target languages to use
+      GET  /get-languages          → Fetch current language settings
+      POST /save-provider          → Save which AI provider and API key to use
+      GET  /get-provider           → Fetch current AI provider settings
+      POST /save-store-settings    → Save the Shopify store URL and access token
+      GET  /get-store-settings     → Fetch current store settings
+  - Go here if language or provider settings are not saving correctly.
+
+routes/dashboard_routes.py
+  - Powers the admin dashboard with stats, analytics, and activity logs.
+  - Endpoints:
+      GET  /api/dashboard          → Main dashboard stats (languages, translations, etc.)
+      GET  /api/dashboard/extension → Richer stats for the Shopify app-home extension
+      GET  /analytics              → Simple analytics summary
+      GET  /audit-history          → Full log of all past actions
+  - Go here if the dashboard is showing wrong numbers or failing.
+
+routes/seo_routes.py
+  - Handles SEO meta-tag translation via the Shopify GraphQL Admin API.
+  - Endpoints:
+      GET  /api/seo-resources      → Fetch translatable products/pages from Shopify
+      POST /api/seo-translate      → Register translated SEO fields back to Shopify
+      POST /api/seo-update-original → Update the original SEO fields in Shopify
+  - Go here if SEO translation is not working or returning GraphQL errors.
+
+--------------------------------------------------------------------------------
+utils/ FOLDER — Shared Helper Functions (not endpoints)
+--------------------------------------------------------------------------------
+
+utils/helpers.py
+  - Core utility functions used across ALL route files.
+  - Contains:
+      get_setting(key, default)    → Read a value from AppSetting table
+      set_setting(key, value)      → Write a value to AppSetting table
+      get_default_provider_settings() → Returns default AI provider config dict
+      normalize_shopify_store_url(url) → Strips https:// and trailing slashes
+      get_shop_from_request()      → Extracts shop domain from current request
+      get_current_store(shop)      → Finds the ShopifyStore DB record for a shop
+      get_shopify_credentials(shop) → Returns (store_url, access_token) tuple
+      _mask_token(token)           → Masks a token for safe logging (e.g. "shp...k3m1")
+  - Go here if store credential lookups or settings reads/writes are failing.
+
+utils/ai_provider.py
+  - All AI model API call logic lives here.
+  - Contains:
+      get_provider_response(...)   → Single-text translation via any AI provider
+      get_bulk_provider_response(...) → Batch-text translation via any AI provider
+      parse_bulk_json_response(...)  → Parses and cleans the AI's JSON bulk response
+      clean_bulk_response_text(...)  → Strips markdown fences from AI responses
+      extract_json_object(...)       → Extracts a JSON object from a messy string
+  - Supports: OpenAI, Google Gemini, Anthropic Claude, Groq, Ollama
+  - Go here if any AI provider is returning errors or wrong results.
+
+utils/shopify_client.py
+  - Functions for calling the Shopify Admin REST API to fetch store content.
+  - Contains:
+      fetch_shopify_pages()        → Gets all pages from the connected store
+      fetch_shopify_products(n)    → Gets the first N products from the store
+      fetch_shopify_collections(n) → Gets the first N collections from the store
+      extract_text_from_html(html) → Strips HTML tags and returns plain text
+  - Go here if Shopify content sync is not returning the right data.
+
+================================================================================
+  QUICK DEBUGGING GUIDE
+================================================================================
+
+  Problem                          → File to check
+  ─────────────────────────────────────────────────────────────────────────
+  App won't start                  → app.py (import errors or blueprint issues)
+  Database column missing          → model.py
+  OAuth / Install broken           → routes/auth_routes.py
+  Translation failing / slow       → routes/translation_routes.py, utils/ai_provider.py
+  Shopify sync not working         → routes/content_routes.py, utils/shopify_client.py
+  Languages / Provider not saving  → routes/settings_routes.py, utils/helpers.py
+  Dashboard showing wrong data     → routes/dashboard_routes.py
+  SEO translation failing          → routes/seo_routes.py
+  Store credentials not found      → utils/helpers.py (get_shopify_credentials)
+
+================================================================================

@@ -5,7 +5,7 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import DashboardPage from "./pages/DashboardPage";
 import LanguagesPage from "./pages/LanguagesPage";
 import ProvidersPage from "./pages/ProvidersPage";
-import TranslationPage from "./pages/TranslationPage.jsx";
+import TranslationsPage from "./pages/TranslationsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AuditHistoryPage from "./pages/AuditHistoryPage";
@@ -21,7 +21,7 @@ function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/languages" element={<LanguagesPage />} />
           <Route path="/providers" element={<ProvidersPage />} />
-          <Route path="/translations" element={<TranslationPage />} />
+          <Route path="/translations" element={<TranslationsPage />} />
           <Route path="/seo" element={<SeoPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<SettingsPage />} />

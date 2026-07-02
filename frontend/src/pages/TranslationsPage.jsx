@@ -25,15 +25,9 @@ function TranslationsPage() {
   const [pageFilter, setPageFilter] = useState("home");
   const [contentKey, setContentKey] = useState("");
   const [sourceText, setSourceText] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("Hindi");
-  const [translatedText, setTranslatedText] = useState("");
-
   const [selectedContent, setSelectedContent] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [editingTranslationId, setEditingTranslationId] = useState(null);
-  const [editingTranslationText, setEditingTranslationText] = useState("");
-  const [isTranslating, setIsTranslating] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [storeConnected, setStoreConnected] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
@@ -62,9 +56,7 @@ function TranslationsPage() {
   useEffect(() => {
     const fetchPageData = async () => {
       await loadContents(pageFilter);
-      await loadTranslations();
       setSelectedContent(null);
-      setTranslatedText("");
     };
 
     fetchPageData();
@@ -113,38 +105,12 @@ function TranslationsPage() {
     setSelectedContent(null);
     setContentKey("");
     setSourceText("");
-    setTranslatedText("");
-    setEditingTranslationId(null);
-    setEditingTranslationText("");
-  };
-
-  const findTranslationForSelection = (content, language, records = history) => {
-    if (!content) return null;
-    return records.find(
-      (item) =>
-        item.source_text === content.source_text &&
-        item.target_language === language
-    );
   };
 
   const handleSelectContent = (content) => {
     setSelectedContent(content);
     setContentKey(content.key);
     setSourceText(content.source_text);
-    setEditingTranslationId(null);
-    setEditingTranslationText("");
-
-    const existing = findTranslationForSelection(content, targetLanguage);
-    setTranslatedText(existing?.translated_text || "");
-  };
-
-  const handleTargetLanguageChange = (language) => {
-    setTargetLanguage(language);
-    setEditingTranslationId(null);
-    setEditingTranslationText("");
-
-    const existing = findTranslationForSelection(selectedContent, language);
-    setTranslatedText(existing?.translated_text || "");
   };
 
   const handleSaveContent = async () => {
@@ -203,78 +169,7 @@ function TranslationsPage() {
     }
   };
 
-  const handleTranslateSavedContent = async () => {
-    if (!selectedContent) {
-      alert("Select a content item before translating.");
-      return;
-    }
 
-    setIsTranslating(true);
-    try {
-      const result = await translateContent(selectedContent.id, targetLanguage);
-      if (!result.success) {
-        throw new Error(result.message || "Translation failed.");
-      }
-
-      setTranslatedText(result.translated_text || "");
-      await loadTranslations();
-    } catch (error) {
-      console.error("Error translating saved content:", error);
-      alert(error.message || "Unable to translate saved content.");
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
-  const handleEditTranslation = (item) => {
-    setEditingTranslationId(item.id);
-    setEditingTranslationText(item.translated_text);
-  };
-
-  const handleSaveTranslationEdit = async (translationId) => {
-    if (!editingTranslationText.trim()) {
-      alert("Translation text cannot be empty.");
-      return;
-    }
-
-    try {
-      const result = await updateTranslation(translationId, editingTranslationText);
-      if (!result.success) {
-        throw new Error(result.message || "Failed to update translation.");
-      }
-
-      await loadTranslations();
-      setEditingTranslationId(null);
-      setEditingTranslationText("");
-      setTranslatedText(editingTranslationText);
-    } catch (error) {
-      console.error("Error updating translation:", error);
-      alert(error.message || "Unable to update translation.");
-    }
-  };
-
-  const handleDeleteTranslation = async (translationId) => {
-    if (!window.confirm("Delete this translation record?")) {
-      return;
-    }
-
-    try {
-      const result = await deleteTranslation(translationId);
-      if (!result.success) {
-        throw new Error(result.message || "Failed to delete translation.");
-      }
-
-      await loadTranslations();
-      if (editingTranslationId === translationId) {
-        setEditingTranslationId(null);
-        setEditingTranslationText("");
-      }
-      setTranslatedText("");
-    } catch (error) {
-      console.error("Error deleting translation:", error);
-      alert(error.message || "Unable to delete translation.");
-    }
-  };
 
   const filteredContents = useMemo(() => {
     const query = searchTerm.toLowerCase();
@@ -286,20 +181,13 @@ function TranslationsPage() {
     );
   }, [contents, searchTerm]);
 
-  const contentTranslations = useMemo(() => {
-    if (!selectedContent) return [];
-    return history.filter((item) => item.source_text === selectedContent.source_text);
-  }, [history, selectedContent]);
-
-  const activeTranslation = findTranslationForSelection(selectedContent, targetLanguage);
-
   return (
     <div className="flex h-[calc(100vh-8rem)] min-h-[640px] flex-col gap-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Website Content</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Content is pulled from your Shopify store, then translated on the right.
+            Content is pulled from your Shopify store. Select an item to edit its text.
           </p>
         </div>
 
@@ -417,8 +305,8 @@ function TranslationsPage() {
         {syncMessage && <p className="mt-2 text-[#008060]">{syncMessage}</p>}
       </div>
 
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Left: Website content */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4">
+        {/* Website content */}
         <section className="card-container flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
             <FileText className="h-4 w-4 text-[#008060]" />
@@ -504,142 +392,7 @@ function TranslationsPage() {
           </div>
         </section>
 
-        {/* Right: Translated content */}
-        <section className="card-container flex min-h-0 flex-col overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
-            <Languages className="h-4 w-4 text-[#008060]" />
-            <div>
-              <h2 className="font-semibold text-slate-900">Translated Content</h2>
-              <p className="text-xs text-slate-500">Translate and review output for the selected item</p>
-            </div>
-          </div>
 
-          <div className="flex min-h-0 flex-1 flex-col p-4">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-slate-500">Target language</label>
-                <select
-                  className="input-field h-9"
-                  value={targetLanguage}
-                  onChange={(e) => handleTargetLanguageChange(e.target.value)}
-                  disabled={!selectedContent}
-                >
-                  {TARGET_LANGUAGES.map((language) => (
-                    <option key={language} value={language}>
-                      {language}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                className="btn btn-primary h-9 px-5 py-2 sm:min-w-[160px]"
-                onClick={handleTranslateSavedContent}
-                disabled={!selectedContent || isTranslating}
-              >
-                {isTranslating ? "Translating..." : activeTranslation ? "Re-translate" : "Translate"}
-              </button>
-            </div>
-
-            {selectedContent ? (
-              <>
-                <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                  <p className="text-xs font-medium text-slate-400">Source preview</p>
-                  <p className="mt-1 line-clamp-2 text-sm text-slate-600">{selectedContent.source_text}</p>
-                </div>
-
-                <label className="mb-1 block text-xs font-medium text-slate-500">Translation</label>
-                {editingTranslationId === activeTranslation?.id ? (
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <textarea
-                      className="input-field min-h-0 flex-1 resize-none text-sm leading-relaxed"
-                      value={editingTranslationText}
-                      onChange={(e) => setEditingTranslationText(e.target.value)}
-                      autoFocus
-                    />
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        className="btn btn-primary flex-1 py-2"
-                        onClick={() => handleSaveTranslationEdit(activeTranslation.id)}
-                      >
-                        Save translation
-                      </button>
-                      <button
-                        className="btn btn-secondary px-4 py-2"
-                        onClick={() => {
-                          setEditingTranslationId(null);
-                          setEditingTranslationText("");
-                        }}
-                        type="button"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <textarea
-                      className="input-field min-h-0 flex-1 resize-none bg-white text-sm leading-relaxed"
-                      value={translatedText}
-                      readOnly
-                      placeholder="Translated text will appear here after you translate."
-                    />
-                    {activeTranslation && (
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          className="btn btn-secondary flex-1 py-2"
-                          onClick={() => handleEditTranslation(activeTranslation)}
-                        >
-                          Edit translation
-                        </button>
-                        <button
-                          className="btn btn-secondary px-4 py-2 text-[#c92a2a] hover:text-[#a50e0e]"
-                          onClick={() => handleDeleteTranslation(activeTranslation.id)}
-                          type="button"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {contentTranslations.length > 0 && (
-                  <div className="mt-4 border-t border-slate-100 pt-4">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-                      Other languages ({contentTranslations.length})
-                    </p>
-                    <ul className="max-h-28 space-y-2 overflow-y-auto">
-                      {contentTranslations.map((item) => (
-                        <li
-                          key={item.id}
-                          className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-slate-700">{item.target_language}</span>
-                            <button
-                              type="button"
-                              className="text-xs font-medium text-[#008060] hover:text-[#006e52]"
-                              onClick={() => handleTargetLanguageChange(item.target_language)}
-                            >
-                              View
-                            </button>
-                          </div>
-                          <p className="mt-1 line-clamp-2 text-slate-600">{item.translated_text}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center text-slate-500">
-                <Languages className="mb-3 h-8 w-8 text-slate-300" />
-                <p className="text-sm font-medium text-slate-900">Nothing to translate yet</p>
-                <p className="mt-1 text-sm">Select content on the left to start translating.</p>
-              </div>
-            )}
-          </div>
-        </section>
       </div>
     </div>
   );

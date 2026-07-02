@@ -1,7 +1,7 @@
 import requests
 from flask import Blueprint, jsonify, request
 from database import db
-from model import AuditLog
+from model import AuditLog, PageContent
 from utils.helpers import get_setting, get_default_provider_settings, get_shopify_credentials
 from utils.ai_provider import get_provider_response
 
@@ -144,6 +144,20 @@ def update_original_seo():
         user_errors = data.get("data", {}).get(mutation_name, {}).get("userErrors", [])
         if user_errors:
             return jsonify({"success": False, "message": user_errors[0].get("message", "Update failed")}), 400
+
+        # Also store in the database
+        db_key = f"seo_{resource_id.split('/')[-1]}"
+        db_source_text = f"Title: {meta_title}\nDescription: {meta_desc}"
+        existing = PageContent.query.filter_by(page="seo", key=db_key).first()
+        if existing:
+            existing.source_text = db_source_text
+        else:
+            new_content = PageContent(page="seo", key=db_key, source_text=db_source_text)
+            db.session.add(new_content)
+        
+        db.session.add(AuditLog(action=f"Updated SEO for {db_key}"))
+        db.session.commit()
+
         return jsonify({"success": True})
     except requests.exceptions.RequestException as e:
         status_code = e.response.status_code if e.response else 500
