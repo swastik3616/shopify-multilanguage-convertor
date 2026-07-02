@@ -5,6 +5,8 @@ from utils.helpers import get_setting, get_default_provider_settings, get_shopif
 from utils.shopify_client import fetch_shopify_pages, fetch_shopify_products, fetch_shopify_collections, extract_text_from_html
 from utils.ai_provider import get_provider_response
 import requests
+from bs4 import BeautifulSoup
+import re
 
 content_bp = Blueprint("content_routes", __name__)
 
@@ -42,8 +44,8 @@ def push_update_to_shopify(page, key, text):
         print(f"Error updating Shopify: {e}")
 
 
-def seed_shopify_page_contents(page):
-    """Fetch and seed page contents from Shopify store."""
+def seed_shopify_page_contents_legacy(page):
+    """Fallback legacy sync using Shopify Admin API."""
     imported = 0
     try:
         if page == "home":
@@ -104,6 +106,101 @@ def seed_shopify_page_contents(page):
 
     except Exception as e:
         print(f"Error seeding {page} content from Shopify: {str(e)}")
+
+    return imported
+
+def seed_shopify_page_contents(page):
+    """Scrape live storefront HTML to extract real sections and tags."""
+    store_url, access_token = get_shopify_credentials()
+    if not store_url:
+        return 0
+
+    imported = 0
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"}
+    
+    urls_to_scrape = []
+    
+    if page == "home":
+        urls_to_scrape.append((f"https://{store_url}/", None))
+    elif page == "product":
+        products = fetch_shopify_products(3)
+        for p in products:
+            handle = p.get("handle")
+            pid = p.get("id")
+            if handle:
+                urls_to_scrape.append((f"https://{store_url}/products/{handle}", pid))
+    elif page == "collection":
+        collections = fetch_shopify_collections(3)
+        for c in collections:
+            handle = c.get("handle")
+            cid = c.get("id")
+            if handle:
+                urls_to_scrape.append((f"https://{store_url}/collections/{handle}", cid))
+
+    if not urls_to_scrape:
+        return seed_shopify_page_contents_legacy(page)
+
+    target_tags = ["h1", "h2", "h3", "h4", "h5", "h6", "p"]
+
+    for url, page_resource_id in urls_to_scrape:
+        try:
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code != 200:
+                print(f"Failed to fetch {url}: Status {resp.status_code}")
+                continue
+            html = resp.text
+        except Exception as e:
+            print(f"Error fetching {url}: {e}")
+            continue
+
+        soup = BeautifulSoup(html, "html.parser")
+        sections = soup.find_all("div", id=re.compile(r"^shopify-section-"))
+
+        for section_idx, section in enumerate(sections):
+            section_id = section.get("id")
+            
+            for elem_idx, element in enumerate(section.find_all(target_tags)):
+                text = element.get_text(separator=" ", strip=True)
+                if not text or len(text) < 2:
+                    continue
+                
+                html_tag = element.name.lower()
+                
+                # Resolve product ID if this block is a product card
+                item_resource_id = page_resource_id
+                if not item_resource_id:
+                    prod_div = element.find_parent(attrs={"data-product-id": True})
+                    if prod_div:
+                        try:
+                            item_resource_id = int(prod_div["data-product-id"])
+                        except:
+                            pass
+                
+                key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"
+                
+                existing = PageContent.query.filter_by(page=page, key=key).first()
+                if existing:
+                    existing.source_text = text
+                    existing.html_tag = html_tag
+                    existing.section_id = section_id
+                    existing.resource_id = item_resource_id
+                else:
+                    db.session.add(PageContent(
+                        page=page,
+                        key=key,
+                        source_text=text,
+                        html_tag=html_tag,
+                        section_id=section_id,
+                        resource_id=item_resource_id
+                    ))
+                imported += 1
+
+    if imported > 0:
+        db.session.commit()
+        print(f"Scraped {imported} {page} content item(s) from live storefront")
+    else:
+        print(f"Scraping returned 0 items for {page}. Falling back to legacy API sync.")
+        return seed_shopify_page_contents_legacy(page)
 
     return imported
 
@@ -169,7 +266,10 @@ def get_contents():
         "id": item.id,
         "page": item.page,
         "key": item.key,
-        "source_text": item.source_text
+        "source_text": item.source_text,
+        "html_tag": getattr(item, 'html_tag', None),
+        "section_id": getattr(item, 'section_id', None),
+        "resource_id": getattr(item, 'resource_id', None)
     } for item in records])
 
 

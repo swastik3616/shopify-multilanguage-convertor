@@ -43,6 +43,21 @@ class PageContent(db.Model):
         nullable=False
     )
 
+    html_tag = db.Column(
+        db.String(50),
+        nullable=True
+    )
+
+    section_id = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    resource_id = db.Column(
+        db.BigInteger,
+        nullable=True
+    )
+
     __table_args__ = (
         db.UniqueConstraint('page', 'key', name='uq_page_key'),
     )

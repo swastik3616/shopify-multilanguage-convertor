@@ -73,14 +73,47 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
     finally { setIsSavingOrig(false); }
   };
 
-  const isMultiline = item.source_text.length > 80;
+  const isMultiline = item.source_text.length > 80 || item.html_tag === 'p';
+  
+  // Style text based on its HTML tag
+  const getTextStyles = () => {
+    switch(item.html_tag) {
+      case 'h1': return 'text-xl font-bold text-slate-900';
+      case 'h2': return 'text-lg font-bold text-slate-800';
+      case 'h3': return 'text-base font-semibold text-slate-800';
+      case 'h4': case 'h5': case 'h6': return 'text-sm font-semibold text-slate-700';
+      case 'p': return 'text-sm text-slate-600 leading-relaxed';
+      default: return 'text-sm text-slate-800 font-medium';
+    }
+  };
+
+  const getTransTextStyles = () => {
+    switch(item.html_tag) {
+      case 'h1': return 'text-xl font-bold text-emerald-900';
+      case 'h2': return 'text-lg font-bold text-emerald-800';
+      case 'h3': return 'text-base font-semibold text-emerald-800';
+      case 'h4': case 'h5': case 'h6': return 'text-sm font-semibold text-emerald-700';
+      case 'p': return 'text-sm text-emerald-700 leading-relaxed';
+      default: return 'text-sm text-emerald-900 font-medium';
+    }
+  };
+
+  const textClass = getTextStyles();
+  const transTextClass = getTransTextStyles();
 
   return (
     <div className="grid grid-cols-2 border-b border-slate-100 last:border-b-0 divide-x divide-slate-100 hover:bg-slate-50/50 transition-colors group">
       {/* Left: Original */}
       <div className="flex flex-col px-5 py-4 gap-2">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full truncate">{item.key}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">&lt;{item.html_tag || 'text'}&gt;</span>
+            {item.resource_id && (
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                📦 ID: {item.resource_id}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             {!isEditingOrig ? (
               <button onClick={() => { setIsEditingOrig(true); setEditOrig(item.source_text); }}
@@ -103,7 +136,7 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
           <textarea className="input-field resize-none text-sm leading-relaxed w-full mt-1" rows={isMultiline ? 4 : 2}
             value={editOrig} onChange={e => setEditOrig(e.target.value)} autoFocus />
         ) : (
-          <p className={`text-sm text-slate-800 leading-relaxed mt-1 ${isMultiline ? "" : "font-medium"}`}>{item.source_text}</p>
+          <p className={`${textClass} mt-1`}>{item.source_text}</p>
         )}
       </div>
 
@@ -138,7 +171,7 @@ function TranslationRow({ item, targetLanguage, allTranslations, onDelete, onCon
           <textarea className="input-field resize-none text-sm leading-relaxed w-full mt-1" rows={isMultiline ? 4 : 2}
             value={editTrans} onChange={e => setEditTrans(e.target.value)} autoFocus />
         ) : translatedText ? (
-          <p className={`text-sm text-emerald-900 leading-relaxed mt-1 ${isMultiline ? "" : "font-medium"}`}>{translatedText}</p>
+          <p className={`${transTextClass} mt-1`}>{translatedText}</p>
         ) : (
           <div className="flex items-center gap-2 mt-1">
             <input type="text" className="input-field h-8 flex-1 text-sm bg-white" placeholder={`Type ${targetLanguage}…`}
@@ -283,37 +316,33 @@ export default function TranslationsPage() {
     );
   }, [contents, searchTerm]);
 
-  // Dynamically group items into website sections based on key prefixes
+  // Dynamically group items into website sections based on real section_id
   const dynamicSections = useMemo(() => {
     const groups = {};
     
     filtered.forEach(item => {
-      let groupName = "General Content Section";
+      let groupName = item.section_id || "Uncategorized Section";
       
-      const key = item.key.toLowerCase();
-      const parts = key.split(/[_-]/);
+      // Clean up "shopify-section-featured-products" -> "Featured Products"
+      if (groupName.startsWith("shopify-section-")) {
+        groupName = groupName.replace("shopify-section-", "");
+      }
       
-      if (key.startsWith("featured_product_")) {
-        groupName = `Featured Product Section ${parts[2]}`;
-      } else if (key.startsWith("product_")) {
-        groupName = `Product Details (${parts[1]})`;
-      } else if (key.startsWith("collection_")) {
-        groupName = `Collection (${parts[1]})`;
-      } else if (parts.length > 1) {
-        // Group by the first prefix word (like "hero", "header", "footer")
-        const prefix = parts[0];
-        if (["hero", "header", "footer", "banner", "about", "contact", "main"].includes(prefix)) {
-          groupName = prefix.charAt(0).toUpperCase() + prefix.slice(1) + " Section";
-        }
+      // Capitalize nicely
+      groupName = groupName.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+      
+      // Add "Section" suffix if it doesn't have it
+      if (!groupName.toLowerCase().includes("section")) {
+        groupName += " Section";
       }
       
       if (!groups[groupName]) groups[groupName] = [];
       groups[groupName].push(item);
     });
 
-    // Convert to array and give them sequential numbers
+    // Convert to array and preserve insertion order roughly
     let sectionCount = 1;
-    return Object.keys(groups).sort().map(title => ({
+    return Object.keys(groups).map(title => ({
       title,
       items: groups[title],
       sectionNumber: sectionCount++
