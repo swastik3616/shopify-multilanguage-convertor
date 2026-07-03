@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Globe, Loader2, RefreshCw, Languages,
   ChevronDown, ChevronRight, PanelLeft, Sparkles,
-  Image as ImageIcon, AlertCircle,
+  Image as ImageIcon, AlertCircle, Edit2, Check, X,
 } from "lucide-react";
 import { fetchUrlContent } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
@@ -191,8 +191,20 @@ function ElementContent({ tag, text, translated=false }) {
 }
 
 /* ─── ElementRow ─────────────────────────────────────────────── */
-function ElementRow({ element, isTranslating }) {
+function ElementRow({ element, isTranslating, onEdit }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState(element.translatedText || "");
   const hasT = !!element.translatedText;
+
+  useEffect(() => {
+    setEditedText(element.translatedText || "");
+  }, [element.translatedText]);
+
+  const handleSave = () => {
+    if (onEdit) onEdit(editedText);
+    setIsEditing(false);
+  };
+
   return (
     <div className="grid grid-cols-1 border-b border-slate-50 last:border-b-0 lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
       {/* Original */}
@@ -206,18 +218,46 @@ function ElementRow({ element, isTranslating }) {
       </div>
 
       {/* Translated */}
-      <div className={`flex items-start gap-3 px-5 py-4 ${hasT ? "bg-emerald-50/30" : "bg-slate-50/40"}`}>
+      <div className={`group flex items-start gap-3 px-5 py-4 ${hasT ? "bg-emerald-50/30" : "bg-slate-50/40"}`}>
         <span className={`mt-0.5 shrink-0 rounded border font-mono text-[9px] font-bold px-1.5 py-0.5 ${tagBadge(element.tag)}`}>
           {element.tag}
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 relative">
           {isTranslating ? (
             <div className="flex items-center gap-2 pt-1">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400"/>
               <span className="text-xs text-slate-400">translating…</span>
             </div>
+          ) : isEditing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={editedText}
+                onChange={e => setEditedText(e.target.value)}
+                className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm text-emerald-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                rows={3}
+              />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => { setIsEditing(false); setEditedText(element.translatedText || ""); }} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
+                  <X className="h-4 w-4" />
+                </button>
+                <button onClick={handleSave} className="rounded-lg bg-emerald-100 p-1.5 text-emerald-600 hover:bg-emerald-200 transition">
+                  <Check className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           ) : hasT ? (
-            <ElementContent tag={element.tag} text={element.translatedText} translated/>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <ElementContent tag={element.tag} text={element.translatedText} translated/>
+              </div>
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-100 transition"
+                title="Edit translation"
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
+            </div>
           ) : (
             <span className="text-sm italic text-slate-300">—</span>
           )}
@@ -228,7 +268,7 @@ function ElementRow({ element, isTranslating }) {
 }
 
 /* ─── SectionRow ─────────────────────────────────────────────── */
-function SectionRow({ section, index, targetLanguage, isActive, onFocus, translatingId, onTranslate }) {
+function SectionRow({ section, index, targetLanguage, isActive, onFocus, translatingId, onTranslate, onEditElement }) {
   const [collapsed, setCollapsed] = useState(index!==0);
   const hasTranslation = section.elements.some(e=>e.translatedText);
   const isTranslating  = translatingId===section.id;
@@ -316,6 +356,7 @@ function SectionRow({ section, index, targetLanguage, isActive, onFocus, transla
                 key={el.id}
                 element={el}
                 isTranslating={isTranslating}
+                onEdit={(newText) => onEditElement(section.id, el.id, newText)}
               />
             ))}
           </motion.div>
@@ -390,6 +431,16 @@ export default function TranslationPage() {
     setTranslatingId("all");
     for (const s of sections) await handleTranslate(s.id);
     setTranslatingId(null);
+  };
+
+  const handleEditElement = (sectionId, elementId, newText) => {
+    setSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        elements: s.elements.map(e => e.id === elementId ? { ...e, translatedText: newText } : e)
+      };
+    }));
   };
 
   const reset = () => {
@@ -501,6 +552,7 @@ export default function TranslationPage() {
                 onFocus={()=>setActiveId(section.id)}
                 translatingId={translatingId}
                 onTranslate={handleTranslate}
+                onEditElement={handleEditElement}
               />
             ))}
           </div>
