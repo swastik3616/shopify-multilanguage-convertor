@@ -498,6 +498,14 @@ export default function TranslationPage() {
   const handleSaveToWebsite = async () => {
     if (!url.trim()) return;
     setIsSavingEdits(true);
+    
+    let normalizedUrl = url.trim();
+    try {
+      if (!normalizedUrl.startsWith("http")) normalizedUrl = "https://" + normalizedUrl;
+      const u = new URL(normalizedUrl);
+      normalizedUrl = (u.origin + u.pathname).replace(/\/$/, "");
+    } catch (e) {}
+
     const edits = [];
     sections.forEach(s => {
       s.elements.forEach(e => {
@@ -522,7 +530,7 @@ export default function TranslationPage() {
     });
     
     try {
-      const res = await saveOverlayEdits(url.trim(), edits);
+      const res = await saveOverlayEdits(normalizedUrl, edits);
       if (res.success) {
          setMessage("Saved successfully to live website overlay!");
       } else {
