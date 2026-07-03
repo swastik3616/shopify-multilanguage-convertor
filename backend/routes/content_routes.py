@@ -4,6 +4,7 @@ from model import PageContent, Translation, AuditLog
 from utils.helpers import get_setting, get_default_provider_settings, get_shopify_credentials
 from utils.shopify_client import fetch_shopify_pages, fetch_shopify_products, fetch_shopify_collections, extract_text_from_html
 from utils.ai_provider import get_provider_response
+from utils.translation_filter import TranslationFilter
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -488,6 +489,16 @@ def translate_content(content_id):
     content = PageContent.query.get(content_id)
     if not content:
         return jsonify({"success": False, "message": "Content item not found"}), 404
+
+    # ── Check if content should be skipped (email, number, URL) ────────────
+    if TranslationFilter.should_skip(content.source_text):
+        print(f"[translate_content] Skipping non-translatable content: {content.source_text}")
+        return jsonify({
+            "success": True,
+            "translated_text": content.source_text,
+            "skipped": True,
+            "message": "Content excluded from translation (email, number, or URL)"
+        })
 
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     provider = provider_settings.get("provider", "openai")
