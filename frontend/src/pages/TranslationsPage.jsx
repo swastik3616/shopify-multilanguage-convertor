@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Globe, Loader2, RefreshCw, Languages,
   ChevronDown, ChevronRight, PanelLeft, Sparkles,
-  Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows,
+  Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap,
 } from "lucide-react";
 import { fetchUrlContent, saveOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
-import { GridViewTable } from "./translation/GridViewTable";
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const LANGUAGES = ["Hindi", "Marathi", "French", "German", "Spanish", "Portuguese", "Japanese", "Arabic"];
@@ -47,6 +46,81 @@ function kindBadge(kind) {
 /* ─── Tiny helpers ───────────────────────────────────────────── */
 function uid(p = "id") { return `${p}_${Math.random().toString(36).slice(2, 9)}`; }
 function norm(t = "") { return t.replace(/\s+/g, " ").trim(); }
+
+function getTagColor(tag) {
+  if (HEADING_TAGS.includes(tag)) return "bg-emerald-100 text-emerald-700";
+  if (tag === "P") return "bg-slate-100 text-slate-700";
+  if (tag === "BUTTON") return "bg-violet-100 text-violet-700";
+  if (tag === "A") return "bg-sky-100 text-sky-700";
+  if (tag === "IMG") return "bg-amber-100 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function getTruncated(text, length = 100) {
+  if (!text) return "";
+  return text.length > length ? text.substring(0, length) + "..." : text;
+}
+
+function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="text-center py-12 text-slate-500">
+        No content items to display
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full overflow-x-auto border border-slate-200 rounded-lg bg-white shadow-sm">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+          <tr className="divide-x divide-slate-200">
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-20">Tag</th>
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-32">Section</th>
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">Source Text</th>
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">{targetLanguage}</th>
+            <th className="px-4 py-3 text-center font-semibold text-slate-700 w-32">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+          {items.map(item => (
+            <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
+              <td className="px-4 py-3">
+                <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap ${getTagColor(item.tag || "P")}`}>
+                  {item.tag || "P"}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
+              <td className="px-4 py-3">
+                <div title={item.text} className="text-sm text-slate-700 break-words">
+                  {getTruncated(item.text, 90)}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                {item.translatedText ? (
+                  <div title={item.translatedText} className="text-sm text-slate-800 break-words">
+                    {getTruncated(item.translatedText, 90)}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Not translated</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-center">
+                <button
+                  onClick={() => onTranslateItem(item.sectionId)}
+                  disabled={translatingId === item.sectionId}
+                  className="inline-flex items-center justify-center rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {translatingId === item.sectionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 /* ─── Parser ─────────────────────────────────────────────────── */
 function parseHtml(html) {
@@ -681,18 +755,11 @@ export default function TranslationPage() {
 
             {/* Grid View */}
             {viewMode === "grid" ? (
-              <GridViewTable
-                items={sections.reduce((all, section) => [...all, ...section.elements.map(el => ({ ...el, sectionId: section.id }))], [])}
+              <TranslationGrid
+                items={sections.reduce((all, section) => [...all, ...section.elements.map(el => ({ ...el, sectionId: section.id, sectionLabel: section.label }))], [])}
                 targetLanguage={targetLang}
-                allTranslations={[]}
-                onDelete={(elementId) => {
-                  setSections(prev => prev.map(s => ({
-                    ...s,
-                    elements: s.elements.filter(e => e.id !== elementId)
-                  })));
-                }}
-                onContentSaved={() => {}}
-                onTranslationSaved={() => {}}
+                translatingId={translatingId}
+                onTranslateItem={handleTranslate}
               />
             ) : (
               /* Panel View */
