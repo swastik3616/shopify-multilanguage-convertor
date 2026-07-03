@@ -245,10 +245,14 @@ function ElementRow({ element, isTranslating, onEdit }) {
                 </button>
               </div>
             </div>
-          ) : hasT ? (
+          ) : (
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <ElementContent tag={element.tag} text={element.translatedText} translated/>
+                {hasT ? (
+                  <ElementContent tag={element.tag} text={element.translatedText} translated/>
+                ) : (
+                  <span className="text-sm italic text-slate-300">—</span>
+                )}
               </div>
               <button 
                 onClick={() => setIsEditing(true)}
@@ -258,8 +262,6 @@ function ElementRow({ element, isTranslating, onEdit }) {
                 <Edit2 className="h-4 w-4" />
               </button>
             </div>
-          ) : (
-            <span className="text-sm italic text-slate-300">—</span>
           )}
         </div>
       </div>
