@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Globe, Loader2, RefreshCw, Languages,
   ChevronDown, ChevronRight, PanelLeft, Sparkles,
-  Image as ImageIcon, AlertCircle, Edit2, Check, X,
+  Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows,
 } from "lucide-react";
 import { fetchUrlContent, saveOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
+import { GridViewTable } from "./translation/GridViewTable";
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const LANGUAGES = ["Hindi","Marathi","French","German","Spanish","Portuguese","Japanese","Arabic"];
@@ -423,6 +424,7 @@ export default function TranslationPage() {
   const [translatingId,setTranslatingId]= useState(null);
   const [activeId,     setActiveId]     = useState(null);
   const [isSavingEdits, setIsSavingEdits] = useState(false);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "panel"
   const topRef = useRef(null);
 
   const hasContent = sections.length>0;
@@ -649,20 +651,70 @@ export default function TranslationPage() {
 
         {/* Sections */}
         {hasContent ? (
-          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6 items-start">
-            {sections.map((section,index)=>(
-              <SectionRow
-                key={section.id}
-                section={section}
-                index={index}
+          <div className="space-y-4">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-white border border-slate-200">
+              <span className="text-sm font-medium text-slate-600">View:</span>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-[#008060] text-white shadow-sm"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Grid3x3 className="h-4 w-4" />
+                <span className="text-sm font-medium">Grid Table</span>
+              </button>
+              <button
+                onClick={() => setViewMode("panel")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                  viewMode === "panel"
+                    ? "bg-[#008060] text-white shadow-sm"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Rows className="h-4 w-4" />
+                <span className="text-sm font-medium">Panel View</span>
+              </button>
+              <span className="text-xs text-slate-500 ml-auto">
+                {sections.reduce((sum, s) => sum + s.elements.length, 0)} items
+              </span>
+            </div>
+
+            {/* Grid View */}
+            {viewMode === "grid" ? (
+              <GridViewTable
+                items={sections.reduce((all, section) => [...all, ...section.elements.map(el => ({ ...el, sectionId: section.id }))], [])}
                 targetLanguage={targetLang}
-                isActive={activeId===section.id}
-                onFocus={()=>setActiveId(section.id)}
-                translatingId={translatingId}
-                onTranslate={handleTranslate}
-                onEditElement={handleEditElement}
+                allTranslations={[]}
+                onDelete={(elementId) => {
+                  setSections(prev => prev.map(s => ({
+                    ...s,
+                    elements: s.elements.filter(e => e.id !== elementId)
+                  })));
+                }}
+                onContentSaved={() => {}}
+                onTranslationSaved={() => {}}
               />
-            ))}
+            ) : (
+              /* Panel View */
+              <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6 items-start">
+                {sections.map((section,index)=>(
+                  <SectionRow
+                    key={section.id}
+                    section={section}
+                    index={index}
+                    targetLanguage={targetLang}
+                    isActive={activeId===section.id}
+                    onFocus={()=>setActiveId(section.id)}
+                    translatingId={translatingId}
+                    onTranslate={handleTranslate}
+                    onEditElement={handleEditElement}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="rounded-[32px] border border-dashed border-slate-300 bg-white p-14 text-center shadow-sm">
