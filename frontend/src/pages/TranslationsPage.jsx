@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Globe, Loader2, RefreshCw, Languages,
-  ChevronDown, ChevronRight, PanelLeft, Sparkles,
+  ChevronDown, ChevronRight, PanelLeft,
   Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap,
 } from "lucide-react";
 import { fetchUrlContent, saveOverlayEdits } from "../services/translationPageService";
@@ -61,7 +61,128 @@ function getTruncated(text, length = 100) {
   return text.length > length ? text.substring(0, length) + "..." : text;
 }
 
-function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem }) {
+function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOriginal, onEditTranslation }) {
+  const [editingSource, setEditingSource] = useState(false);
+  const [editingTranslation, setEditingTranslation] = useState(false);
+  const [sourceValue, setSourceValue] = useState(item.text || "");
+  const [translationValue, setTranslationValue] = useState(item.translatedText || "");
+
+  return (
+    <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
+      <td className="px-4 py-3">
+        <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap ${getTagColor(item.tag || "P")}`}>
+          {item.tag || "P"}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
+      <td className="px-4 py-3">
+        {editingSource ? (
+          <div className="flex flex-col gap-2">
+            <input
+              type="text"
+              className="input-field w-full text-sm"
+              value={sourceValue}
+              onChange={e => setSourceValue(e.target.value)}
+              autoFocus
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setSourceValue(item.text || ""); setEditingSource(false); }}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => { onEditOriginal(item.sectionId, item.id, sourceValue, true); setEditingSource(false); }}
+                className="rounded-lg bg-slate-900 p-1.5 text-white hover:bg-slate-800 transition"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-sm text-slate-700 break-words" title={item.text}>{getTruncated(item.text, 90)}</div>
+            <button
+              type="button"
+              onClick={() => setEditingSource(true)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+              title="Edit source"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {editingTranslation ? (
+          <div className="flex flex-col gap-2">
+            <input
+              type="text"
+              className="input-field w-full text-sm"
+              value={translationValue}
+              onChange={e => setTranslationValue(e.target.value)}
+              autoFocus
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setTranslationValue(item.translatedText || ""); setEditingTranslation(false); }}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => { onEditTranslation(item.sectionId, item.id, translationValue, false); setEditingTranslation(false); }}
+                className="rounded-lg bg-emerald-100 p-1.5 text-emerald-700 hover:bg-emerald-200 transition"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : item.translatedText ? (
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-sm text-slate-800 break-words" title={item.translatedText}>{getTruncated(item.translatedText, 90)}</div>
+            <button
+              type="button"
+              onClick={() => setEditingTranslation(true)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+              title="Edit translation"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-slate-400 italic">Not translated</span>
+            <button
+              type="button"
+              onClick={() => setEditingTranslation(true)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+              title="Add translation"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </td>
+      <td className="px-4 py-3 text-center">
+        <button
+          onClick={() => onTranslateItem(item.sectionId)}
+          disabled={translatingId === item.sectionId}
+          className="inline-flex items-center justify-center rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
+        >
+          {translatingId === item.sectionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem, onEditOriginal, onEditTranslation }) {
   if (!items || items.length === 0) {
     return (
       <div className="text-center py-12 text-slate-500">
@@ -84,37 +205,15 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
         </thead>
         <tbody className="divide-y divide-slate-200">
           {items.map(item => (
-            <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
-              <td className="px-4 py-3">
-                <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap ${getTagColor(item.tag || "P")}`}>
-                  {item.tag || "P"}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
-              <td className="px-4 py-3">
-                <div title={item.text} className="text-sm text-slate-700 break-words">
-                  {getTruncated(item.text, 90)}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                {item.translatedText ? (
-                  <div title={item.translatedText} className="text-sm text-slate-800 break-words">
-                    {getTruncated(item.translatedText, 90)}
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-400 italic">Not translated</span>
-                )}
-              </td>
-              <td className="px-4 py-3 text-center">
-                <button
-                  onClick={() => onTranslateItem(item.sectionId)}
-                  disabled={translatingId === item.sectionId}
-                  className="inline-flex items-center justify-center rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {translatingId === item.sectionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-                </button>
-              </td>
-            </tr>
+            <TranslationGridRow
+              key={item.id}
+              item={item}
+              targetLanguage={targetLanguage}
+              translatingId={translatingId}
+              onTranslateItem={onTranslateItem}
+              onEditOriginal={onEditOriginal}
+              onEditTranslation={onEditTranslation}
+            />
           ))}
         </tbody>
       </table>
@@ -273,14 +372,6 @@ function ElementRow({ element, isTranslating, onEdit, onEditOriginal }) {
   const [editedTextO, setEditedTextO] = useState(element.text || "");
 
   const hasT = !!element.translatedText;
-
-  useEffect(() => {
-    setEditedTextT(element.translatedText || "");
-  }, [element.translatedText]);
-
-  useEffect(() => {
-    setEditedTextO(element.text || "");
-  }, [element.text]);
 
   const handleSaveT = () => {
     if (onEdit) onEdit(editedTextT);
@@ -578,7 +669,9 @@ export default function TranslationPage() {
       if (!normalizedUrl.startsWith("http")) normalizedUrl = "https://" + normalizedUrl;
       const u = new URL(normalizedUrl);
       normalizedUrl = (u.origin + u.pathname).replace(/\/$/, "");
-    } catch (e) {}
+    } catch (error) {
+      console.warn("Failed to normalize URL", error);
+    }
 
     const edits = [];
     sections.forEach(s => {
@@ -760,6 +853,8 @@ export default function TranslationPage() {
                 targetLanguage={targetLang}
                 translatingId={translatingId}
                 onTranslateItem={handleTranslate}
+                onEditOriginal={handleEditElement}
+                onEditTranslation={handleEditElement}
               />
             ) : (
               /* Panel View */
