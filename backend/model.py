@@ -114,3 +114,14 @@ class AppSetting(db.Model):
         db.Text,
         nullable=False
     )
+
+
+class OverlayEdit(db.Model):
+    __tablename__ = "overlay_edits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(500), nullable=False)
+    original_text = db.Column(db.Text, nullable=False)
+    new_text = db.Column(db.Text, nullable=False)
+    is_translation = db.Column(db.Boolean, default=False)
+    target_language = db.Column(db.String(100), nullable=True)

@@ -14,6 +14,7 @@ from routes.content_routes import content_bp
 from routes.settings_routes import settings_bp
 from routes.dashboard_routes import dashboard_bp
 from routes.seo_routes import seo_bp
+from routes.overlay_routes import overlay_bp
 
 # ── App Factory ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -50,6 +51,7 @@ app.register_blueprint(content_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(seo_bp)
+app.register_blueprint(overlay_bp)
 
 # ── Core Routes ───────────────────────────────────────────────────────────────
 @app.route("/")

@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronRight, PanelLeft, Sparkles,
   Image as ImageIcon, AlertCircle, Edit2, Check, X,
 } from "lucide-react";
-import { fetchUrlContent } from "../services/translationPageService";
+import { fetchUrlContent, saveOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
 
 /* ─── Constants ──────────────────────────────────────────────── */
@@ -420,6 +420,7 @@ export default function TranslationPage() {
   const [message, setMessage] = useState("");
   const [translatingId, setTranslatingId] = useState(null);
   const [activeId, setActiveId] = useState(null);
+  const [isSavingEdits, setIsSavingEdits] = useState(false);
   const topRef = useRef(null);
 
   const hasContent = sections.length > 0;
@@ -492,6 +493,36 @@ export default function TranslationPage() {
     }));
   };
 
+  const handleSaveToWebsite = async () => {
+    if (!url.trim()) return;
+    setIsSavingEdits(true);
+    const edits = [];
+    sections.forEach(s => {
+      s.elements.forEach(e => {
+        if (e.translatedText) {
+          edits.push({
+            original_text: e.text,
+            new_text: e.translatedText,
+            is_translation: true,
+            target_language: targetLang
+          });
+        }
+      });
+    });
+    
+    try {
+      const res = await saveOverlayEdits(url.trim(), edits);
+      if (res.success) {
+         setMessage("Saved successfully to live website overlay!");
+      } else {
+         setMessage("Failed to save: " + res.message);
+      }
+    } catch(err) {
+      setMessage("Failed to save: " + err.message);
+    }
+    setIsSavingEdits(false);
+  };
+
   const reset = () => {
     setUrl(""); setSections([]); setPageMeta({ title: "", description: "" });
     setMessage(""); setFetchStatus("idle"); setActiveId(null); setTranslatingId(null);
@@ -542,6 +573,15 @@ export default function TranslationPage() {
                 >
                   {translatingId === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
                   Translate All
+                </button>
+              )}
+              {hasContent && (
+                <button
+                  type="button" onClick={handleSaveToWebsite} disabled={isSavingEdits}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isSavingEdits ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Save to Website
                 </button>
               )}
               <button
