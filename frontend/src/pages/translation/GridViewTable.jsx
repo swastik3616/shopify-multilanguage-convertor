@@ -9,13 +9,14 @@ export const LANG_FLAGS = {
 };
 
 function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved, onTranslationSaved) {
-  const findEx = () => allTranslations.find(h => h.source_text === item.source_text && h.target_language === targetLanguage);
-  const [translated, setTranslated] = useState(findEx()?.translated_text || "");
+  const sourceText = item.originalText || item.text || "";
+  const findEx = () => allTranslations.find(h => h.source_text === sourceText && h.target_language === targetLanguage);
+  const [translated, setTranslated] = useState(item.translatedText || findEx()?.translated_text || "");
   const [isTranslating, setIsTranslating] = useState(false);
-  const [editOrig, setEditOrig] = useState(item.source_text);
+  const [editOrig, setEditOrig] = useState(sourceText);
   const [editingOrig, setEditingOrig] = useState(false);
   const [savingOrig, setSavingOrig] = useState(false);
-  const [editTrans, setEditTrans] = useState("");
+  const [editTrans, setEditTrans] = useState(item.translatedText || "");
   const [editingTrans, setEditingTrans] = useState(false);
   const [savingTrans, setSavingTrans] = useState(false);
   const [showTransInput, setShowTransInput] = useState(false);
@@ -122,7 +123,7 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
 
                 {/* Key Column */}
                 <td className="px-4 py-3 text-xs text-slate-500 font-mono">
-                  {getTruncated(item.key, 30)}
+                  {getTruncated(item.key || item.sectionId || item.id, 30)}
                 </td>
 
                 {/* Source Text Column */}
@@ -138,9 +139,9 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
                   ) : (
                     <div 
                       className="text-sm text-slate-700 cursor-pointer hover:text-slate-900 break-words"
-                      title={item.source_text}
+                      title={sourceText}
                     >
-                      {getTruncated(item.source_text, 80)}
+                      {getTruncated(sourceText, 80)}
                     </div>
                   )}
                 </td>
@@ -173,7 +174,7 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
                     {/* Edit Source */}
                     {!h.editingOrig ? (
                       <button
-                        onClick={() => { h.setEditingOrig(true); h.setEditOrig(item.source_text); }}
+                        onClick={() => { h.setEditingOrig(true); h.setEditOrig(sourceText); }}
                         className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-colors opacity-0 group-hover:opacity-100"
                         title="Edit source"
                       >
