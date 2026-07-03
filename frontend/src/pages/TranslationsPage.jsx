@@ -70,7 +70,7 @@ function parseHtml(html) {
     const t = text || "";
     if (!t && tag !== "IMG") return;
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
-    cur.elements.push({ id: uid("el"), tag, text: t, translatable: true, translatedText: "" });
+    cur.elements.push({ id: uid("el"), tag, text: t, originalText: t, translatable: true, translatedText: "" });
   };
 
   startSec("content");
@@ -127,7 +127,7 @@ function fallbackSection(text) {
   return {
     id: uid("sec"), kind: "content", label: "Imported Content", mismatch: false,
     elements: text.split(/\n{2,}/).map(t => t.trim()).filter(Boolean)
-      .map(t => ({ id: uid("el"), tag: "P", text: t, translatable: true, translatedText: "" })),
+      .map(t => ({ id: uid("el"), tag: "P", text: t, originalText: t, translatable: true, translatedText: "" })),
   };
 }
 
@@ -499,9 +499,18 @@ export default function TranslationPage() {
     const edits = [];
     sections.forEach(s => {
       s.elements.forEach(e => {
+        const orig = e.originalText || e.text;
+        if (e.originalText && e.text !== e.originalText) {
+          edits.push({
+            original_text: e.originalText,
+            new_text: e.text,
+            is_translation: false,
+            target_language: null
+          });
+        }
         if (e.translatedText) {
           edits.push({
-            original_text: e.text,
+            original_text: orig,
             new_text: e.translatedText,
             is_translation: true,
             target_language: targetLang
