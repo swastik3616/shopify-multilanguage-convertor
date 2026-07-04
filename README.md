@@ -61,7 +61,7 @@ Translations are intelligently cached in a PostgreSQL database, so repeated requ
 | 🔄 **Live Restore** | Switching back to the source language reloads the original store content |
 | 📊 **Admin Dashboard** | Real-time stats — active languages, translation count, provider status |
 | 📝 **Audit Logs** | Full activity history for all configuration changes and translation events |
-| 🖥️ **Side-by-Side Translation UI** | Fetch any URL and preview original vs translated content side-by-side |
+| 🖥️ **Side-by-Side Translation UI** | Fetch any URL and preview original vs translated content in a simplified grid table with source text, translations, and actions |
 | 🏪 **Shopify OAuth** | Standard OAuth 2.0 installation flow with per-store access token management |
 
 ---
@@ -69,6 +69,7 @@ Translations are intelligently cached in a PostgreSQL database, so repeated requ
 ## 🆕 Recent Updates
 
 - **Structural Translation Workspace:** The Side-by-Side Translation UI now perfectly maps out your webpage structure. Instead of flat text, it visually separates elements into tagged blocks (`[H1]`, `[P]`, `[BUTTON]`, `[IMG]`) grouped by semantic HTML sections (like `<header>` or `<main>`), preserving your exact website layout.
+- **Simplified Translation Grid:** The grid table now focuses on source text, translated text, and actions only, with the separate tag and section columns removed for a cleaner review experience.
 - **Masonry Grid Layout:** The Translation Workspace has been upgraded to a responsive, masonry-style grid layout, making it much easier to view and translate multiple sections simultaneously on large monitors.
 - **Storefront Auto-Translate Fix:** Fixed a critical bug in the storefront `language_switcher_embed.liquid` extension that forcefully translated the store to a target language on every page load. The store now respects the native source language initially.
 - **Live Dashboard Analytics:** The admin dashboard now displays real, dynamic database queries for translation volumes over the last 7 days and a live activity feed pulling directly from the Audit Logs, complete with PostgreSQL transaction safety fallback for legacy schemas.
