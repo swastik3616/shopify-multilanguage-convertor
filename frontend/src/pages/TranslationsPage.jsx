@@ -70,12 +70,6 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
   return (
     <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
       <td className="px-4 py-3">
-        <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap ${getTagColor(item.tag || "P")}`}>
-          {item.tag || "P"}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
-      <td className="px-4 py-3">
         {editingSource ? (
           <div className="flex flex-col gap-2">
             <input
@@ -196,8 +190,6 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
           <tr className="divide-x divide-slate-200">
-            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-20">Tag</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-32">Section</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">Source Text</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">{targetLanguage}</th>
             <th className="px-4 py-3 text-center font-semibold text-slate-700 w-32">Actions</th>
