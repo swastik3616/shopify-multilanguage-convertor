@@ -279,39 +279,21 @@
 
         if (!newText) return;
 
-        // REQUIRED: Must have selector to avoid global replacements
-        if (selector) {
-          try {
-            const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
-              return matchesTarget(el, originalText, elementTag);
-            });
-            if (matchingElements.length) {
-              matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
-              return;
-            }
-          } catch(e) {
-            console.warn('[LSW] Invalid selector, skipping:', selector, e);
-          }
+        // STRICT: Selector is REQUIRED to prevent global replacements affecting all products
+        if (!selector) {
+          console.warn('[LSW] Skipping replacement without selector to prevent global replacement:', originalText);
+          return;
         }
 
-        // Fallback: Only replace if element tag specified (avoid global wildcard replacement)
-        if (elementTag) {
-          const tagName = elementTag.toUpperCase();
-          const fallbackElements = Array.from(document.querySelectorAll(tagName))
-            .filter(function(el) { return matchesTarget(el, originalText, elementTag); });
-          
-          if (fallbackElements.length) {
-            fallbackElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
-            return;
+        try {
+          const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
+            return matchesTarget(el, originalText, elementTag);
+          });
+          if (matchingElements.length) {
+            matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
           }
-        }
-
-        // Final fallback: Only use common semantic elements with tag specification
-        if (elementTag) {
-          const commonSelectors = 'h1, h2, h3, h4, h5, h6, p, button, a, label, strong, b, span, li, td, th';
-          const fallbackElements = Array.from(document.querySelectorAll(commonSelectors))
-            .filter(function(el) { return el.tagName.toUpperCase() === elementTag.toUpperCase() && matchesTarget(el, originalText, elementTag); });
-          fallbackElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
+        } catch(e) {
+          console.warn('[LSW] Invalid selector, skipping:', selector, e);
         }
       });
     }
