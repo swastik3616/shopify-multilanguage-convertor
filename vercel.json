@@ -10,6 +10,12 @@
       ]
     }
   ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://shopify-multilanguage-convertor.onrender.com/api/$1"
+    }
+  ],
   "experimentalServices": {
     "frontend": {
       "root": "frontend",

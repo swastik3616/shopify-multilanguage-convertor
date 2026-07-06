@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { apiFetch } from "../services/apiClient";
 
 const ContentLanguageContext = createContext();
 
@@ -15,13 +16,10 @@ export function ContentLanguageProvider({ children }) {
   useEffect(() => {
     const loadLanguages = async () => {
       try {
-        const response = await fetch("/api/get-languages");
+        const response = await apiFetch("/get-languages");
         const data = await response.json();
         if (data.targets) {
           setAvailableLanguages(data.targets);
-        }
-        if (data.source) {
-          // Optionally set source language as default
         }
       } catch (error) {
         console.error("Failed to load available languages:", error);
