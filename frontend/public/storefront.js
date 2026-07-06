@@ -103,8 +103,19 @@
   }
 
 
-  document.addEventListener("DOMContentLoaded", async () => {
+  async function syncReplacements() {
     const replacements = await fetchReplacements();
     applyReplacements(replacements);
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    await syncReplacements();
+    window.setInterval(syncReplacements, 5000);
+    window.addEventListener("focus", syncReplacements);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        syncReplacements();
+      }
+    });
   });
 })();
