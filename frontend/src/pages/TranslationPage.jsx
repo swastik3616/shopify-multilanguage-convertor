@@ -313,37 +313,20 @@ function parseHtml(html) {
     if (!SKIP_TAGS.has(node.tagName)) {
       const tag = node.tagName;
 
-      if      (tag==="MAIN")    ensureSec("main");
-      else if (tag==="ASIDE")   ensureSec("aside");
-      else if (tag==="SECTION") startSec("section");
-      else if (tag==="ARTICLE") startSec("article");
-      else if (HEADING_TAGS.includes(tag)) {
+      // Only extract readable text content: Headings and Paragraphs
+      if (HEADING_TAGS.includes(tag)) {
         const t = norm(node.textContent||"");
-        if (t) { startSec(cur?.kind||"content"); addEl(tag,t); }
+        if (t) { startSec(cur?.kind||"content"); addEl(tag,t,node); }
       }
       else if (tag==="P") {
         const t = norm(node.textContent||"");
-        if (t.length>1) addEl("P",t);
+        if (t.length>1) addEl("P",t,node);
       }
       else if (tag==="IMG") {
-        addEl("IMG", norm(node.getAttribute("alt")||""));
+        const alt = norm(node.getAttribute("alt")||"");
+        if (alt.length > 0) addEl("IMG", alt, node);
       }
-      else if (tag==="BUTTON") {
-        const t = norm(node.textContent||"");
-        if (t.length>0 && t.length<60) addEl("BUTTON",t);
-      }
-      else if (tag==="INPUT" && ["submit","button"].includes((node.getAttribute("type")||"").toLowerCase())) {
-        const t = norm(node.getAttribute("value")||"");
-        if (t.length>0 && t.length<60) addEl("BUTTON",t);
-      }
-      else if (tag==="A" && node.children.length===0) {
-        const t = norm(node.textContent||"");
-        if (t.length>1 && t.length<80 && !t.startsWith("http") && !/^\//.test(t)) addEl("A",t);
-      }
-      else if (TEXT_TAGS.has(tag) && node.children.length===0) {
-        const t = norm(node.textContent||"");
-        if (t.length>1 && t.length<220) addEl(tag,t);
-      }
+      // Skip: BUTTON, INPUT, A (links), SPAN, and all other interactive UI elements
     }
     node = walker.nextNode();
   }
