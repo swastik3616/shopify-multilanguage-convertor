@@ -288,11 +288,24 @@ function parseHtml(html) {
   };
   const ensureSec = (kind) => { if (!cur || cur.kind!==kind) startSec(kind); };
 
+  // Matches header/footer/nav either as real tag names, or as class/id names
+  // used on wrapper divs (e.g. <div class="site-header">, <div id="footer-main">)
+  const LANDMARK_NAME_RE = /(^|[-_ ])(header|footer|nav|navbar|menu|topbar|announcement-bar)([-_ ]|$)/i;
+
+  const looksLikeLandmark = (el) => {
+    if (!el || !el.tagName) return false;
+    if (SKIP_TAGS.has(el.tagName)) return true;
+    const id = el.id || "";
+    const cls = typeof el.className === "string" ? el.className : "";
+    return LANDMARK_NAME_RE.test(id) || LANDMARK_NAME_RE.test(cls);
+  };
+
   const isInsideExcludedLandmark = (node) => {
     // Walk up the DOM tree and exclude anything nested inside header/footer/nav
+    // (by real tag, or by class/id naming convention on wrapper elements)
     let el = node;
     while (el) {
-      if (el.tagName && SKIP_TAGS.has(el.tagName)) return true;
+      if (looksLikeLandmark(el)) return true;
       el = el.parentElement;
     }
     return false;
