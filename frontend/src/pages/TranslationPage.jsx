@@ -288,24 +288,38 @@ function parseHtml(html) {
   };
   const ensureSec = (kind) => { if (!cur || cur.kind!==kind) startSec(kind); };
 
-  // Matches header/footer/nav either as real tag names, or as class/id names
-  // used on wrapper divs (e.g. <div class="site-header">, <div id="footer-main">)
-  const LANDMARK_NAME_RE = /(^|[-_ ])(header|footer|nav|navbar|menu|topbar|announcement-bar)([-_ ]|$)/i;
+  // Matches header/footer/nav/modal/dropdown/overlay/interactive UI
+  // Real tag names: HEADER, FOOTER, NAV
+  // Class/id names: header, footer, nav, navbar, menu, topbar, announcement-bar, modal, dropdown, popover, overlay, drawer, cart, account, login, search, popup
+  const LANDMARK_NAME_RE = /(^|[-_ ])(header|footer|nav|navbar|menu|topbar|announcement-bar|modal|dropdown|popover|overlay|drawer|cart|account|login|search|popup|icon)([-_ ]|$)/i;
+  const INTERACTIVE_ATTR_RE = /modal|popup|dropdown|menu|cart|account|login|search/i;
 
   const looksLikeLandmark = (el) => {
     if (!el || !el.tagName) return false;
     if (SKIP_TAGS.has(el.tagName)) return true;
     const id = el.id || "";
     const cls = typeof el.className === "string" ? el.className : "";
-    return LANDMARK_NAME_RE.test(id) || LANDMARK_NAME_RE.test(cls);
+    // Check for landmark/modal/interactive patterns in id and class
+    if (LANDMARK_NAME_RE.test(id) || LANDMARK_NAME_RE.test(cls)) return true;
+    // Check for aria attributes indicating interactive content
+    if (el.getAttribute("aria-modal") === "true") return true;
+    if (el.getAttribute("role") === "dialog") return true;
+    if (el.getAttribute("role") === "menu") return true;
+    return false;
   };
 
   const isInsideExcludedLandmark = (node) => {
-    // Walk up the DOM tree and exclude anything nested inside header/footer/nav
-    // (by real tag, or by class/id naming convention on wrapper elements)
+    // Walk up the DOM tree and exclude anything nested inside header/footer/nav/modal/interactive-UI
     let el = node;
-    while (el) {
+    while (el && el.nodeType === Node.ELEMENT_NODE) {
       if (looksLikeLandmark(el)) return true;
+      // Additional check: if element has click handler or is absolutely positioned (likely overlay)
+      const computedStyle = window.getComputedStyle(el);
+      if (computedStyle.position === "fixed" || computedStyle.position === "absolute") {
+        // Could be a modal/dropdown/overlay
+        const cls = typeof el.className === "string" ? el.className : "";
+        if (INTERACTIVE_ATTR_RE.test(cls)) return true;
+      }
       el = el.parentElement;
     }
     return false;
