@@ -125,3 +125,43 @@ def get_replacements():
             })
             
     return jsonify({"replacements": replacements})
+
+@overlay_bp.route("/overlay/cleanup-bad-edits", methods=["POST", "DELETE"])
+def cleanup_bad_edits():
+    """
+    ADMIN ONLY: Remove all overlay edits without selectors to fix global replacement issue.
+    This is a one-time cleanup for the product scoping bug.
+    """
+    try:
+        # Get stats before
+        total_before = OverlayEdit.query.count()
+        with_selector = OverlayEdit.query.filter(OverlayEdit.selector.isnot(None)).count()
+        without_selector = OverlayEdit.query.filter(OverlayEdit.selector.is_(None)).count()
+        
+        # Delete bad edits
+        deleted_count = OverlayEdit.query.filter(OverlayEdit.selector.is_(None)).delete()
+        db.session.commit()
+        
+        # Get stats after
+        total_after = OverlayEdit.query.count()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cleaned up {deleted_count} bad edits without selectors",
+            "stats": {
+                "before": {
+                    "total": total_before,
+                    "with_selector": with_selector,
+                    "without_selector": without_selector
+                },
+                "after": {
+                    "total": total_after,
+                    "deleted": deleted_count
+                }
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
