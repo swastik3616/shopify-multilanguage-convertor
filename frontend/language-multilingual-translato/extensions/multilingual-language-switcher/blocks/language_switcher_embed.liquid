@@ -212,13 +212,132 @@
   localStorage.removeItem(STORAGE_KEY);
   setActive(sourceLanguage);
 
-  // Load the overlay replacement script so saved edits are applied on the storefront.
+  // Apply saved overlay replacements directly so edits appear on the storefront.
   if (!window.__multilingualOverlayLoaded) {
     window.__multilingualOverlayLoaded = true;
-    const overlayScript = document.createElement('script');
-    overlayScript.src = 'https://shopify-multilanguage-convertor-plugin.vercel.app/storefront.js';
-    overlayScript.defer = true;
-    document.head.appendChild(overlayScript);
+
+    const overlayBackend = 'https://shopify-multilanguage-convertor.onrender.com';
+    const currentUrl = (window.location.origin + window.location.pathname + window.location.search).replace(/\/$/, '');
+
+    function normalizeText(value) {
+      return (value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function matchesTarget(element, originalText, elementTag) {
+      if (!originalText) return false;
+      const normalizedOriginal = normalizeText(originalText);
+      const upperTag = (elementTag || '').toUpperCase();
+
+      if (['INPUT', 'TEXTAREA'].includes(upperTag)) {
+        const candidateText = normalizeText(element.value || element.placeholder || '');
+        return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
+      }
+
+      if (upperTag === 'BUTTON' || element.tagName === 'BUTTON') {
+        const candidateText = normalizeText(element.textContent || element.value || '');
+        return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
+      }
+
+      const candidateText = normalizeText(element.textContent || '');
+      return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
+    }
+
+    function applyTextToElement(element, newText, elementTag) {
+      const upperTag = (elementTag || '').toUpperCase();
+
+      if (['INPUT', 'TEXTAREA'].includes(upperTag)) {
+        element.value = newText;
+        return;
+      }
+
+      if (upperTag === 'BUTTON' || element.tagName === 'BUTTON') {
+        element.textContent = newText;
+        return;
+      }
+
+      if (element.tagName === 'INPUT') {
+        element.value = newText;
+        return;
+      }
+
+      if (element.placeholder !== undefined) {
+        element.placeholder = newText;
+        return;
+      }
+
+      element.textContent = newText;
+    }
+
+    function applyReplacements(replacements) {
+      if (!Array.isArray(replacements) || !replacements.length) return;
+
+      replacements.forEach(function(item) {
+        const originalText = item.original_text;
+        const newText = item.new_text;
+        const selector = item.selector;
+        const elementTag = item.element_tag;
+
+        if (!newText) return;
+
+        if (selector) {
+          const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
+            return matchesTarget(el, originalText, elementTag);
+          });
+          if (matchingElements.length) {
+            matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
+            return;
+          }
+        }
+
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        let applied = false;
+        let node;
+        while ((node = walker.nextNode())) {
+          const currentText = normalizeText(node.nodeValue || '');
+          const targetText = normalizeText(originalText || '');
+          if (currentText === targetText || currentText.includes(targetText)) {
+            node.nodeValue = newText;
+            applied = true;
+          }
+        }
+
+        if (!applied) {
+          const fallbackElements = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, li, button, a, label, td, th, strong, em, b, i'))
+            .filter(function(el) { return matchesTarget(el, originalText, elementTag); });
+          fallbackElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
+        }
+      });
+    }
+
+    async function syncOverlayReplacements() {
+      try {
+        const requestUrl = new URL(`${overlayBackend}/overlay/replacements`);
+        requestUrl.searchParams.set('url', currentUrl);
+        const res = await fetch(requestUrl.toString());
+        if (!res.ok) return;
+        const data = await res.json();
+        const replacements = Array.isArray(data && data.replacements) ? data.replacements : [];
+        if (replacements.length) {
+          console.log('[LSW] Applying overlay replacements', replacements.length);
+          applyReplacements(replacements);
+        }
+      } catch (e) {
+        console.error('[LSW] Failed to apply overlay replacements:', e);
+      }
+    }
+
+    syncOverlayReplacements();
+    setInterval(syncOverlayReplacements, 5000);
+    window.addEventListener('focus', syncOverlayReplacements);
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) {
+        syncOverlayReplacements();
+      }
+    });
+    const observer = new MutationObserver(function() {
+      syncOverlayReplacements();
+    });
+    observer.observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true });
   }
 
 })();
