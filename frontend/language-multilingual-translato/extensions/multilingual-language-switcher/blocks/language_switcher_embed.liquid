@@ -279,31 +279,38 @@
 
         if (!newText) return;
 
+        // REQUIRED: Must have selector to avoid global replacements
         if (selector) {
-          const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
-            return matchesTarget(el, originalText, elementTag);
-          });
-          if (matchingElements.length) {
-            matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
+          try {
+            const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
+              return matchesTarget(el, originalText, elementTag);
+            });
+            if (matchingElements.length) {
+              matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
+              return;
+            }
+          } catch(e) {
+            console.warn('[LSW] Invalid selector, skipping:', selector, e);
+          }
+        }
+
+        // Fallback: Only replace if element tag specified (avoid global wildcard replacement)
+        if (elementTag) {
+          const tagName = elementTag.toUpperCase();
+          const fallbackElements = Array.from(document.querySelectorAll(tagName))
+            .filter(function(el) { return matchesTarget(el, originalText, elementTag); });
+          
+          if (fallbackElements.length) {
+            fallbackElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
             return;
           }
         }
 
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-        let applied = false;
-        let node;
-        while ((node = walker.nextNode())) {
-          const currentText = normalizeText(node.nodeValue || '');
-          const targetText = normalizeText(originalText || '');
-          if (currentText === targetText || currentText.includes(targetText)) {
-            node.nodeValue = newText;
-            applied = true;
-          }
-        }
-
-        if (!applied) {
-          const fallbackElements = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, li, button, a, label, td, th, strong, em, b, i'))
-            .filter(function(el) { return matchesTarget(el, originalText, elementTag); });
+        // Final fallback: Only use common semantic elements with tag specification
+        if (elementTag) {
+          const commonSelectors = 'h1, h2, h3, h4, h5, h6, p, button, a, label, strong, b, span, li, td, th';
+          const fallbackElements = Array.from(document.querySelectorAll(commonSelectors))
+            .filter(function(el) { return el.tagName.toUpperCase() === elementTag.toUpperCase() && matchesTarget(el, originalText, elementTag); });
           fallbackElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
         }
       });

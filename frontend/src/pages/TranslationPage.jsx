@@ -52,11 +52,13 @@ function buildElementSelector(node) {
 
   const parts = [];
   let current = node;
+  let depth = 0;
 
-  while (current && current.nodeType === Node.ELEMENT_NODE) {
+  while (current && current.nodeType === Node.ELEMENT_NODE && depth < 20) {
     let part = current.tagName.toLowerCase();
     const parent = current.parentElement;
 
+    // Add nth-of-type to ensure unique identification
     if (parent) {
       const sameTagSiblings = Array.from(parent.children).filter(child => child.tagName === current.tagName);
       if (sameTagSiblings.length > 1) {
@@ -64,11 +66,25 @@ function buildElementSelector(node) {
       }
     }
 
+    // Try to use ID or class for better uniqueness
+    if (current.id) {
+      return "#" + current.id;
+    }
+    if (current.className && typeof current.className === 'string' && current.className.trim()) {
+      const classes = current.className.split(/\s+/).filter(c => !c.startsWith('_') && c.length > 0);
+      if (classes.length > 0 && classes.length < 4) {
+        return "." + classes.join(".");
+      }
+    }
+
     parts.unshift(part);
     current = parent;
+    depth++;
   }
 
-  return parts.join(" > ");
+  // Return path from html or body
+  const result = parts.join(" > ");
+  return result || "body";
 }
 
 function getTagColor(tag) {
