@@ -125,3 +125,6 @@ class OverlayEdit(db.Model):
     new_text = db.Column(db.Text, nullable=False)
     is_translation = db.Column(db.Boolean, default=False)
     target_language = db.Column(db.String(100), nullable=True)
+    selector = db.Column(db.String(1000), nullable=True)
+    element_tag = db.Column(db.String(50), nullable=True)
+    field_name = db.Column(db.String(100), nullable=True)

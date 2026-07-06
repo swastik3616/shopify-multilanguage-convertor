@@ -47,6 +47,30 @@ function kindBadge(kind) {
 function uid(p="id") { return `${p}_${Math.random().toString(36).slice(2,9)}`; }
 function norm(t="")  { return t.replace(/\s+/g," ").trim(); }
 
+function buildElementSelector(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const parts = [];
+  let current = node;
+
+  while (current && current.nodeType === Node.ELEMENT_NODE) {
+    let part = current.tagName.toLowerCase();
+    const parent = current.parentElement;
+
+    if (parent) {
+      const sameTagSiblings = Array.from(parent.children).filter(child => child.tagName === current.tagName);
+      if (sameTagSiblings.length > 1) {
+        part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
+      }
+    }
+
+    parts.unshift(part);
+    current = parent;
+  }
+
+  return parts.join(" > ");
+}
+
 function getTagColor(tag) {
   if (HEADING_TAGS.includes(tag)) return "bg-emerald-100 text-emerald-700";
   if (tag === "P") return "bg-slate-100 text-slate-700";
@@ -248,12 +272,20 @@ function parseHtml(html) {
   };
   const ensureSec = (kind) => { if (!cur || cur.kind!==kind) startSec(kind); };
 
-  const addEl = (tag, text) => {
+  const addEl = (tag, text, node = null) => {
     if (!cur) startSec("content");
     const t = text || "";
-    if (!t && tag!=="IMG") return;
-    if (cur.elements.some(e => e.tag===tag && e.text===t)) return;
-    cur.elements.push({ id:uid("el"), tag, text:t, originalText:t, translatable:true, translatedText:"" });
+    if (!t && tag !== "IMG") return;
+    if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
+    cur.elements.push({
+      id: uid("el"),
+      tag,
+      text: t,
+      originalText: t,
+      translatable: true,
+      translatedText: "",
+      selector: buildElementSelector(node) || null,
+    });
   };
 
   startSec("content");
@@ -688,12 +720,17 @@ export default function TranslationPage() {
     sections.forEach(s => {
       s.elements.forEach(e => {
         const orig = e.originalText || e.text;
+        const selector = e.selector || null;
+        const elementTag = e.tag || null;
         if (e.originalText && e.text !== e.originalText) {
           edits.push({
             original_text: e.originalText,
             new_text: e.text,
             is_translation: false,
-            target_language: null
+            target_language: null,
+            selector,
+            element_tag: elementTag,
+            field_name: e.tag || null,
           });
         }
         if (e.translatedText) {
@@ -701,7 +738,10 @@ export default function TranslationPage() {
             original_text: orig,
             new_text: e.translatedText,
             is_translation: true,
-            target_language: targetLang
+            target_language: targetLang,
+            selector,
+            element_tag: elementTag,
+            field_name: e.tag || null,
           });
         }
       });

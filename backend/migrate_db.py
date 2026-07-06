@@ -30,6 +30,24 @@ def migrate():
                 cursor.execute("ALTER TABLE page_contents ADD COLUMN resource_id BIGINT;")
             except sqlite3.OperationalError as e:
                 print(f"Skipping resource_id: {e}")
+
+            try:
+                print("Adding selector column to overlay_edits...")
+                cursor.execute("ALTER TABLE overlay_edits ADD COLUMN selector VARCHAR(1000);")
+            except sqlite3.OperationalError as e:
+                print(f"Skipping overlay selector: {e}")
+
+            try:
+                print("Adding element_tag column to overlay_edits...")
+                cursor.execute("ALTER TABLE overlay_edits ADD COLUMN element_tag VARCHAR(50);")
+            except sqlite3.OperationalError as e:
+                print(f"Skipping overlay element_tag: {e}")
+
+            try:
+                print("Adding field_name column to overlay_edits...")
+                cursor.execute("ALTER TABLE overlay_edits ADD COLUMN field_name VARCHAR(100);")
+            except sqlite3.OperationalError as e:
+                print(f"Skipping overlay field_name: {e}")
                 
             conn.commit()
             conn.close()
@@ -54,6 +72,27 @@ def migrate():
                 db.session.execute(text("ALTER TABLE page_contents ADD COLUMN resource_id BIGINT;"))
                 db.session.commit()
                 print("Added resource_id")
+            except Exception as e:
+                db.session.rollback()
+
+            try:
+                db.session.execute(text("ALTER TABLE overlay_edits ADD COLUMN selector VARCHAR(1000);"))
+                db.session.commit()
+                print("Added overlay selector")
+            except Exception as e:
+                db.session.rollback()
+
+            try:
+                db.session.execute(text("ALTER TABLE overlay_edits ADD COLUMN element_tag VARCHAR(50);"))
+                db.session.commit()
+                print("Added overlay element_tag")
+            except Exception as e:
+                db.session.rollback()
+
+            try:
+                db.session.execute(text("ALTER TABLE overlay_edits ADD COLUMN field_name VARCHAR(100);"))
+                db.session.commit()
+                print("Added overlay field_name")
             except Exception as e:
                 db.session.rollback()
                 

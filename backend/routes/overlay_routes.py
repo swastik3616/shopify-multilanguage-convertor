@@ -22,26 +22,39 @@ def save_overlay_edits():
         new_text = edit.get("new_text", "").strip()
         is_trans = edit.get("is_translation", False)
         target_lang = edit.get("target_language")
+        selector = edit.get("selector") or edit.get("target_selector")
+        element_tag = edit.get("element_tag")
+        field_name = edit.get("field_name")
         
         if not orig_text or not new_text:
             continue
-            
-        existing = OverlayEdit.query.filter_by(
-            url=url,
-            original_text=orig_text,
-            is_translation=is_trans,
-            target_language=target_lang
-        ).first()
+
+        filter_kwargs = {
+            "url": url,
+            "original_text": orig_text,
+            "is_translation": is_trans,
+            "target_language": target_lang,
+        }
+        if selector:
+            filter_kwargs["selector"] = selector
+
+        existing = OverlayEdit.query.filter_by(**filter_kwargs).first()
         
         if existing:
             existing.new_text = new_text
+            existing.selector = selector
+            existing.element_tag = element_tag
+            existing.field_name = field_name
         else:
             db.session.add(OverlayEdit(
                 url=url,
                 original_text=orig_text,
                 new_text=new_text,
                 is_translation=is_trans,
-                target_language=target_lang
+                target_language=target_lang,
+                selector=selector,
+                element_tag=element_tag,
+                field_name=field_name,
             ))
         saved_count += 1
         
@@ -59,15 +72,30 @@ def get_replacements():
     if not url:
         return jsonify({"replacements": {}})
         
-    # Get direct original text edits (non-translations)
+    replacements = []
     base_edits = OverlayEdit.query.filter_by(url=url, is_translation=False).all()
-    replacements = {e.original_text: e.new_text for e in base_edits}
-    
-    # If a language is requested, overlay translation edits
+    for edit in base_edits:
+        replacements.append({
+            "original_text": edit.original_text,
+            "new_text": edit.new_text,
+            "selector": edit.selector,
+            "element_tag": edit.element_tag,
+            "field_name": edit.field_name,
+            "is_translation": False,
+            "target_language": None,
+        })
+
     if target_lang:
         trans_edits = OverlayEdit.query.filter_by(url=url, is_translation=True, target_language=target_lang).all()
-        for e in trans_edits:
-            # Overwrite original text with the translation
-            replacements[e.original_text] = e.new_text
+        for edit in trans_edits:
+            replacements.append({
+                "original_text": edit.original_text,
+                "new_text": edit.new_text,
+                "selector": edit.selector,
+                "element_tag": edit.element_tag,
+                "field_name": edit.field_name,
+                "is_translation": True,
+                "target_language": edit.target_language,
+            })
             
     return jsonify({"replacements": replacements})

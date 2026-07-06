@@ -214,6 +214,30 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
 }
 
 /* ─── Parser ─────────────────────────────────────────────────── */
+function buildElementSelector(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const parts = [];
+  let current = node;
+
+  while (current && current.nodeType === Node.ELEMENT_NODE) {
+    let part = current.tagName.toLowerCase();
+    const parent = current.parentElement;
+
+    if (parent) {
+      const sameTagSiblings = Array.from(parent.children).filter(child => child.tagName === current.tagName);
+      if (sameTagSiblings.length > 1) {
+        part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
+      }
+    }
+
+    parts.unshift(part);
+    current = parent;
+  }
+
+  return parts.join(" > ");
+}
+
 function parseHtml(html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const meta = {
@@ -231,12 +255,20 @@ function parseHtml(html) {
   };
   const ensureSec = (kind) => { if (!cur || cur.kind !== kind) startSec(kind); };
 
-  const addEl = (tag, text) => {
+  const addEl = (tag, text, node = null) => {
     if (!cur) startSec("content");
     const t = text || "";
     if (!t && tag !== "IMG") return;
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
-    cur.elements.push({ id: uid("el"), tag, text: t, originalText: t, translatable: true, translatedText: "" });
+    cur.elements.push({
+      id: uid("el"),
+      tag,
+      text: t,
+      originalText: t,
+      translatable: true,
+      translatedText: "",
+      selector: buildElementSelector(node) || null,
+    });
   };
 
   startSec("content");
@@ -257,30 +289,30 @@ function parseHtml(html) {
       else if (tag === "ARTICLE") startSec("article");
       else if (HEADING_TAGS.includes(tag)) {
         const t = norm(node.textContent || "");
-        if (t) { startSec(cur?.kind || "content"); addEl(tag, t); }
+        if (t) { startSec(cur?.kind || "content"); addEl(tag, t, node); }
       }
       else if (tag === "P") {
         const t = norm(node.textContent || "");
-        if (t.length > 1) addEl("P", t);
+        if (t.length > 1) addEl("P", t, node);
       }
       else if (tag === "IMG") {
-        addEl("IMG", norm(node.getAttribute("alt") || ""));
+        addEl("IMG", norm(node.getAttribute("alt") || ""), node);
       }
       else if (tag === "BUTTON") {
         const t = norm(node.textContent || "");
-        if (t.length > 0 && t.length < 60) addEl("BUTTON", t);
+        if (t.length > 0 && t.length < 60) addEl("BUTTON", t, node);
       }
       else if (tag === "INPUT" && ["submit", "button"].includes((node.getAttribute("type") || "").toLowerCase())) {
         const t = norm(node.getAttribute("value") || "");
-        if (t.length > 0 && t.length < 60) addEl("BUTTON", t);
+        if (t.length > 0 && t.length < 60) addEl("BUTTON", t, node);
       }
       else if (tag === "A" && node.children.length === 0) {
         const t = norm(node.textContent || "");
-        if (t.length > 1 && t.length < 80 && !t.startsWith("http") && !/^\//.test(t)) addEl("A", t);
+        if (t.length > 1 && t.length < 80 && !t.startsWith("http") && !/^\//.test(t)) addEl("A", t, node);
       }
       else if (TEXT_TAGS.has(tag) && node.children.length === 0) {
         const t = norm(node.textContent || "");
-        if (t.length > 1 && t.length < 220) addEl(tag, t);
+        if (t.length > 1 && t.length < 220) addEl(tag, t, node);
       }
     }
     node = walker.nextNode();
@@ -669,12 +701,17 @@ export default function TranslationPage() {
     sections.forEach(s => {
       s.elements.forEach(e => {
         const orig = e.originalText || e.text;
+        const selector = e.selector || null;
+        const elementTag = e.tag || null;
         if (e.originalText && e.text !== e.originalText) {
           edits.push({
             original_text: e.originalText,
             new_text: e.text,
             is_translation: false,
-            target_language: null
+            target_language: null,
+            selector,
+            element_tag: elementTag,
+            field_name: e.tag || null,
           });
         }
         if (e.translatedText) {
@@ -682,7 +719,10 @@ export default function TranslationPage() {
             original_text: orig,
             new_text: e.translatedText,
             is_translation: true,
-            target_language: targetLang
+            target_language: targetLang,
+            selector,
+            element_tag: elementTag,
+            field_name: e.tag || null,
           });
         }
       });
