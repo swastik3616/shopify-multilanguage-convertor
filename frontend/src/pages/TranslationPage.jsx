@@ -11,7 +11,7 @@ import { translateText } from "../services/translationService";
 /* ─── Constants ──────────────────────────────────────────────── */
 const LANGUAGES = ["Hindi","Marathi","French","German","Spanish","Portuguese","Japanese","Arabic"];
 const HEADING_TAGS = ["H1","H2","H3","H4","H5","H6"];
-const SKIP_TAGS  = new Set(["SCRIPT","STYLE","NOSCRIPT","TEMPLATE","SVG"]);
+const SKIP_TAGS  = new Set(["SCRIPT","STYLE","NOSCRIPT","TEMPLATE","SVG","HEADER","FOOTER","NAV"]);
 const TEXT_TAGS  = new Set(["SPAN","LI","LABEL","SMALL","STRONG","EM","B","I","TD","TH","CAPTION","SUMMARY"]);
 const KIND_LABELS = {
   header:"Header", nav:"Navigation", main:"Main Content",
@@ -313,10 +313,7 @@ function parseHtml(html) {
     if (!SKIP_TAGS.has(node.tagName)) {
       const tag = node.tagName;
 
-      if      (tag==="HEADER")  ensureSec("header");
-      else if (tag==="NAV")     ensureSec("nav");
-      else if (tag==="MAIN")    ensureSec("main");
-      else if (tag==="FOOTER")  ensureSec("footer");
+      if      (tag==="MAIN")    ensureSec("main");
       else if (tag==="ASIDE")   ensureSec("aside");
       else if (tag==="SECTION") startSec("section");
       else if (tag==="ARTICLE") startSec("article");
