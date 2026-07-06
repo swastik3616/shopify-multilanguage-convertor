@@ -330,34 +330,6 @@ function parseHtml(html) {
     const t = text || "";
     if (!t && tag !== "IMG") return;
 
-    // Structural exclusion: skip anything nested inside header/footer/nav
-    if (node && isInsideExcludedLandmark(node)) return;
-
-    // Keyword exclusion: skip common UI/navigation/account/cart/footer text
-    const lowerText = t.toLowerCase();
-    const UIKeywords = [
-      // Navigation
-      "skip to content", "home", "catalog", "contact", "menu", "nav", "navigation",
-      // Account/Auth
-      "log in", "login", "sign in", "account", "my account", "register", "sign up", "have an account", "don't have", "forgot", "password",
-      // Cart
-      "cart", "add to cart", "your cart is empty", "checkout", "view cart", "update cart", "remove", "quantity",
-      // Buttons/CTA
-      "browse", "shop all", "shop now", "continue shopping", "view all", "see more", "more", "less", "apply", "submit", "search", "clear",
-      // Price/Product UI
-      "sale price", "regular price", "price", "sold out", "loading", "loading...", "no products found", "view all",
-      // Footer
-      "join our", "email list", "exclusive deals", "powered by", "terms and", "privacy policy", "contact us", "about us", "shipping", "returns", "faqs",
-      // Search/Form
-      "search products", "search here", "enter your", "email address", "subscribe",
-      // Other
-      "product title", "more options", "close", "expand", "collapse", "read more"
-    ];
-    
-    if (UIKeywords.some(keyword => lowerText.includes(keyword))) {
-      return; // Skip UI text
-    }
-
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
     cur.elements.push({
       id: uid("el"),
@@ -370,6 +342,25 @@ function parseHtml(html) {
     });
   };
 
+  const isInsideLandmark = (node) => {
+    // Skip anything inside HEADER, FOOTER, NAV tags or their class-based equivalents
+    let el = node;
+    while (el && el.nodeType === Node.ELEMENT_NODE) {
+      const tag = el.tagName;
+      const id = el.id?.toLowerCase() || "";
+      const cls = typeof el.className === "string" ? el.className.toLowerCase() : "";
+      
+      // Skip real HEADER/FOOTER/NAV tags
+      if (tag === "HEADER" || tag === "FOOTER" || tag === "NAV") return true;
+      
+      // Skip class/id-based landmark divs
+      if (LANDMARK_NAME_RE.test(id) || LANDMARK_NAME_RE.test(cls)) return true;
+      
+      el = el.parentElement;
+    }
+    return false;
+  };
+
   startSec("content");
 
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
@@ -378,30 +369,35 @@ function parseHtml(html) {
   while (node) {
     const tag = node.tagName;
 
-    // ONLY extract from pure text elements: Headings and Paragraphs
-    // These should have minimal nesting and contain actual content
-    if (HEADING_TAGS.includes(tag) && node.children.length === 0) {
-      // Only headings with no children - avoids picking up nested UI
-      const t = norm(node.textContent||"");
-      if (t && t.length > 0) {
-        startSec(cur?.kind||"content");
-        addEl(tag, t, node);
+    // COMPLETELY SKIP HEADER/FOOTER/NAV sections - don't even traverse into them
+    if (tag === "HEADER" || tag === "FOOTER" || tag === "NAV") {
+      node = walker.nextSibling(); // Jump to next sibling, skip children
+      continue;
+    }
+
+    // ONLY extract from main content: Headings and Paragraphs NOT inside landmarks
+    if (!isInsideLandmark(node)) {
+      if (HEADING_TAGS.includes(tag) && node.children.length === 0) {
+        const t = norm(node.textContent||"");
+        if (t && t.length > 0) {
+          startSec(cur?.kind||"content");
+          addEl(tag, t, node);
+        }
+      }
+      else if (tag==="P" && node.children.length === 0) {
+        const t = norm(node.textContent||"");
+        if (t.length>1) {
+          addEl("P", t, node);
+        }
+      }
+      else if (tag==="IMG") {
+        const alt = norm(node.getAttribute("alt")||"");
+        if (alt.length > 0) {
+          addEl("IMG", alt, node);
+        }
       }
     }
-    else if (tag==="P" && node.children.length === 0) {
-      // Only paragraphs with no children
-      const t = norm(node.textContent||"");
-      if (t.length>1) {
-        addEl("P", t, node);
-      }
-    }
-    else if (tag==="IMG") {
-      const alt = norm(node.getAttribute("alt")||"");
-      if (alt.length > 0) {
-        addEl("IMG", alt, node);
-      }
-    }
-    // Skip everything else completely - no nested content extraction
+
     node = walker.nextNode();
   }
 
