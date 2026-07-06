@@ -288,20 +288,24 @@ function parseHtml(html) {
   };
   const ensureSec = (kind) => { if (!cur || cur.kind!==kind) startSec(kind); };
 
+  const isInsideExcludedLandmark = (node) => {
+    // Walk up the DOM tree and exclude anything nested inside header/footer/nav
+    let el = node;
+    while (el) {
+      if (el.tagName && SKIP_TAGS.has(el.tagName)) return true;
+      el = el.parentElement;
+    }
+    return false;
+  };
+
   const addEl = (tag, text, node = null) => {
     if (!cur) startSec("content");
     const t = text || "";
     if (!t && tag !== "IMG") return;
-    
-    // Filter out common UI/navigation text that shouldn't be edited
-    const lowerText = t.toLowerCase();
-    if (lowerText.includes("login") || lowerText.includes("sign in") || 
-        lowerText.includes("have an account") || lowerText.includes("don't have") ||
-        lowerText.includes("cart") || lowerText.includes("search") || 
-        lowerText.includes("account") && tag !== "P") {
-      return; // Skip UI text
-    }
-    
+
+    // Structural exclusion only: skip anything nested inside header/footer/nav
+    if (node && isInsideExcludedLandmark(node)) return;
+
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
     cur.elements.push({
       id: uid("el"),
@@ -320,34 +324,32 @@ function parseHtml(html) {
   let node = walker.currentNode;
 
   while (node) {
-    if (!SKIP_TAGS.has(node.tagName)) {
-      const tag = node.tagName;
+    const tag = node.tagName;
 
-      // ONLY extract from pure text elements: Headings and Paragraphs
-      // These should have minimal nesting and contain actual content
-      if (HEADING_TAGS.includes(tag) && node.children.length === 0) {
-        // Only headings with no children - avoids picking up nested UI
-        const t = norm(node.textContent||"");
-        if (t && t.length > 0 && !t.toLowerCase().includes("login") && !t.toLowerCase().includes("account") && !t.toLowerCase().includes("cart") && !t.toLowerCase().includes("search")) {
-          startSec(cur?.kind||"content");
-          addEl(tag, t, node);
-        }
+    // ONLY extract from pure text elements: Headings and Paragraphs
+    // These should have minimal nesting and contain actual content
+    if (HEADING_TAGS.includes(tag) && node.children.length === 0) {
+      // Only headings with no children - avoids picking up nested UI
+      const t = norm(node.textContent||"");
+      if (t && t.length > 0) {
+        startSec(cur?.kind||"content");
+        addEl(tag, t, node);
       }
-      else if (tag==="P" && node.children.length === 0) {
-        // Only paragraphs with no children - avoids UI text
-        const t = norm(node.textContent||"");
-        if (t.length>1 && !t.toLowerCase().includes("login") && !t.toLowerCase().includes("account")) {
-          addEl("P", t, node);
-        }
-      }
-      else if (tag==="IMG") {
-        const alt = norm(node.getAttribute("alt")||"");
-        if (alt.length > 0 && !alt.toLowerCase().includes("icon") && !alt.toLowerCase().includes("button")) {
-          addEl("IMG", alt, node);
-        }
-      }
-      // Skip everything else completely - no nested content extraction
     }
+    else if (tag==="P" && node.children.length === 0) {
+      // Only paragraphs with no children
+      const t = norm(node.textContent||"");
+      if (t.length>1) {
+        addEl("P", t, node);
+      }
+    }
+    else if (tag==="IMG") {
+      const alt = norm(node.getAttribute("alt")||"");
+      if (alt.length > 0) {
+        addEl("IMG", alt, node);
+      }
+    }
+    // Skip everything else completely - no nested content extraction
     node = walker.nextNode();
   }
 
