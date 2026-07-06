@@ -27,7 +27,22 @@
             }
         })();
     </script>
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+    <script>
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            var hasShop = !!(params.get('shop') || localStorage.getItem('shopify_shop'));
+            var hasHost = !!(params.get('host') || localStorage.getItem('shopify_host'));
+            var isEmbedded = window.top !== window;
+            var shouldLoadAppBridge = isEmbedded || (hasShop && hasHost);
+
+            if (shouldLoadAppBridge) {
+                var script = document.createElement('script');
+                script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
+                script.defer = true;
+                document.head.appendChild(script);
+            }
+        })();
+    </script>
     <title>frontend</title>
 </head>
 
