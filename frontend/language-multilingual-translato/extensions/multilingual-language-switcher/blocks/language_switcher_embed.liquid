@@ -212,6 +212,15 @@
   localStorage.removeItem(STORAGE_KEY);
   setActive(sourceLanguage);
 
+  // Load the overlay replacement script so saved edits are applied on the storefront.
+  if (!window.__multilingualOverlayLoaded) {
+    window.__multilingualOverlayLoaded = true;
+    const overlayScript = document.createElement('script');
+    overlayScript.src = 'https://shopify-multilanguage-convertor-plugin.vercel.app/storefront.js';
+    overlayScript.defer = true;
+    document.head.appendChild(overlayScript);
+  }
+
 })();
 </script>
 
