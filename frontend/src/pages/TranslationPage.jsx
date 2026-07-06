@@ -330,8 +330,33 @@ function parseHtml(html) {
     const t = text || "";
     if (!t && tag !== "IMG") return;
 
-    // Structural exclusion only: skip anything nested inside header/footer/nav
+    // Structural exclusion: skip anything nested inside header/footer/nav
     if (node && isInsideExcludedLandmark(node)) return;
+
+    // Keyword exclusion: skip common UI/navigation/account/cart/footer text
+    const lowerText = t.toLowerCase();
+    const UIKeywords = [
+      // Navigation
+      "skip to content", "home", "catalog", "contact", "menu", "nav", "navigation",
+      // Account/Auth
+      "log in", "login", "sign in", "account", "my account", "register", "sign up", "have an account", "don't have", "forgot", "password",
+      // Cart
+      "cart", "add to cart", "your cart is empty", "checkout", "view cart", "update cart", "remove", "quantity",
+      // Buttons/CTA
+      "browse", "shop all", "shop now", "continue shopping", "view all", "see more", "more", "less", "apply", "submit", "search", "clear",
+      // Price/Product UI
+      "sale price", "regular price", "price", "sold out", "loading", "loading...", "no products found", "view all",
+      // Footer
+      "join our", "email list", "exclusive deals", "powered by", "terms and", "privacy policy", "contact us", "about us", "shipping", "returns", "faqs",
+      // Search/Form
+      "search products", "search here", "enter your", "email address", "subscribe",
+      // Other
+      "product title", "more options", "close", "expand", "collapse", "read more"
+    ];
+    
+    if (UIKeywords.some(keyword => lowerText.includes(keyword))) {
+      return; // Skip UI text
+    }
 
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
     cur.elements.push({
