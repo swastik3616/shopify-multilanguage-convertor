@@ -1,8 +1,33 @@
 from flask import Blueprint, jsonify, request
+from urllib.parse import urlparse
 from database import db
 from model import OverlayEdit
 
 overlay_bp = Blueprint("overlay_routes", __name__)
+
+def _candidate_urls(raw_url):
+    variants = set()
+    if not raw_url:
+        return variants
+
+    raw_url = raw_url.strip()
+    variants.add(raw_url)
+
+    parsed = urlparse(raw_url)
+    if not parsed.scheme or not parsed.netloc:
+        return variants
+
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    path = parsed.path or "/"
+    variants.add(base + path)
+    variants.add(base + path.rstrip("/"))
+    variants.add(base + (path if path != "/" else ""))
+    if path.endswith("/"):
+        variants.add(base + path[:-1])
+    else:
+        variants.add(base + path + "/")
+    return variants
+
 
 @overlay_bp.route("/overlay/save", methods=["POST", "OPTIONS"])
 def save_overlay_edits():
@@ -71,9 +96,10 @@ def get_replacements():
     
     if not url:
         return jsonify({"replacements": {}})
-        
+
+    candidate_urls = list(_candidate_urls(url))
     replacements = []
-    base_edits = OverlayEdit.query.filter_by(url=url, is_translation=False).all()
+    base_edits = OverlayEdit.query.filter(OverlayEdit.url.in_(candidate_urls), OverlayEdit.is_translation.is_(False)).all()
     for edit in base_edits:
         replacements.append({
             "original_text": edit.original_text,

@@ -2,8 +2,7 @@
 
 
   const BACKEND_URL = "https://shopify-multilanguage-convertor.onrender.com";
-  const currentUrl = (window.location.origin + window.location.pathname).replace(/\/$/, "");
-
+  const currentUrl = (window.location.origin + window.location.pathname + window.location.search).replace(/\/$/, "");
 
   const urlParams = new URLSearchParams(window.location.search);
   const targetLanguage = urlParams.get("lang") || localStorage.getItem("store_language") || null;
@@ -36,20 +35,27 @@
     }
   }
 
+  function normalizeText(value) {
+    return (value || "").replace(/\s+/g, " ").trim();
+  }
+
   function matchesEditTarget(element, originalText, elementTag) {
     if (!originalText) return false;
-    const normalizedOriginal = originalText.trim();
+    const normalizedOriginal = normalizeText(originalText);
     const upperTag = (elementTag || "").toUpperCase();
 
     if (["INPUT", "TEXTAREA"].includes(upperTag)) {
-      return (element.value || "").trim() === normalizedOriginal || (element.placeholder || "").trim() === normalizedOriginal;
+      const candidateText = normalizeText(element.value || element.placeholder || "");
+      return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
     }
 
     if (upperTag === "BUTTON" || element.tagName === "BUTTON") {
-      return (element.textContent || "").trim() === normalizedOriginal || (element.value || "").trim() === normalizedOriginal;
+      const candidateText = normalizeText(element.textContent || element.value || "");
+      return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
     }
 
-    return (element.textContent || "").trim() === normalizedOriginal;
+    const candidateText = normalizeText(element.textContent || "");
+    return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
   }
 
   function applyTextToElement(element, newText, elementTag) {
@@ -93,23 +99,35 @@
       }
 
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      let applied = false;
       let node;
       while ((node = walker.nextNode())) {
-        if ((node.nodeValue || "").trim() === (original_text || "").trim()) {
+        const currentText = normalizeText(node.nodeValue || "");
+        const targetText = normalizeText(original_text || "");
+        if (currentText === targetText || currentText.includes(targetText)) {
           node.nodeValue = new_text;
+          applied = true;
         }
+      }
+
+      if (!applied) {
+        const matchingElements = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6, p, span, li, button, a, label, td, th, strong, em, b, i"))
+          .filter(el => matchesEditTarget(el, original_text, element_tag));
+        matchingElements.forEach(el => applyTextToElement(el, new_text, element_tag));
       }
     });
   }
 
-
   async function syncReplacements() {
     const replacements = await fetchReplacements();
+    if (replacements.length > 0) {
+      console.log("Applying overlay replacements", replacements.length, currentUrl);
+    }
     applyReplacements(replacements);
   }
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    await syncReplacements();
+  function startOverlaySync() {
+    syncReplacements();
     window.setInterval(syncReplacements, 5000);
     window.addEventListener("focus", syncReplacements);
     document.addEventListener("visibilitychange", () => {
@@ -117,5 +135,15 @@
         syncReplacements();
       }
     });
-  });
+    const observer = new MutationObserver(() => {
+      syncReplacements();
+    });
+    observer.observe(document.body || document.documentElement, { childList: true, subtree: true, characterData: true });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startOverlaySync);
+  } else {
+    startOverlaySync();
+  }
 })();
