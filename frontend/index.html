@@ -6,6 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="shopify-api-key" content="a0e57fc9651cc4e3bdee89b0489e46a8" />
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     <script>
         (function () {
             var urlParams = new URLSearchParams(window.location.search);
@@ -24,22 +25,6 @@
                 if (shop) urlParams.set('shop', shop);
                 if (host) urlParams.set('host', host);
                 window.history.replaceState({}, document.title, window.location.pathname + '?' + urlParams.toString());
-            }
-        })();
-    </script>
-    <script>
-        (function () {
-            var params = new URLSearchParams(window.location.search);
-            var hasShop = !!(params.get('shop') || localStorage.getItem('shopify_shop'));
-            var hasHost = !!(params.get('host') || localStorage.getItem('shopify_host'));
-            var isEmbedded = window.top !== window;
-            var shouldLoadAppBridge = isEmbedded || (hasShop && hasHost);
-
-            if (shouldLoadAppBridge) {
-                var script = document.createElement('script');
-                script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
-                script.defer = true;
-                document.head.appendChild(script);
             }
         })();
     </script>
