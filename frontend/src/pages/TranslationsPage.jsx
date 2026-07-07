@@ -5,13 +5,13 @@ import {
   ChevronDown, ChevronRight, PanelLeft,
   Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap,
 } from "lucide-react";
-import { fetchUrlContent, saveOverlayEdits } from "../services/translationPageService";
+import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const LANGUAGES = ["Hindi", "Marathi", "French", "German", "Spanish", "Portuguese", "Japanese", "Arabic"];
 const HEADING_TAGS = ["H1", "H2", "H3", "H4", "H5", "H6"];
-const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG"]);
+// SKIP_TAGS no longer needed — backend strips header/footer/nav before sending HTML
 const TEXT_TAGS = new Set(["SPAN", "LI", "LABEL", "SMALL", "STRONG", "EM", "B", "I", "TD", "TH", "CAPTION", "SUMMARY"]);
 const KIND_LABELS = {
   header: "Header", nav: "Navigation", main: "Main Content",
@@ -47,6 +47,46 @@ function kindBadge(kind) {
 function uid(p = "id") { return `${p}_${Math.random().toString(36).slice(2, 9)}`; }
 function norm(t = "") { return t.replace(/\s+/g, " ").trim(); }
 
+function buildElementSelector(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const parts = [];
+  let current = node;
+  let depth = 0;
+
+  while (current && current.nodeType === Node.ELEMENT_NODE && depth < 20) {
+    let part = current.tagName.toLowerCase();
+    const parent = current.parentElement;
+
+    // Add nth-of-type to ensure unique identification
+    if (parent) {
+      const sameTagSiblings = Array.from(parent.children).filter(child => child.tagName === current.tagName);
+      if (sameTagSiblings.length > 1) {
+        part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
+      }
+    }
+
+    // Try to use ID or class for better uniqueness
+    if (current.id) {
+      return "#" + current.id;
+    }
+    if (current.className && typeof current.className === 'string' && current.className.trim()) {
+      const classes = current.className.split(/\s+/).filter(c => !c.startsWith('_') && c.length > 0);
+      if (classes.length > 0 && classes.length < 4) {
+        return "." + classes.join(".");
+      }
+    }
+
+    parts.unshift(part);
+    current = parent;
+    depth++;
+  }
+
+  // Return path from html or body
+  const result = parts.join(" > ");
+  return result || "body";
+}
+
 function getTagColor(tag) {
   if (HEADING_TAGS.includes(tag)) return "bg-emerald-100 text-emerald-700";
   if (tag === "P") return "bg-slate-100 text-slate-700";
@@ -67,8 +107,24 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
   const [sourceValue, setSourceValue] = useState(item.text || "");
   const [translationValue, setTranslationValue] = useState(item.translatedText || "");
 
+  const openSourceEditor = () => {
+    setSourceValue(item.text || "");
+    setEditingSource(true);
+  };
+
+  const openTranslationEditor = () => {
+    setTranslationValue(item.translatedText || "");
+    setEditingTranslation(true);
+  };
+
   return (
     <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
+      <td className="px-4 py-3">
+        <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap ${getTagColor(item.tag || "P")}`}>
+          {item.tag || "P"}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
       <td className="px-4 py-3">
         {editingSource ? (
           <div className="flex flex-col gap-2">
@@ -101,7 +157,7 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
             <div className="text-sm text-slate-700 break-words" title={item.text}>{getTruncated(item.text, 90)}</div>
             <button
               type="button"
-              onClick={() => setEditingSource(true)}
+              onClick={openSourceEditor}
               className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
               title="Edit source"
             >
@@ -142,7 +198,7 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
             <div className="text-sm text-slate-800 break-words" title={item.translatedText}>{getTruncated(item.translatedText, 90)}</div>
             <button
               type="button"
-              onClick={() => setEditingTranslation(true)}
+              onClick={openTranslationEditor}
               className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
               title="Edit translation"
             >
@@ -154,7 +210,7 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
             <span className="text-xs text-slate-400 italic">Not translated</span>
             <button
               type="button"
-              onClick={() => setEditingTranslation(true)}
+              onClick={openTranslationEditor}
               className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
               title="Add translation"
             >
@@ -177,7 +233,7 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
 }
 
 function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem, onEditOriginal, onEditTranslation }) {
-  if (!items || items.length === 0) {
+  if (!items || !items.length) {
     return (
       <div className="text-center py-12 text-slate-500">
         No content items to display
@@ -190,6 +246,8 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
           <tr className="divide-x divide-slate-200">
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-20">Tag</th>
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-32">Section</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">Source Text</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">{targetLanguage}</th>
             <th className="px-4 py-3 text-center font-semibold text-slate-700 w-32">Actions</th>
@@ -200,7 +258,6 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
             <TranslationGridRow
               key={item.id}
               item={item}
-              targetLanguage={targetLanguage}
               translatingId={translatingId}
               onTranslateItem={onTranslateItem}
               onEditOriginal={onEditOriginal}
@@ -214,30 +271,6 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
 }
 
 /* ─── Parser ─────────────────────────────────────────────────── */
-function buildElementSelector(node) {
-  if (!node || node.nodeType !== Node.ELEMENT_NODE) return "";
-
-  const parts = [];
-  let current = node;
-
-  while (current && current.nodeType === Node.ELEMENT_NODE) {
-    let part = current.tagName.toLowerCase();
-    const parent = current.parentElement;
-
-    if (parent) {
-      const sameTagSiblings = Array.from(parent.children).filter(child => child.tagName === current.tagName);
-      if (sameTagSiblings.length > 1) {
-        part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
-      }
-    }
-
-    parts.unshift(part);
-    current = parent;
-  }
-
-  return parts.join(" > ");
-}
-
 function parseHtml(html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const meta = {
@@ -253,12 +286,12 @@ function parseHtml(html) {
     sections.push(cur);
     return cur;
   };
-  const ensureSec = (kind) => { if (!cur || cur.kind !== kind) startSec(kind); };
 
   const addEl = (tag, text, node = null) => {
     if (!cur) startSec("content");
-    const t = text || "";
+    const t = (text || "").replace(/\s+/g, " ").trim();
     if (!t && tag !== "IMG") return;
+    // Deduplicate within the same section
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
     cur.elements.push({
       id: uid("el"),
@@ -271,50 +304,62 @@ function parseHtml(html) {
     });
   };
 
+  // Start with a single content section
   startSec("content");
 
-  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+  // Walk every element — backend already stripped header/footer/nav
+  const walker = doc.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_ELEMENT);
   let node = walker.currentNode;
 
-  while (node) {
-    if (!SKIP_TAGS.has(node.tagName)) {
-      const tag = node.tagName;
+  // Track all text seen globally to deduplicate identical strings across
+  // product cards — one saved edit for "Product title" should not create
+  // 16 identical rows in the workspace.
+  const seenTexts = new Set();
 
-      if (tag === "HEADER") ensureSec("header");
-      else if (tag === "NAV") ensureSec("nav");
-      else if (tag === "MAIN") ensureSec("main");
-      else if (tag === "FOOTER") ensureSec("footer");
-      else if (tag === "ASIDE") ensureSec("aside");
-      else if (tag === "SECTION") startSec("section");
-      else if (tag === "ARTICLE") startSec("article");
-      else if (HEADING_TAGS.includes(tag)) {
-        const t = norm(node.textContent || "");
-        if (t) { startSec(cur?.kind || "content"); addEl(tag, t, node); }
-      }
-      else if (tag === "P") {
-        const t = norm(node.textContent || "");
-        if (t.length > 1) addEl("P", t, node);
-      }
-      else if (tag === "IMG") {
-        addEl("IMG", norm(node.getAttribute("alt") || ""), node);
-      }
-      else if (tag === "BUTTON") {
-        const t = norm(node.textContent || "");
-        if (t.length > 0 && t.length < 60) addEl("BUTTON", t, node);
-      }
-      else if (tag === "INPUT" && ["submit", "button"].includes((node.getAttribute("type") || "").toLowerCase())) {
-        const t = norm(node.getAttribute("value") || "");
-        if (t.length > 0 && t.length < 60) addEl("BUTTON", t, node);
-      }
-      else if (tag === "A" && node.children.length === 0) {
-        const t = norm(node.textContent || "");
-        if (t.length > 1 && t.length < 80 && !t.startsWith("http") && !/^\//.test(t)) addEl("A", t, node);
-      }
-      else if (TEXT_TAGS.has(tag) && node.children.length === 0) {
-        const t = norm(node.textContent || "");
-        if (t.length > 1 && t.length < 220) addEl(tag, t, node);
-      }
+  while (node) {
+    const tag = node.tagName;
+
+    // Skip non-content tags
+    if (["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG"].includes(tag)) {
+      node = walker.nextNode();
+      continue;
     }
+
+    // Only capture leaf-ish elements (no block children) to avoid capturing
+    // a parent whose textContent is just the concatenation of its children.
+    const isLeaf = !([...node.children].some(c =>
+      ["DIV", "SECTION", "ARTICLE", "MAIN", "UL", "OL", "TABLE"].includes(c.tagName)
+    ));
+
+    const captureText = (resolvedTag) => {
+      const t = norm(node.textContent || "");
+      // Skip empty, too short (<2 chars), or very long strings (>300 = likely
+      // a concatenated block, not a translatable phrase).
+      if (!t || t.length < 2 || t.length > 300) return;
+      // Global dedup: same exact text already captured somewhere on the page
+      if (seenTexts.has(t)) return;
+      seenTexts.add(t);
+      addEl(resolvedTag, t, node);
+    };
+
+    if (HEADING_TAGS.includes(tag) && isLeaf) {
+      const t = norm(node.textContent || "");
+      if (t.length > 0) { startSec("content"); captureText(tag); }
+    }
+    else if (tag === "P" && isLeaf) { captureText("P"); }
+    else if (tag === "BUTTON" && isLeaf) { captureText("BUTTON"); }
+    else if (tag === "A" && isLeaf) { captureText("A"); }
+    else if (tag === "LABEL" && isLeaf) { captureText("LABEL"); }
+    else if (tag === "SPAN" && isLeaf) {
+      // Only capture short spans — prices, badges, labels (not full paragraphs)
+      const t = norm(node.textContent || "");
+      if (t.length >= 2 && t.length <= 150) { captureText("SPAN"); }
+    }
+    else if (tag === "IMG") {
+      const alt = norm(node.getAttribute("alt") || "");
+      if (alt.length > 0) addEl("IMG", alt, node);
+    }
+
     node = walker.nextNode();
   }
 
@@ -586,7 +631,7 @@ function SectionRow({ section, index, targetLanguage, isActive, onFocus, transla
           >
             {section.elements.map(el => (
               <ElementRow
-                key={el.id}
+                key={`${el.id}-${el.text || ""}-${el.translatedText || ""}`}
                 element={el}
                 isTranslating={isTranslating}
                 onEdit={(newText) => onEditElement(section.id, el.id, newText, false)}
@@ -619,19 +664,80 @@ export default function TranslationPage() {
   const doneEls = useMemo(() => sections.reduce((a, s) => a + s.elements.filter(e => e.translatedText).length, 0), [sections]);
   const progress = totalEls ? Math.round((doneEls / totalEls) * 100) : 0;
 
+  /* ── Normalize a URL the same way handleSaveToWebsite does ── */
+  const normalizeUrl = (raw) => {
+    try {
+      let u = raw.trim();
+      if (!u.startsWith("http")) u = "https://" + u;
+      const parsed = new URL(u);
+      return (parsed.origin + parsed.pathname).replace(/\/$/, "");
+    } catch {
+      return raw.trim();
+    }
+  };
+
   /* ── Fetch ── */
   const handleFetch = async () => {
     if (!url.trim()) { setMessage("Enter a URL first."); return; }
     setFetchStatus("loading"); setMessage(""); setSections([]); setPageMeta({ title: "", description: "" }); setActiveId(null);
+
+    // Normalize URL once — same format used when saving edits
+    const fetchUrl = normalizeUrl(url.trim());
+
     try {
-      const res = await fetchUrlContent(url.trim());
+      // Fetch HTML and saved edits in parallel using the same normalized URL
+      const [res, savedEdits] = await Promise.all([
+        fetchUrlContent(fetchUrl),
+        fetchOverlayEdits(fetchUrl, targetLang).catch(() => ({ base: {}, translations: {} })),
+      ]);
+
       if (!res.success) throw new Error(res.message || "Fetch failed.");
+
       if (res.html) {
         const { meta, sections: parsed } = parseHtml(res.html);
         setPageMeta(meta);
-        setSections(parsed);
-        setActiveId(parsed[0]?.id ?? null);
-        if (!parsed.length) setMessage("HTML fetched but no content sections detected.");
+
+        // Merge saved overlay edits back into parsed elements.
+        // Matching is done case-insensitively and whitespace-normalised
+        // so minor scraping differences don't break the lookup.
+        const baseEntries = Object.entries(savedEdits?.base || {});
+        const transEntries = Object.entries(savedEdits?.translations || {});
+
+        const findSavedNew = (elText, entries) => {
+          if (!elText) return null;
+          const norm = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
+          const normEl = norm(elText);
+          for (const [orig, newVal] of entries) {
+            if (norm(orig) === normEl) return newVal;
+          }
+          return null;
+        };
+
+        const merged = (baseEntries.length > 0 || transEntries.length > 0)
+          ? parsed.map(sec => ({
+            ...sec,
+            elements: sec.elements.map(el => {
+              const savedBase = findSavedNew(el.text, baseEntries);
+              const savedTrans = findSavedNew(el.text, transEntries);
+
+              let updatedEl = { ...el };
+              if (savedBase) {
+                // Keep originalText as the real Shopify text so future
+                // saves still reference the correct original_text in DB
+                updatedEl.text = savedBase;
+                updatedEl.originalText = el.text;
+              }
+              if (savedTrans) {
+                updatedEl.translatedText = savedTrans;
+              }
+              return updatedEl;
+            }),
+          }))
+          : parsed;
+
+        setSections(merged);
+        setActiveId(merged[0]?.id ?? null);
+        if (!merged.length) setMessage("HTML fetched but no content sections detected.");
       } else {
         setSections([fallbackSection(res.text || "")]);
         setMessage("Returned as plain text — structure could not be detected.");
@@ -676,8 +782,8 @@ export default function TranslationPage() {
         ...s,
         elements: s.elements.map(e => {
           if (e.id !== elementId) return e;
-          return isOriginal 
-            ? { ...e, text: newText } 
+          return isOriginal
+            ? { ...e, text: newText }
             : { ...e, translatedText: newText };
         })
       };
@@ -687,7 +793,7 @@ export default function TranslationPage() {
   const handleSaveToWebsite = async () => {
     if (!url.trim()) return;
     setIsSavingEdits(true);
-    
+
     let normalizedUrl = url.trim();
     try {
       if (!normalizedUrl.startsWith("http")) normalizedUrl = "https://" + normalizedUrl;
@@ -727,15 +833,15 @@ export default function TranslationPage() {
         }
       });
     });
-    
+
     try {
       const res = await saveOverlayEdits(normalizedUrl, edits);
       if (res.success) {
-         setMessage("Saved successfully to live website overlay!");
+        setMessage("Saved successfully to live website overlay!");
       } else {
-         setMessage("Failed to save: " + res.message);
+        setMessage("Failed to save: " + res.message);
       }
-    } catch(err) {
+    } catch (err) {
       setMessage("Failed to save: " + err.message);
     }
     setIsSavingEdits(false);
@@ -853,22 +959,20 @@ export default function TranslationPage() {
               <span className="text-sm font-medium text-slate-600">View:</span>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
-                  viewMode === "grid"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${viewMode === "grid"
                     ? "bg-[#008060] text-white shadow-sm"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
+                  }`}
               >
                 <Grid3x3 className="h-4 w-4" />
                 <span className="text-sm font-medium">Grid Table</span>
               </button>
               <button
                 onClick={() => setViewMode("panel")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
-                  viewMode === "panel"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${viewMode === "panel"
                     ? "bg-[#008060] text-white shadow-sm"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
+                  }`}
               >
                 <Rows className="h-4 w-4" />
                 <span className="text-sm font-medium">Panel View</span>
