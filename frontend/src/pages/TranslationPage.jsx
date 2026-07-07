@@ -645,15 +645,31 @@ export default function TranslationPage() {
   const doneEls    = useMemo(()=>sections.reduce((a,s)=>a+s.elements.filter(e=>e.translatedText).length,0),[sections]);
   const progress   = totalEls ? Math.round((doneEls/totalEls)*100) : 0;
 
+  /* ── Normalize a URL the same way handleSaveToWebsite does ── */
+  const normalizeUrl = (raw) => {
+    try {
+      let u = raw.trim();
+      if (!u.startsWith("http")) u = "https://" + u;
+      const parsed = new URL(u);
+      return (parsed.origin + parsed.pathname).replace(/\/$/, "");
+    } catch {
+      return raw.trim();
+    }
+  };
+
   /* ── Fetch ── */
   const handleFetch = async () => {
     if (!url.trim()) { setMessage("Enter a URL first."); return; }
     setFetchStatus("loading"); setMessage(""); setSections([]); setPageMeta({ title:"", description:"" }); setActiveId(null);
+
+    // Normalize URL once — same format used when saving edits
+    const fetchUrl = normalizeUrl(url.trim());
+
     try {
-      // Fetch HTML and saved edits in parallel
+      // Fetch HTML and saved edits in parallel using the same normalized URL
       const [res, savedEdits] = await Promise.all([
-        fetchUrlContent(url.trim()),
-        fetchOverlayEdits(url.trim()).catch(() => ({})),
+        fetchUrlContent(fetchUrl),
+        fetchOverlayEdits(fetchUrl).catch(() => ({})),
       ]);
 
       if (!res.success) throw new Error(res.message || "Fetch failed.");
@@ -662,16 +678,28 @@ export default function TranslationPage() {
         const { meta, sections: parsed } = parseHtml(res.html);
         setPageMeta(meta);
 
-        // Merge saved overlay edits: if an element's text matches a saved
-        // original_text, replace it with the saved new_text so the user
-        // sees what they actually saved, not the raw Shopify value.
-        const hasSavedEdits = Object.keys(savedEdits).length > 0;
-        const merged = hasSavedEdits
+        // Merge saved overlay edits back into parsed elements.
+        // Matching is done case-insensitively and whitespace-normalised
+        // so minor scraping differences don't break the lookup.
+        const editEntries = Object.entries(savedEdits); // [[originalText, newText], ...]
+        const findSavedNew = (elText) => {
+          if (!elText) return null;
+          const norm = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
+          const normEl = norm(elText);
+          for (const [orig, newVal] of editEntries) {
+            if (norm(orig) === normEl) return newVal;
+          }
+          return null;
+        };
+
+        const merged = editEntries.length > 0
           ? parsed.map(sec => ({
               ...sec,
               elements: sec.elements.map(el => {
-                const savedNew = savedEdits[el.text?.trim()];
+                const savedNew = findSavedNew(el.text);
                 if (savedNew) {
+                  // Keep originalText as the real Shopify text so future
+                  // saves still reference the correct original_text in DB
                   return { ...el, text: savedNew, originalText: el.text };
                 }
                 return el;
