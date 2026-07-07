@@ -274,6 +274,18 @@ def fetch_url_content():
         for tag in soup.find_all(["header", "footer", "nav", "aside"]):
             tag.decompose()
 
+        # 1b. Remove Shopify's built-in collection-page filter/sort/facet
+        # widget and accessibility skip-links entirely. These are theme
+        # chrome — "Featured", "Best selling", "Price, low to high",
+        # "Availability", "In stock", "Clear all", "Skip to results list",
+        # etc. are UI controls, not per-page content anyone translates
+        # item-by-item, but they were passing through untouched because
+        # the id/class regex below never accounted for them. Dawn-based
+        # themes render this widget using specific custom elements, so
+        # remove those tags outright before the class/id pass below.
+        for tag in soup.find_all(["facet-filters-form", "price-range"]):
+            tag.decompose()
+
         # 2. Remove elements whose id or class is a very specific Shopify chrome
         # pattern.  We intentionally use a TIGHT list so we don't accidentally
         # remove content sections (e.g. an announcement banner with real text,
@@ -287,7 +299,11 @@ def fetch_url_content():
             r"cart-drawer|cart-notification|cart-popup|ajax-cart|minicart|"
             r"login-modal|account-modal|search-modal|search-drawer|"
             r"predictive-search|cookie-banner|gdpr-banner|"
-            r"language-switcher|currency-switcher)([-_]|$)",
+            r"language-switcher|currency-switcher|"
+            r"facets?|facet-filters?|active-facets|"
+            r"sort-by|sorting|collection-sort|"
+            r"filter-drawer|filter-button|mobile-facets|"
+            r"skip-to-content|skip-to-results|skip-link)([-_]|$)",
             _re.IGNORECASE,
         )
         for el in soup.find_all(True):
