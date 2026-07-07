@@ -162,21 +162,6 @@ def fetch_url_content():
         import time
         from urllib.parse import urlparse, urlencode, parse_qsl
 
-        # ── FIX ────────────────────────────────────────────────────────────
-        # The previous cache-busting relied only on a `_nocache` query
-        # param. Many caching layers (Shopify's own Fastly edge cache for
-        # proxied/custom-domain stores, Cloudflare in front of a custom
-        # domain, or a caching app on the theme) build their cache key
-        # from the path only and silently ignore unrecognized query
-        # params — so `_nocache=...` never actually reached the cache
-        # key, and stale HTML kept getting served even after the
-        # merchant updated the product in Shopify Admin.
-        #
-        # Fix: also send explicit HTTP cache-control headers, which is
-        # the standards-based way to tell any compliant proxy/CDN "give
-        # me the freshest copy, don't serve from cache." This is on top
-        # of (not instead of) the query-param trick, since some CDNs key
-        # off one, some off the other.
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)",
             "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -190,9 +175,75 @@ def fetch_url_content():
         query_params.append(("_nocache", str(int(time.time() * 1000))))
         fetch_url = parsed._replace(query=urlencode(query_params)).geturl()
 
-        resp = requests.get(fetch_url, headers=headers, timeout=12)
+        # ── FIX: password-protected (dev/unlaunched) stores ────────────────
+        # A plain requests.get() with no cookies hits Shopify's storefront
+        # password gate on stores that haven't launched yet. Shopify does
+        # NOT return an error for this — it returns 200 with a page that
+        # shows a decorative, fake preview of the theme populated with
+        # placeholder demo content ("Product title", "Rs. 19.99", "Sale
+        # price", "Regular price", etc). That placeholder markup is what
+        # was getting scraped and shown in the translation grid instead of
+        # the real product data — nothing to do with caching or overlays.
+        #
+        # Fix: use a session, and if the fetched page looks like the
+        # password gate, POST the configured store password to
+        # `{origin}/password` first (this sets Shopify's storefront_digest
+        # cookie on the session), then re-fetch the real page with that
+        # cookie attached.
+        session = requests.Session()
+        resp = session.get(fetch_url, headers=headers, timeout=12)
         resp.raise_for_status()
         html = resp.text
+
+        looks_like_password_gate = (
+            'name="password"' in html
+            or 'id="password"' in html
+            or "/password" in (resp.url or "")
+            or "storefront_password" in html.lower()
+        )
+
+        if looks_like_password_gate:
+            store_password = get_setting("store_password", "")
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+            if store_password:
+                login_resp = session.post(
+                    f"{origin}/password",
+                    data={"form_type": "storefront_password", "password": store_password},
+                    headers=headers,
+                    timeout=12,
+                    allow_redirects=True,
+                )
+                # Re-fetch the real page now that the session (hopefully)
+                # carries the storefront_digest cookie.
+                resp = session.get(fetch_url, headers=headers, timeout=12)
+                resp.raise_for_status()
+                html = resp.text
+
+                still_gated = (
+                    'name="password"' in html
+                    or 'id="password"' in html
+                    or "storefront_password" in html.lower()
+                )
+                if still_gated:
+                    return jsonify({
+                        "success": False,
+                        "message": (
+                            "This store is password-protected and the configured "
+                            "store password didn't unlock it. Double-check the "
+                            "password saved in settings matches the store's "
+                            "current storefront password."
+                        ),
+                    }), 401
+            else:
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        "This store is password-protected (it's showing the "
+                        "Shopify password gate, not the real page). Add the "
+                        "store's storefront password in Settings so the fetch "
+                        "can log in before scraping content."
+                    ),
+                }), 401
 
         # ── Diagnostics ──────────────────────────────────────────────────
         # Log the caching-related response headers so you can confirm
