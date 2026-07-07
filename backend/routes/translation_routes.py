@@ -159,11 +159,21 @@ def fetch_url_content():
     try:
         from bs4 import BeautifulSoup
         import re as _re
+        import time
+        from urllib.parse import urlparse, urlencode, parse_qsl
 
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"
         }
-        resp = requests.get(url, headers=headers, timeout=12)
+        
+        # Add a random cache-busting query parameter to force Shopify CDN to 
+        # return the freshest HTML rather than a stale cached version.
+        parsed = urlparse(url)
+        query_params = parse_qsl(parsed.query)
+        query_params.append(("_nocache", str(int(time.time() * 1000))))
+        fetch_url = parsed._replace(query=urlencode(query_params)).geturl()
+
+        resp = requests.get(fetch_url, headers=headers, timeout=12)
         resp.raise_for_status()
         html = resp.text
         MAX_HTML_LENGTH = 500_000
