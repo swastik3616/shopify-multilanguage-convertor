@@ -177,14 +177,20 @@ def fetch_url_content():
         for tag in soup.find_all(["header", "footer", "nav", "aside"]):
             tag.decompose()
 
-        # 2. Remove elements whose id or class strongly suggests chrome UI.
-        # Guard with `el.parent` because decomposing a parent also removes its
-        # children from the tree — those children are still in the find_all list
-        # but become "orphaned" (parent = None) and will raise if accessed.
+        # 2. Remove elements whose id or class is a very specific Shopify chrome
+        # pattern.  We intentionally use a TIGHT list so we don't accidentally
+        # remove content sections (e.g. an announcement banner with real text,
+        # or a hero section whose id contains the word "header").
+        #
+        # Removed from the old broad list:
+        #   announcement, menu, topbar  ← too generic, kills real content
+        #   header/footer/nav already handled above by semantic tag removal
         CHROME_RE = _re.compile(
-            r"(^|[-_\s])(header|footer|nav|navbar|menu|topbar|announcement|"
-            r"cart|login|account|search|popup|modal|drawer|overlay|"
-            r"language-switcher|cookie|gdpr)([-_\s]|$)",
+            r"(^|[-_])(site-header|site-footer|site-nav|mobile-nav|mobile-menu|"
+            r"cart-drawer|cart-notification|cart-popup|ajax-cart|minicart|"
+            r"login-modal|account-modal|search-modal|search-drawer|"
+            r"predictive-search|cookie-banner|gdpr-banner|"
+            r"language-switcher|currency-switcher)([-_]|$)",
             _re.IGNORECASE,
         )
         for el in soup.find_all(True):
