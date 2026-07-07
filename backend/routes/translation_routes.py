@@ -162,11 +162,28 @@ def fetch_url_content():
         import time
         from urllib.parse import urlparse, urlencode, parse_qsl
 
+        # ── FIX ────────────────────────────────────────────────────────────
+        # The previous cache-busting relied only on a `_nocache` query
+        # param. Many caching layers (Shopify's own Fastly edge cache for
+        # proxied/custom-domain stores, Cloudflare in front of a custom
+        # domain, or a caching app on the theme) build their cache key
+        # from the path only and silently ignore unrecognized query
+        # params — so `_nocache=...` never actually reached the cache
+        # key, and stale HTML kept getting served even after the
+        # merchant updated the product in Shopify Admin.
+        #
+        # Fix: also send explicit HTTP cache-control headers, which is
+        # the standards-based way to tell any compliant proxy/CDN "give
+        # me the freshest copy, don't serve from cache." This is on top
+        # of (not instead of) the query-param trick, since some CDNs key
+        # off one, some off the other.
         headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"
+            "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
         }
-        
-        # Add a random cache-busting query parameter to force Shopify CDN to 
+
+        # Add a random cache-busting query parameter to force Shopify CDN to
         # return the freshest HTML rather than a stale cached version.
         parsed = urlparse(url)
         query_params = parse_qsl(parsed.query)
@@ -176,6 +193,25 @@ def fetch_url_content():
         resp = requests.get(fetch_url, headers=headers, timeout=12)
         resp.raise_for_status()
         html = resp.text
+
+        # ── Diagnostics ──────────────────────────────────────────────────
+        # Log the caching-related response headers so you can confirm
+        # whether a CDN/proxy is serving from cache. If `age` is present
+        # and > 0, or `x-cache`/`cf-cache-status` says HIT, something
+        # between us and Shopify is caching despite the headers above —
+        # that points to a CDN/proxy config change being needed rather
+        # than anything fixable purely from this backend.
+        cache_debug = {
+            "age": resp.headers.get("Age"),
+            "cache-control": resp.headers.get("Cache-Control"),
+            "x-cache": resp.headers.get("X-Cache"),
+            "cf-cache-status": resp.headers.get("CF-Cache-Status"),
+            "x-shopify-stage": resp.headers.get("X-Shopify-Stage"),
+            "etag": resp.headers.get("ETag"),
+            "last-modified": resp.headers.get("Last-Modified"),
+        }
+        print(f"[fetch-url] url={fetch_url} status={resp.status_code} cache_headers={cache_debug}")
+
         MAX_HTML_LENGTH = 500_000
         if len(html) > MAX_HTML_LENGTH:
             html = html[:MAX_HTML_LENGTH]
@@ -215,7 +251,7 @@ def fetch_url_content():
         main_tag = soup.find("main") or soup.find("body") or soup
         cleaned_html = str(main_tag)
 
-        return jsonify({"success": True, "html": cleaned_html})
+        return jsonify({"success": True, "html": cleaned_html, "_cache_debug": cache_debug})
     except Exception as e:
         return jsonify({"success": False, "message": f"Unable to fetch content: {str(e)}"}), 500
 
@@ -238,16 +274,16 @@ def create_manual_translation():
     source_text = data.get("source_text")
     target_language = data.get("target_language")
     translated_text = data.get("translated_text")
-    
+
     if not source_text or not target_language or not translated_text:
         return jsonify({"success": False, "message": "Missing fields"}), 400
-        
+
     existing = Translation.query.filter_by(source_text=source_text, target_language=target_language).first()
     if existing:
         existing.translated_text = translated_text
         db.session.commit()
         return jsonify({"success": True, "id": existing.id})
-        
+
     new_t = Translation(source_text=source_text, target_language=target_language, translated_text=translated_text)
     db.session.add(new_t)
     db.session.commit()

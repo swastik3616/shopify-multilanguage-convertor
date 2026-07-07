@@ -245,3 +245,22 @@ def dedupe_overlay_edits():
             "success": False,
             "error": str(e)
         }), 500
+
+@overlay_bp.route("/overlay/clear-all", methods=["POST", "DELETE", "GET"])
+def clear_all_overlay_edits():
+    """
+    ADMIN ONLY: Completely wipe the OverlayEdit database table to start fresh.
+    """
+    try:
+        deleted_count = OverlayEdit.query.delete()
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": f"Successfully deleted all {deleted_count} saved overlay edits/translations from the database."
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
