@@ -311,6 +311,11 @@ function parseHtml(html) {
   const walker = doc.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_ELEMENT);
   let node = walker.currentNode;
 
+  // Track all text seen globally to deduplicate identical strings across
+  // product cards — one saved edit for "Product title" should not create
+  // 16 identical rows in the workspace.
+  const seenTexts = new Set();
+
   while (node) {
     const tag = node.tagName;
 
@@ -320,20 +325,36 @@ function parseHtml(html) {
       continue;
     }
 
-    // Headings — start a fresh section per heading group
-    if (HEADING_TAGS.includes(tag)) {
+    // Only capture leaf-ish elements (no block children) to avoid capturing
+    // a parent whose textContent is just the concatenation of its children.
+    const isLeaf = !([...node.children].some(c =>
+      ["DIV","SECTION","ARTICLE","MAIN","UL","OL","TABLE"].includes(c.tagName)
+    ));
+
+    const captureText = (resolvedTag) => {
       const t = norm(node.textContent || "");
-      if (t.length > 0) {
-        startSec("content");
-        addEl(tag, t, node);
-      }
-    }
-    // Paragraphs
-    else if (tag === "P") {
+      // Skip empty, too short (<2 chars), or very long strings (>300 = likely
+      // a concatenated block, not a translatable phrase).
+      if (!t || t.length < 2 || t.length > 300) return;
+      // Global dedup: same exact text already captured somewhere on the page
+      if (seenTexts.has(t)) return;
+      seenTexts.add(t);
+      addEl(resolvedTag, t, node);
+    };
+
+    if (HEADING_TAGS.includes(tag) && isLeaf) {
       const t = norm(node.textContent || "");
-      if (t.length > 1) addEl("P", t, node);
+      if (t.length > 0) { startSec("content"); captureText(tag); }
     }
-    // Image alt text
+    else if (tag === "P" && isLeaf)           { captureText("P"); }
+    else if (tag === "BUTTON" && isLeaf)       { captureText("BUTTON"); }
+    else if (tag === "A" && isLeaf)            { captureText("A"); }
+    else if (tag === "LABEL" && isLeaf)        { captureText("LABEL"); }
+    else if (tag === "SPAN" && isLeaf) {
+      // Only capture short spans — prices, badges, labels (not full paragraphs)
+      const t = norm(node.textContent || "");
+      if (t.length >= 2 && t.length <= 150)    { captureText("SPAN"); }
+    }
     else if (tag === "IMG") {
       const alt = norm(node.getAttribute("alt") || "");
       if (alt.length > 0) addEl("IMG", alt, node);
