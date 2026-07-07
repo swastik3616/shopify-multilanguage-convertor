@@ -114,14 +114,18 @@ def get_replacements():
     candidate_urls = list(_candidate_urls(url))
     replacements = []
 
-    # ── FIX ────────────────────────────────────────────────────────────
-    # Order by id ASC so that if any duplicate rows still exist (e.g. from
-    # before this fix, or a race condition), the frontend can reliably
-    # apply a "last one wins" fold and get the most recently created row,
-    # rather than depending on undefined/default database ordering.
+    # ── GLOBAL FIX ────────────────────────────────────────────────────────────
+    # Previously, we only returned edits that matched the exact URL. This meant
+    # if you translated "jeans" on the Catalog page, it wouldn't be translated
+    # on the Homepage.
+    # We now fetch ALL translations for the entire domain so edits are global!
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    domain = f"{parsed.scheme}://{parsed.netloc}"
+
     base_edits = (
         OverlayEdit.query
-        .filter(OverlayEdit.url.in_(candidate_urls), OverlayEdit.is_translation.is_(False))
+        .filter(OverlayEdit.url.startswith(domain), OverlayEdit.is_translation.is_(False))
         .order_by(OverlayEdit.id.asc())
         .all()
     )
@@ -139,7 +143,7 @@ def get_replacements():
     if target_lang:
         trans_edits = (
             OverlayEdit.query
-            .filter_by(url=url, is_translation=True, target_language=target_lang)
+            .filter(OverlayEdit.url.startswith(domain), OverlayEdit.is_translation.is_(True), OverlayEdit.target_language==target_lang)
             .order_by(OverlayEdit.id.asc())
             .all()
         )
