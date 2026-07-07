@@ -11,7 +11,7 @@ import { translateText } from "../services/translationService";
 /* ─── Constants ──────────────────────────────────────────────── */
 const LANGUAGES = ["Hindi","Marathi","French","German","Spanish","Portuguese","Japanese","Arabic"];
 const HEADING_TAGS = ["H1","H2","H3","H4","H5","H6"];
-const SKIP_TAGS  = new Set(["SCRIPT","STYLE","NOSCRIPT","TEMPLATE","SVG","HEADER","FOOTER","NAV"]);
+// SKIP_TAGS no longer needed — backend strips header/footer/nav before sending HTML
 const TEXT_TAGS  = new Set(["SPAN","LI","LABEL","SMALL","STRONG","EM","B","I","TD","TH","CAPTION","SUMMARY"]);
 const KIND_LABELS = {
   header:"Header", nav:"Navigation", main:"Main Content",
@@ -272,7 +272,7 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
 
 /* ─── Parser ─────────────────────────────────────────────────── */
 function parseHtml(html) {
-  const doc  = new DOMParser().parseFromString(html,"text/html");
+  const doc  = new DOMParser().parseFromString(html, "text/html");
   const meta = {
     title:       doc.title?.trim() || "",
     description: doc.querySelector('meta[name="description"]')?.getAttribute("content")?.trim() || "",
@@ -281,55 +281,17 @@ function parseHtml(html) {
   const sections = [];
   let cur = null;
 
-  const startSec = (kind="content") => {
-    cur = { id:uid("sec"), kind, label:KIND_LABELS[kind]||"Content", elements:[], mismatch:false };
+  const startSec = (kind = "content") => {
+    cur = { id: uid("sec"), kind, label: KIND_LABELS[kind] || "Content", elements: [], mismatch: false };
     sections.push(cur);
     return cur;
-  };
-  const ensureSec = (kind) => { if (!cur || cur.kind!==kind) startSec(kind); };
-
-  // Matches header/footer/nav/modal/dropdown/overlay/interactive UI
-  // Real tag names: HEADER, FOOTER, NAV
-  // Class/id names: header, footer, nav, navbar, menu, topbar, announcement-bar, modal, dropdown, popover, overlay, drawer, cart, account, login, search, popup
-  const LANDMARK_NAME_RE = /(^|[-_ ])(header|footer|nav|navbar|menu|topbar|announcement-bar|modal|dropdown|popover|overlay|drawer|cart|account|login|search|popup|icon)([-_ ]|$)/i;
-  const INTERACTIVE_ATTR_RE = /modal|popup|dropdown|menu|cart|account|login|search/i;
-
-  const looksLikeLandmark = (el) => {
-    if (!el || !el.tagName) return false;
-    if (SKIP_TAGS.has(el.tagName)) return true;
-    const id = el.id || "";
-    const cls = typeof el.className === "string" ? el.className : "";
-    // Check for landmark/modal/interactive patterns in id and class
-    if (LANDMARK_NAME_RE.test(id) || LANDMARK_NAME_RE.test(cls)) return true;
-    // Check for aria attributes indicating interactive content
-    if (el.getAttribute("aria-modal") === "true") return true;
-    if (el.getAttribute("role") === "dialog") return true;
-    if (el.getAttribute("role") === "menu") return true;
-    return false;
-  };
-
-  const isInsideExcludedLandmark = (node) => {
-    // Walk up the DOM tree and exclude anything nested inside header/footer/nav/modal/interactive-UI
-    let el = node;
-    while (el && el.nodeType === Node.ELEMENT_NODE) {
-      if (looksLikeLandmark(el)) return true;
-      // Additional check: if element has click handler or is absolutely positioned (likely overlay)
-      const computedStyle = window.getComputedStyle(el);
-      if (computedStyle.position === "fixed" || computedStyle.position === "absolute") {
-        // Could be a modal/dropdown/overlay
-        const cls = typeof el.className === "string" ? el.className : "";
-        if (INTERACTIVE_ATTR_RE.test(cls)) return true;
-      }
-      el = el.parentElement;
-    }
-    return false;
   };
 
   const addEl = (tag, text, node = null) => {
     if (!cur) startSec("content");
-    const t = text || "";
+    const t = (text || "").replace(/\s+/g, " ").trim();
     if (!t && tag !== "IMG") return;
-
+    // Deduplicate within the same section
     if (cur.elements.some(e => e.tag === tag && e.text === t)) return;
     cur.elements.push({
       id: uid("el"),
@@ -342,66 +304,45 @@ function parseHtml(html) {
     });
   };
 
-  const isInsideLandmark = (node) => {
-    // Skip anything inside HEADER, FOOTER, NAV tags or their class-based equivalents
-    let el = node;
-    while (el && el.nodeType === Node.ELEMENT_NODE) {
-      const tag = el.tagName;
-      const id = el.id?.toLowerCase() || "";
-      const cls = typeof el.className === "string" ? el.className.toLowerCase() : "";
-      
-      // Skip real HEADER/FOOTER/NAV tags
-      if (tag === "HEADER" || tag === "FOOTER" || tag === "NAV") return true;
-      
-      // Skip class/id-based landmark divs
-      if (LANDMARK_NAME_RE.test(id) || LANDMARK_NAME_RE.test(cls)) return true;
-      
-      el = el.parentElement;
-    }
-    return false;
-  };
-
+  // Start with a single content section
   startSec("content");
 
-  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+  // Walk every element — backend already stripped header/footer/nav
+  const walker = doc.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_ELEMENT);
   let node = walker.currentNode;
 
   while (node) {
     const tag = node.tagName;
 
-    // COMPLETELY SKIP HEADER/FOOTER/NAV sections - don't even traverse into them
-    if (tag === "HEADER" || tag === "FOOTER" || tag === "NAV") {
-      node = walker.nextSibling(); // Jump to next sibling, skip children
+    // Skip non-content tags
+    if (["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG"].includes(tag)) {
+      node = walker.nextNode();
       continue;
     }
 
-    // ONLY extract from main content: Headings and Paragraphs NOT inside landmarks
-    if (!isInsideLandmark(node)) {
-      if (HEADING_TAGS.includes(tag) && node.children.length === 0) {
-        const t = norm(node.textContent||"");
-        if (t && t.length > 0) {
-          startSec(cur?.kind||"content");
-          addEl(tag, t, node);
-        }
+    // Headings — start a fresh section per heading group
+    if (HEADING_TAGS.includes(tag)) {
+      const t = norm(node.textContent || "");
+      if (t.length > 0) {
+        startSec("content");
+        addEl(tag, t, node);
       }
-      else if (tag==="P" && node.children.length === 0) {
-        const t = norm(node.textContent||"");
-        if (t.length>1) {
-          addEl("P", t, node);
-        }
-      }
-      else if (tag==="IMG") {
-        const alt = norm(node.getAttribute("alt")||"");
-        if (alt.length > 0) {
-          addEl("IMG", alt, node);
-        }
-      }
+    }
+    // Paragraphs
+    else if (tag === "P") {
+      const t = norm(node.textContent || "");
+      if (t.length > 1) addEl("P", t, node);
+    }
+    // Image alt text
+    else if (tag === "IMG") {
+      const alt = norm(node.getAttribute("alt") || "");
+      if (alt.length > 0) addEl("IMG", alt, node);
     }
 
     node = walker.nextNode();
   }
 
-  return { meta, sections: sections.filter(s=>s.elements.length>0) };
+  return { meta, sections: sections.filter(s => s.elements.length > 0) };
 }
 
 function fallbackSection(text) {

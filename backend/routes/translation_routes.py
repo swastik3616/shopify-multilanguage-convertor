@@ -157,6 +157,9 @@ def fetch_url_content():
         url = f"https://{url}"
 
     try:
+        from bs4 import BeautifulSoup
+        import re as _re
+
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"
         }
@@ -167,7 +170,31 @@ def fetch_url_content():
         if len(html) > MAX_HTML_LENGTH:
             html = html[:MAX_HTML_LENGTH]
 
-        return jsonify({"success": True, "html": html})
+        # ── Strip navigation/chrome elements server-side ──────────────────
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 1. Remove semantic landmark tags entirely
+        for tag in soup.find_all(["header", "footer", "nav", "aside"]):
+            tag.decompose()
+
+        # 2. Remove elements whose id or class strongly suggests chrome UI
+        CHROME_RE = _re.compile(
+            r"(^|[-_\s])(header|footer|nav|navbar|menu|topbar|announcement|"
+            r"cart|login|account|search|popup|modal|drawer|overlay|"
+            r"language-switcher|cookie|gdpr)([-_\s]|$)",
+            _re.IGNORECASE,
+        )
+        for el in soup.find_all(True):
+            el_id  = el.get("id", "") or ""
+            el_cls = " ".join(el.get("class", []) or [])
+            if CHROME_RE.search(el_id) or CHROME_RE.search(el_cls):
+                el.decompose()
+
+        # 3. Prefer <main> content if the theme uses it; otherwise use <body>
+        main_tag = soup.find("main") or soup.find("body") or soup
+        cleaned_html = str(main_tag)
+
+        return jsonify({"success": True, "html": cleaned_html})
     except Exception as e:
         return jsonify({"success": False, "message": f"Unable to fetch content: {str(e)}"}), 500
 
