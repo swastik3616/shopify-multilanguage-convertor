@@ -25,22 +25,32 @@ export const saveOverlayEdits = async (url, edits) => {
 // public endpoint — storefront.js also calls it without auth headers.
 // apiFetch throws on any non-OK or non-JSON response and would silently
 // return {} via the .catch(), breaking the merge entirely.
-export const fetchOverlayEdits = async (url) => {
+export const fetchOverlayEdits = async (url, targetLang) => {
   try {
-    const endpoint = `${API_URL}/overlay/replacements?url=${encodeURIComponent(url)}`;
+    let endpoint = `${API_URL}/overlay/replacements?url=${encodeURIComponent(url)}`;
+    if (targetLang) {
+      endpoint += `&target_language=${encodeURIComponent(targetLang)}`;
+    }
     const response = await fetch(endpoint, { method: "GET" });
-    if (!response.ok) return {};
+    if (!response.ok) return { base: {}, translations: {} };
     const data = await response.json();
+    
     // Return a map keyed by original_text for quick lookup
-    const map = {};
+    const base = {};
+    const translations = {};
+    
     const list = data.replacements || [];
     list.forEach((edit) => {
-      if (!edit.is_translation && edit.original_text && edit.new_text) {
-        map[edit.original_text.trim()] = edit.new_text;
+      if (edit.original_text && edit.new_text) {
+        if (edit.is_translation) {
+          translations[edit.original_text.trim()] = edit.new_text;
+        } else {
+          base[edit.original_text.trim()] = edit.new_text;
+        }
       }
     });
-    return map;
+    return { base, translations };
   } catch {
-    return {};
+    return { base: {}, translations: {} };
   }
 };

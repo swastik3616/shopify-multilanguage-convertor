@@ -690,7 +690,7 @@ export default function TranslationPage() {
       // Fetch HTML and saved edits in parallel using the same normalized URL
       const [res, savedEdits] = await Promise.all([
         fetchUrlContent(fetchUrl),
-        fetchOverlayEdits(fetchUrl).catch(() => ({})),
+        fetchOverlayEdits(fetchUrl, targetLang).catch(() => ({ base: {}, translations: {} })),
       ]);
 
       if (!res.success) throw new Error(res.message || "Fetch failed.");
@@ -702,28 +702,37 @@ export default function TranslationPage() {
         // Merge saved overlay edits back into parsed elements.
         // Matching is done case-insensitively and whitespace-normalised
         // so minor scraping differences don't break the lookup.
-        const editEntries = Object.entries(savedEdits); // [[originalText, newText], ...]
-        const findSavedNew = (elText) => {
+        const baseEntries = Object.entries(savedEdits?.base || {});
+        const transEntries = Object.entries(savedEdits?.translations || {});
+
+        const findSavedNew = (elText, entries) => {
           if (!elText) return null;
           const norm = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
           const normEl = norm(elText);
-          for (const [orig, newVal] of editEntries) {
+          for (const [orig, newVal] of entries) {
             if (norm(orig) === normEl) return newVal;
           }
           return null;
         };
 
-        const merged = editEntries.length > 0
+        const merged = (baseEntries.length > 0 || transEntries.length > 0)
           ? parsed.map(sec => ({
               ...sec,
               elements: sec.elements.map(el => {
-                const savedNew = findSavedNew(el.text);
-                if (savedNew) {
+                const savedBase = findSavedNew(el.text, baseEntries);
+                const savedTrans = findSavedNew(el.text, transEntries);
+                
+                let updatedEl = { ...el };
+                if (savedBase) {
                   // Keep originalText as the real Shopify text so future
                   // saves still reference the correct original_text in DB
-                  return { ...el, text: savedNew, originalText: el.text };
+                  updatedEl.text = savedBase;
+                  updatedEl.originalText = el.text;
                 }
-                return el;
+                if (savedTrans) {
+                  updatedEl.translatedText = savedTrans;
+                }
+                return updatedEl;
               }),
             }))
           : parsed;
