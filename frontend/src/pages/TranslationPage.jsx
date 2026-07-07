@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronRight, PanelLeft,
   Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap,
 } from "lucide-react";
-import { fetchUrlContent, saveOverlayEdits } from "../services/translationPageService";
+import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
 
 /* ─── Constants ──────────────────────────────────────────────── */
@@ -650,21 +650,45 @@ export default function TranslationPage() {
     if (!url.trim()) { setMessage("Enter a URL first."); return; }
     setFetchStatus("loading"); setMessage(""); setSections([]); setPageMeta({ title:"", description:"" }); setActiveId(null);
     try {
-      const res = await fetchUrlContent(url.trim());
-      if (!res.success) throw new Error(res.message||"Fetch failed.");
+      // Fetch HTML and saved edits in parallel
+      const [res, savedEdits] = await Promise.all([
+        fetchUrlContent(url.trim()),
+        fetchOverlayEdits(url.trim()).catch(() => ({})),
+      ]);
+
+      if (!res.success) throw new Error(res.message || "Fetch failed.");
+
       if (res.html) {
-        const { meta, sections:parsed } = parseHtml(res.html);
+        const { meta, sections: parsed } = parseHtml(res.html);
         setPageMeta(meta);
-        setSections(parsed);
-        setActiveId(parsed[0]?.id??null);
-        if (!parsed.length) setMessage("HTML fetched but no content sections detected.");
+
+        // Merge saved overlay edits: if an element's text matches a saved
+        // original_text, replace it with the saved new_text so the user
+        // sees what they actually saved, not the raw Shopify value.
+        const hasSavedEdits = Object.keys(savedEdits).length > 0;
+        const merged = hasSavedEdits
+          ? parsed.map(sec => ({
+              ...sec,
+              elements: sec.elements.map(el => {
+                const savedNew = savedEdits[el.text?.trim()];
+                if (savedNew) {
+                  return { ...el, text: savedNew, originalText: el.text };
+                }
+                return el;
+              }),
+            }))
+          : parsed;
+
+        setSections(merged);
+        setActiveId(merged[0]?.id ?? null);
+        if (!merged.length) setMessage("HTML fetched but no content sections detected.");
       } else {
-        setSections([fallbackSection(res.text||"")]);
+        setSections([fallbackSection(res.text || "")]);
         setMessage("Returned as plain text — structure could not be detected.");
       }
       setFetchStatus("done");
     } catch(err) {
-      setFetchStatus("error"); setMessage(err.message||"Failed to fetch.");
+      setFetchStatus("error"); setMessage(err.message || "Failed to fetch.");
     }
   };
 
