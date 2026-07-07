@@ -33,11 +33,11 @@ def _candidate_urls(raw_url):
 def save_overlay_edits():
     if request.method == "OPTIONS":
         return "", 204
-    
+
     data = request.json
     url = data.get("url", "").strip()
     edits = data.get("edits", [])
-    
+
     if not url:
         return jsonify({"success": False, "message": "URL is required"}), 400
 
@@ -50,21 +50,35 @@ def save_overlay_edits():
         selector = edit.get("selector") or edit.get("target_selector")
         element_tag = edit.get("element_tag")
         field_name = edit.get("field_name")
-        
+
         if not orig_text or not new_text:
             continue
 
+        # ── FIX ────────────────────────────────────────────────────────
+        # The identity of an overlay edit is (url, original_text,
+        # is_translation, target_language). `selector` is *metadata about*
+        # an edit (where it lives on the page), not part of what makes it
+        # unique. It used to be included in the lookup below, but it's
+        # recomputed client-side on every fetch from the live DOM
+        # (id/class/nth-of-type), so it can legitimately differ between
+        # two saves of the exact same text (Shopify injecting a different
+        # class, a sibling product card shifting position, etc).
+        #
+        # When that happened, the old filter_by(..., selector=selector)
+        # would fail to find the existing row and INSERT a duplicate
+        # instead of updating it — leaving a stale row in the table that
+        # a later read could pick up, showing old content after a "save".
+        #
+        # Do NOT add `selector` to this filter. Just update it below.
         filter_kwargs = {
             "url": url,
             "original_text": orig_text,
             "is_translation": is_trans,
             "target_language": target_lang,
         }
-        if selector:
-            filter_kwargs["selector"] = selector
 
         existing = OverlayEdit.query.filter_by(**filter_kwargs).first()
-        
+
         if existing:
             existing.new_text = new_text
             existing.selector = selector
@@ -82,7 +96,7 @@ def save_overlay_edits():
                 field_name=field_name,
             ))
         saved_count += 1
-        
+
     db.session.commit()
     return jsonify({"success": True, "message": f"Saved {saved_count} overlay edits."})
 
@@ -90,16 +104,27 @@ def save_overlay_edits():
 def get_replacements():
     if request.method == "OPTIONS":
         return "", 204
-        
+
     url = request.args.get("url", "").strip()
     target_lang = request.args.get("target_language")
-    
+
     if not url:
         return jsonify({"replacements": {}})
 
     candidate_urls = list(_candidate_urls(url))
     replacements = []
-    base_edits = OverlayEdit.query.filter(OverlayEdit.url.in_(candidate_urls), OverlayEdit.is_translation.is_(False)).all()
+
+    # ── FIX ────────────────────────────────────────────────────────────
+    # Order by id ASC so that if any duplicate rows still exist (e.g. from
+    # before this fix, or a race condition), the frontend can reliably
+    # apply a "last one wins" fold and get the most recently created row,
+    # rather than depending on undefined/default database ordering.
+    base_edits = (
+        OverlayEdit.query
+        .filter(OverlayEdit.url.in_(candidate_urls), OverlayEdit.is_translation.is_(False))
+        .order_by(OverlayEdit.id.asc())
+        .all()
+    )
     for edit in base_edits:
         replacements.append({
             "original_text": edit.original_text,
@@ -112,7 +137,12 @@ def get_replacements():
         })
 
     if target_lang:
-        trans_edits = OverlayEdit.query.filter_by(url=url, is_translation=True, target_language=target_lang).all()
+        trans_edits = (
+            OverlayEdit.query
+            .filter_by(url=url, is_translation=True, target_language=target_lang)
+            .order_by(OverlayEdit.id.asc())
+            .all()
+        )
         for edit in trans_edits:
             replacements.append({
                 "original_text": edit.original_text,
@@ -123,7 +153,7 @@ def get_replacements():
                 "is_translation": True,
                 "target_language": edit.target_language,
             })
-            
+
     return jsonify({"replacements": replacements})
 
 @overlay_bp.route("/overlay/cleanup-bad-edits", methods=["POST", "DELETE"])
@@ -137,14 +167,14 @@ def cleanup_bad_edits():
         total_before = OverlayEdit.query.count()
         with_selector = OverlayEdit.query.filter(OverlayEdit.selector.isnot(None)).count()
         without_selector = OverlayEdit.query.filter(OverlayEdit.selector.is_(None)).count()
-        
+
         # Delete bad edits
         deleted_count = OverlayEdit.query.filter(OverlayEdit.selector.is_(None)).delete()
         db.session.commit()
-        
+
         # Get stats after
         total_after = OverlayEdit.query.count()
-        
+
         return jsonify({
             "success": True,
             "message": f"Cleaned up {deleted_count} bad edits without selectors",
@@ -161,6 +191,56 @@ def cleanup_bad_edits():
             }
         })
     except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@overlay_bp.route("/overlay/dedupe", methods=["POST"])
+def dedupe_overlay_edits():
+    """
+    ADMIN ONLY: One-time cleanup for the duplicate-row bug caused by
+    matching on `selector` in /overlay/save. For every group of rows
+    that share (url, original_text, is_translation, target_language),
+    keep only the most recently updated/created row (highest id) and
+    delete the rest, since the highest id reflects the most recent save.
+    """
+    try:
+        all_edits = OverlayEdit.query.order_by(OverlayEdit.id.asc()).all()
+
+        groups = {}
+        for edit in all_edits:
+            key = (edit.url, edit.original_text, edit.is_translation, edit.target_language)
+            groups.setdefault(key, []).append(edit)
+
+        deleted_count = 0
+        kept_count = 0
+        for key, rows in groups.items():
+            if len(rows) <= 1:
+                kept_count += len(rows)
+                continue
+            # Rows are already in ascending id order (oldest -> newest).
+            # Keep the last one (most recently created/updated), delete the rest.
+            *stale, latest = rows
+            for row in stale:
+                db.session.delete(row)
+                deleted_count += 1
+            kept_count += 1
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": f"Removed {deleted_count} duplicate overlay edit(s), kept {kept_count}.",
+            "stats": {
+                "groups_found": len(groups),
+                "duplicates_removed": deleted_count,
+                "rows_kept": kept_count,
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
         return jsonify({
             "success": False,
             "error": str(e)
