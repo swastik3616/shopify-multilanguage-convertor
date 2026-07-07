@@ -39,6 +39,19 @@
     return (value || "").replace(/\s+/g, " ").trim();
   }
 
+  // ── FIX ──────────────────────────────────────────────────────────────
+  // This used to also match on `candidateText.includes(normalizedOriginal)`.
+  // That substring check is what caused updated/unrelated content to get
+  // silently overwritten: a saved edit with a short or generic
+  // original_text (e.g. "T-Shirt", "Sale", a size/color name) would match
+  // ANY element whose text merely *contained* that phrase — including a
+  // brand new product title you just added/changed in Shopify Admin that
+  // happens to contain the same word (e.g. "Classic T-Shirt" contains
+  // "T-Shirt"). Since this script re-runs every 5 seconds and on every
+  // DOM mutation, it would keep re-overwriting the fresh content with the
+  // old saved value, making it look like your update "wasn't showing."
+  //
+  // Only exact (post-normalization) matches are safe to auto-apply here.
   function matchesEditTarget(element, originalText, elementTag) {
     if (!originalText) return false;
     const normalizedOriginal = normalizeText(originalText);
@@ -46,16 +59,16 @@
 
     if (["INPUT", "TEXTAREA"].includes(upperTag)) {
       const candidateText = normalizeText(element.value || element.placeholder || "");
-      return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
+      return candidateText === normalizedOriginal;
     }
 
     if (upperTag === "BUTTON" || element.tagName === "BUTTON") {
       const candidateText = normalizeText(element.textContent || element.value || "");
-      return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
+      return candidateText === normalizedOriginal;
     }
 
     const candidateText = normalizeText(element.textContent || "");
-    return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
+    return candidateText === normalizedOriginal;
   }
 
   function applyTextToElement(element, newText, elementTag) {
@@ -98,13 +111,19 @@
         }
       }
 
+      // ── FIX ──────────────────────────────────────────────────────────
+      // Same exact-match-only rule applies to the fallback text-node walk.
+      // `.includes()` here was the other half of the substring-overwrite
+      // bug — it would rewrite the middle of an unrelated, longer text
+      // node just because it contained the old original_text somewhere
+      // inside it.
+      const targetText = normalizeText(original_text || "");
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
       let applied = false;
       let node;
       while ((node = walker.nextNode())) {
         const currentText = normalizeText(node.nodeValue || "");
-        const targetText = normalizeText(original_text || "");
-        if (currentText === targetText || currentText.includes(targetText)) {
+        if (currentText === targetText) {
           node.nodeValue = new_text;
           applied = true;
         }
@@ -118,12 +137,36 @@
     });
   }
 
+  let isApplying = false;
+  let resyncQueued = false;
+
   async function syncReplacements() {
-    const replacements = await fetchReplacements();
-    if (replacements.length > 0) {
-      console.log("Applying overlay replacements", replacements.length, currentUrl);
+    // ── FIX ──────────────────────────────────────────────────────────
+    // The MutationObserver below fires on every DOM change — including
+    // the ones applyReplacements() itself just made — which was
+    // triggering another syncReplacements() call, which mutates the DOM
+    // again, which fires the observer again, etc. Guard against
+    // re-entrancy so applying replacements doesn't recursively trigger
+    // itself; a change made by something else while we're applying just
+    // gets coalesced into one follow-up run instead of stacking calls.
+    if (isApplying) {
+      resyncQueued = true;
+      return;
     }
-    applyReplacements(replacements);
+    isApplying = true;
+    try {
+      const replacements = await fetchReplacements();
+      if (replacements.length > 0) {
+        console.log("Applying overlay replacements", replacements.length, currentUrl);
+      }
+      applyReplacements(replacements);
+    } finally {
+      isApplying = false;
+      if (resyncQueued) {
+        resyncQueued = false;
+        syncReplacements();
+      }
+    }
   }
 
   function startOverlaySync() {
