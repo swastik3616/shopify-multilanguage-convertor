@@ -119,11 +119,6 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
 
   return (
     <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
-      <td className="px-4 py-3">
-        <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap ${getTagColor(item.tag || "P")}`}>
-          {item.tag || "P"}
-        </span>
-      </td>
       <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
       <td className="px-4 py-3">
         {editingSource ? (
@@ -246,7 +241,6 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
           <tr className="divide-x divide-slate-200">
-            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-20">Tag</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 w-32">Section</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">Source Text</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">{targetLanguage}</th>
@@ -456,9 +450,6 @@ function ElementRow({ element, isTranslating, onEdit, onEditOriginal }) {
     <div className="grid grid-cols-1 border-b border-slate-50 last:border-b-0 lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
       {/* Original */}
       <div className={`group flex items-start gap-3 px-5 py-4 bg-white`}>
-        <span className={`mt-0.5 shrink-0 rounded border font-mono text-[9px] font-bold px-1.5 py-0.5 ${tagBadge(element.tag)}`}>
-          {element.tag}
-        </span>
         <div className="min-w-0 flex-1 relative">
           {isEditingO ? (
             <div className="flex flex-col gap-2">
@@ -496,9 +487,6 @@ function ElementRow({ element, isTranslating, onEdit, onEditOriginal }) {
 
       {/* Translated */}
       <div className={`group flex items-start gap-3 px-5 py-4 ${hasT ? "bg-emerald-50/30" : "bg-slate-50/40"}`}>
-        <span className={`mt-0.5 shrink-0 rounded border font-mono text-[9px] font-bold px-1.5 py-0.5 ${tagBadge(element.tag)}`}>
-          {element.tag}
-        </span>
         <div className="min-w-0 flex-1 relative">
           {isTranslating ? (
             <div className="flex items-center gap-2 pt-1">
