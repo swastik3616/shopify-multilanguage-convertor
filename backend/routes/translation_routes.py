@@ -177,7 +177,10 @@ def fetch_url_content():
         for tag in soup.find_all(["header", "footer", "nav", "aside"]):
             tag.decompose()
 
-        # 2. Remove elements whose id or class strongly suggests chrome UI
+        # 2. Remove elements whose id or class strongly suggests chrome UI.
+        # Guard with `el.parent` because decomposing a parent also removes its
+        # children from the tree — those children are still in the find_all list
+        # but become "orphaned" (parent = None) and will raise if accessed.
         CHROME_RE = _re.compile(
             r"(^|[-_\s])(header|footer|nav|navbar|menu|topbar|announcement|"
             r"cart|login|account|search|popup|modal|drawer|overlay|"
@@ -185,6 +188,8 @@ def fetch_url_content():
             _re.IGNORECASE,
         )
         for el in soup.find_all(True):
+            if el.parent is None:          # already removed by a parent decompose
+                continue
             el_id  = el.get("id", "") or ""
             el_cls = " ".join(el.get("class", []) or [])
             if CHROME_RE.search(el_id) or CHROME_RE.search(el_cls):
