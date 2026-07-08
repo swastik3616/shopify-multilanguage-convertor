@@ -18,6 +18,13 @@ def migrate():
                 print(f"Skipping html_tag: {e}")
                 
             try:
+                print("Adding created_at to translations...")
+                cursor.execute("ALTER TABLE translations ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;")
+            except sqlite3.OperationalError as e:
+                print(f"Skipping created_at on translations: {e}")
+
+                
+            try:
                 print("Adding section_id column...")
                 cursor.execute("ALTER TABLE page_contents ADD COLUMN section_id VARCHAR(255);")
             except sqlite3.OperationalError as e:
@@ -56,6 +63,13 @@ def migrate():
                 db.session.execute(text("ALTER TABLE page_contents ADD COLUMN html_tag VARCHAR(50);"))
                 db.session.commit()
                 print("Added html_tag")
+            except Exception as e:
+                db.session.rollback()
+
+            try:
+                db.session.execute(text("ALTER TABLE translations ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"))
+                db.session.commit()
+                print("Added created_at to translations")
             except Exception as e:
                 db.session.rollback()
 

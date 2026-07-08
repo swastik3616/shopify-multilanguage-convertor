@@ -30,11 +30,21 @@ def get_dashboard_stats():
     today = datetime.utcnow().date()
     volume_by_day = []
     day_labels = []
+
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    recent_translations = Translation.query.filter(Translation.created_at >= seven_days_ago).all()
+    
+    counts_by_date = {}
+    for t in recent_translations:
+        if t.created_at:
+            d = t.created_at.date()
+            counts_by_date[d] = counts_by_date.get(d, 0) + 1
+
     for offset in range(6, -1, -1):
         day = today - timedelta(days=offset)
         label = day.strftime("%a %d").replace(" 0", " ")
         day_labels.append(label)
-        volume_by_day.append(0)  # placeholder until DB migration adds created_at
+        volume_by_day.append(counts_by_date.get(day, 0))
 
     # ── Recent activity ───────────────────────────────────────────────────
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()

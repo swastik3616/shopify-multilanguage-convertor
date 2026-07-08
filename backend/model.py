@@ -22,6 +22,11 @@ class Translation(db.Model):
         nullable=False
     )
 
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
 
 class PageContent(db.Model):
     __tablename__ = "page_contents"
