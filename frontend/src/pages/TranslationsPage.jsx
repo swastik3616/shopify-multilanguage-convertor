@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Globe, Loader2, RefreshCw, Languages,
@@ -99,6 +99,13 @@ function getTruncated(text, length = 100) {
 function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTranslation }) {
   const [editingTranslation, setEditingTranslation] = useState(false);
   const [translationValue, setTranslationValue] = useState(item.translatedText || "");
+
+  // Keep local state in sync when parent updates translatedText (e.g. after auto-translate)
+  useEffect(() => {
+    if (!editingTranslation) {
+      setTranslationValue(item.translatedText || "");
+    }
+  }, [item.translatedText, editingTranslation]);
 
   const openTranslationEditor = () => {
     setTranslationValue(item.translatedText || "");

@@ -85,8 +85,6 @@
   const statusTxt = document.getElementById('lsw-embed-status-text');
   const optCont  = document.getElementById('lsw-embed-options');
 
-  // sourceLanguage: the store's original language (fetched from backend)
-  // Falls back to 'English' if backend is unreachable
   let sourceLanguage = 'English';
   let activeLanguages = ALL_LANGUAGES;
 
@@ -94,11 +92,9 @@
     const res = await fetch(`${BACKEND}/get-languages`);
     if (res.ok) {
       const data = await res.json();
-      // Set the dynamic source language
       if (data.source) {
         sourceLanguage = data.source;
       }
-      // Build the list: source language first, then targets only
       const selectedLangs = [data.source, ...(data.targets || [])].filter(Boolean);
       if (selectedLangs.length > 0) {
         activeLanguages = ALL_LANGUAGES.filter(item => selectedLangs.includes(item.lang));
@@ -147,6 +143,9 @@
     label.textContent = lang;
   }
 
+  // Forward-reference — real implementation is assigned inside the overlay block below
+  let syncOverlayReplacements = async function() {};
+
   async function handleSelect(lang) {
     dropdown.hidden = true;
     chevron.style.transform = '';
@@ -162,9 +161,11 @@
     setActive(lang);
     localStorage.setItem(STORAGE_KEY, lang);
     await runTranslation(lang);
+    // Apply any manually saved/edited translations for this language on top
+    await syncOverlayReplacements();
   }
 
-  // Reference to the language-switcher root element — reused in the walker filter below.
+  // Reference to the language-switcher root element
   const lswRoot = document.getElementById('lsw-embed');
 
   async function runTranslation(lang) {
@@ -174,7 +175,6 @@
         const tag = n.parentElement && n.parentElement.tagName;
         if (!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
         if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE'].includes(tag)) return NodeFilter.FILTER_REJECT;
-        // Skip any text node that lives inside the language-switcher widget.
         if (lswRoot && lswRoot.contains(n.parentElement)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }}
@@ -211,13 +211,11 @@
     console.log('[LSW] Done!');
   }
 
-  // Always start in the source language — clear any stale saved preference.
-  // The store should open in its original language on every fresh page load.
-  // Users must consciously pick a language from the switcher each session.
+  // Always start in the source language on fresh page load
   localStorage.removeItem(STORAGE_KEY);
   setActive(sourceLanguage);
 
-  // Apply saved overlay replacements directly so edits appear on the storefront.
+  // Apply saved overlay replacements so edited translations appear on the storefront
   if (!window.__multilingualOverlayLoaded) {
     window.__multilingualOverlayLoaded = true;
 
@@ -286,7 +284,7 @@
 
         // STRICT: Selector is REQUIRED to prevent global replacements affecting all products
         if (!selector) {
-          console.warn('[LSW] Skipping replacement without selector to prevent global replacement:', originalText);
+          console.warn('[LSW] Skipping replacement without selector:', originalText);
           return;
         }
 
@@ -303,22 +301,30 @@
       });
     }
 
-    async function syncOverlayReplacements() {
+    // Real implementation — also assigned to the outer-scope let for handleSelect to use
+    syncOverlayReplacements = async function() {
       try {
         const requestUrl = new URL(`${overlayBackend}/overlay/replacements`);
         requestUrl.searchParams.set('url', currentUrl);
+
+        // KEY FIX: pass the selected language so translated edits are fetched and applied
+        const selectedLang = localStorage.getItem(STORAGE_KEY);
+        if (selectedLang && selectedLang !== sourceLanguage) {
+          requestUrl.searchParams.set('target_language', selectedLang);
+        }
+
         const res = await fetch(requestUrl.toString());
         if (!res.ok) return;
         const data = await res.json();
         const replacements = Array.isArray(data && data.replacements) ? data.replacements : [];
         if (replacements.length) {
-          console.log('[LSW] Applying overlay replacements', replacements.length);
+          console.log('[LSW] Applying overlay replacements:', replacements.length, 'lang:', selectedLang || 'base');
           applyReplacements(replacements);
         }
       } catch (e) {
         console.error('[LSW] Failed to apply overlay replacements:', e);
       }
-    }
+    };
 
     syncOverlayReplacements();
     setInterval(syncOverlayReplacements, 5000);
