@@ -94,13 +94,6 @@ function Sidebar() {
           {seoLinks.map((link) => <NavLink key={link.path} item={link} />)}
         </div>
       </div>
-
-      <div className="p-3 border-t border-slate-200 flex flex-col gap-1 shrink-0">
-        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-3">System</div>
-        {systemLinks.map((link) => (
-          <NavLink key={link.path} item={link} />
-        ))}
-      </div>
     </div>
   );
 }
