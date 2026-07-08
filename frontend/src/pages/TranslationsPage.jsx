@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
-const LANGUAGES = ["Hindi", "Marathi", "French", "German", "Spanish", "Portuguese", "Japanese", "Arabic"];
+import { getLanguages } from "../services/languageService";
+
 const HEADING_TAGS = ["H1", "H2", "H3", "H4", "H5", "H6"];
 const TEXT_TAGS = new Set(["SPAN", "LI", "LABEL", "SMALL", "STRONG", "EM", "B", "I", "TD", "TH", "CAPTION", "SUMMARY"]);
 const KIND_LABELS = {
@@ -542,7 +543,18 @@ export default function TranslationPage() {
   const [url, setUrl] = useState("");
   const [pageMeta, setPageMeta] = useState({ title: "", description: "" });
   const [sections, setSections] = useState([]);
-  const [targetLang, setTargetLang] = useState("Hindi");
+  const [availableLangs, setAvailableLangs] = useState([]);
+  const [targetLang, setTargetLang] = useState("");
+
+  useEffect(() => {
+    getLanguages().then(data => {
+      const targets = data.targets || [];
+      if (targets.length > 0) {
+        setAvailableLangs(targets);
+        setTargetLang(targets[0]);
+      }
+    }).catch(err => console.error("Failed to fetch languages:", err));
+  }, []);
   const [fetchStatus, setFetchStatus] = useState("idle");
   const [message, setMessage] = useState("");
   const [translatingId, setTranslatingId] = useState(null);
@@ -763,7 +775,7 @@ export default function TranslationPage() {
                 value={targetLang} onChange={e => setTargetLang(e.target.value)}
                 className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
               >
-                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                {availableLangs.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
               <button
                 type="button" onClick={handleFetch} disabled={fetchStatus === "loading"}

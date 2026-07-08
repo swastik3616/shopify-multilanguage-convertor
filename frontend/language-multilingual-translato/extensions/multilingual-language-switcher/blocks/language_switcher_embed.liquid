@@ -182,7 +182,18 @@
 
     const nodes = [], texts = [];
     let n;
-    while ((n = walker.nextNode())) { nodes.push(n); texts.push(n.nodeValue.trim()); }
+    while ((n = walker.nextNode())) { 
+      nodes.push(n); 
+      texts.push(n.nodeValue.trim()); 
+      
+      // Capture original text before translation so overlay replacements can match it later
+      let p = n.parentElement;
+      while (p && p !== document.documentElement) {
+        if (p.__lsw_orig_text !== undefined) break; // Already captured for this element and its ancestors
+        p.__lsw_orig_text = p.textContent;
+        p = p.parentElement;
+      }
+    }
 
     console.log(`[LSW] Translating ${texts.length} nodes to ${lang}`);
     status.style.display = 'flex';
@@ -231,44 +242,58 @@
       const normalizedOriginal = normalizeText(originalText);
       const upperTag = (elementTag || '').toUpperCase();
 
+      // Use the captured original text if available (so we can match even after auto-translation)
+      const currentText = element.__lsw_orig_text !== undefined ? element.__lsw_orig_text : (element.textContent || '');
+
       if (['INPUT', 'TEXTAREA'].includes(upperTag)) {
         const candidateText = normalizeText(element.value || element.placeholder || '');
         return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
       }
 
       if (upperTag === 'BUTTON' || element.tagName === 'BUTTON') {
-        const candidateText = normalizeText(element.textContent || element.value || '');
+        const candidateText = normalizeText(element.__lsw_orig_text !== undefined ? element.__lsw_orig_text : (element.textContent || element.value || ''));
         return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
       }
 
-      const candidateText = normalizeText(element.textContent || '');
+      const candidateText = normalizeText(currentText);
       return candidateText === normalizedOriginal || candidateText.includes(normalizedOriginal);
     }
 
     function applyTextToElement(element, newText, elementTag) {
-      const upperTag = (elementTag || '').toUpperCase();
+      const tag = (element.tagName || elementTag || '').toUpperCase();
 
-      if (['INPUT', 'TEXTAREA'].includes(upperTag)) {
-        element.value = newText;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        if (element.type === 'submit' || element.type === 'button') {
+          element.value = newText;
+        } else if (element.placeholder && element.placeholder.trim() !== '') {
+          element.placeholder = newText;
+        } else {
+          element.value = newText;
+        }
         return;
       }
 
-      if (upperTag === 'BUTTON' || element.tagName === 'BUTTON') {
-        element.textContent = newText;
-        return;
+      // Safe replacement: instead of overwriting textContent (which destroys child elements like SVGs and refs),
+      // we only replace the text nodes.
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+      const textNodes = [];
+      let n;
+      while (n = walker.nextNode()) {
+        if (n.nodeValue.trim().length > 0) {
+          textNodes.push(n);
+        }
       }
 
-      if (element.tagName === 'INPUT') {
-        element.value = newText;
-        return;
+      if (textNodes.length > 0) {
+        textNodes[0].nodeValue = newText;
+        // If there are multiple text parts, clear the others to avoid duplicated text
+        for (let i = 1; i < textNodes.length; i++) {
+          textNodes[i].nodeValue = '';
+        }
+      } else {
+        // If no text nodes exist, safely append a text node
+        element.appendChild(document.createTextNode(newText));
       }
-
-      if (element.placeholder !== undefined) {
-        element.placeholder = newText;
-        return;
-      }
-
-      element.textContent = newText;
     }
 
     function applyReplacements(replacements) {
@@ -290,15 +315,9 @@
         }
 
         try {
-          const allElements = Array.from(document.querySelectorAll(selector));
-
-          // KEY FIX: For translated overlays, the DOM already has auto-translated text
-          // (from runTranslation), so matching by original English text will always fail.
-          // Instead, match by selector alone — it's specific enough.
-          // For base edits (non-translation), still verify text to avoid false positives.
-          const matchingElements = isTranslation
-            ? allElements
-            : allElements.filter(function(el) { return matchesTarget(el, originalText, elementTag); });
+          const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
+            return matchesTarget(el, originalText, elementTag);
+          });
 
           if (matchingElements.length) {
             matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
