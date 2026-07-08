@@ -279,6 +279,7 @@
         const newText = item.new_text;
         const selector = item.selector;
         const elementTag = item.element_tag;
+        const isTranslation = item.is_translation;
 
         if (!newText) return;
 
@@ -289,11 +290,19 @@
         }
 
         try {
-          const matchingElements = Array.from(document.querySelectorAll(selector)).filter(function(el) {
-            return matchesTarget(el, originalText, elementTag);
-          });
+          const allElements = Array.from(document.querySelectorAll(selector));
+
+          // KEY FIX: For translated overlays, the DOM already has auto-translated text
+          // (from runTranslation), so matching by original English text will always fail.
+          // Instead, match by selector alone — it's specific enough.
+          // For base edits (non-translation), still verify text to avoid false positives.
+          const matchingElements = isTranslation
+            ? allElements
+            : allElements.filter(function(el) { return matchesTarget(el, originalText, elementTag); });
+
           if (matchingElements.length) {
             matchingElements.forEach(function(el) { applyTextToElement(el, newText, elementTag); });
+            console.log('[LSW] Applied edit to', matchingElements.length, 'element(s) via', selector);
           }
         } catch(e) {
           console.warn('[LSW] Invalid selector, skipping:', selector, e);
