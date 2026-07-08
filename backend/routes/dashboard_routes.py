@@ -27,8 +27,6 @@ def get_dashboard_stats():
 
     first_log = AuditLog.query.order_by(AuditLog.created_at.asc()).first()
     install_time = first_log.created_at.strftime("%Y-%m-%d %H:%M") if first_log and first_log.created_at else "N/A"
-
-    # ── Volume by day (last 7 days) — returns 0 until created_at migrated ──
     today = datetime.utcnow().date()
     volume_by_day = []
     day_labels = []

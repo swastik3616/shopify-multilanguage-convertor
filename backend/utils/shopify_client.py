@@ -3,7 +3,6 @@ from utils.helpers import get_shopify_credentials
 import re
 
 def fetch_shopify_pages():
-    """Fetch pages from Shopify store."""
     store_url, access_token = get_shopify_credentials()
     if not store_url or not access_token:
         return []

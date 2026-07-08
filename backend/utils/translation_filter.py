@@ -1,13 +1,6 @@
-"""
-Translation filter utility to identify and exclude non-translatable content.
-Prevents emails, phone numbers, URLs, and numbers from being translated.
-"""
-
 import re
 
-class TranslationFilter:
-    """Filter to identify content that should NOT be translated."""
-    
+class TranslationFilter:    
     # Patterns that should NOT be translated
     PATTERNS = {
         'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
@@ -83,7 +76,6 @@ class TranslationFilter:
         if not text:
             return []
         
-        # Check if entire text should be skipped
         if TranslationFilter.should_skip(text):
             return [{'type': 'skip', 'content': text}]
         

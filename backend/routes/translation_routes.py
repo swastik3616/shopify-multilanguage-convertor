@@ -25,14 +25,10 @@ def bulk_translate():
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
     api_key = provider_settings["api_keys"].get(provider, "")
-
-    # ── Step 0: Filter out non-translatable content (emails, numbers, URLs) ──
-    skip_indices = {}  # indices to skip with their original values
+    skip_indices = {}  
     for i, text in enumerate(texts):
         if TranslationFilter.should_skip(text):
             skip_indices[i] = text
-
-    # ── Step 1: Translation Cache Lookup ──────────────────────────────────
     cached_map = {}
     uncached_indices = []
     db_cache = {}
@@ -50,7 +46,6 @@ def bulk_translate():
 
     for i, text in enumerate(texts):
         if i in skip_indices:
-            # Skip non-translatable content - use original text
             cached_map[i] = text
         elif text in db_cache:
             cached_map[i] = db_cache[text]
@@ -59,8 +54,6 @@ def bulk_translate():
 
     cache_hits = len(texts) - len(uncached_indices) - len(skip_indices)
     print(f"[bulk-translate] cache={cache_hits}/{len(texts)} hits | skipped={len(skip_indices)} | need_ai={len(uncached_indices)} | lang='{target_language}'")
-
-    # ── Step 2: Call AI only for uncached texts ───────────────────────────
     if uncached_indices:
         uncached_dict = {
             str(j): texts[orig_idx]
@@ -85,8 +78,6 @@ def bulk_translate():
             ))
 
         db.session.commit()
-
-    # ── Step 3: Rebuild final ordered list ───────────────────────────────
     translated_texts = [cached_map.get(i, texts[i]) for i in range(len(texts))]
 
     return jsonify({
@@ -108,8 +99,6 @@ def translate_text():
 
     if not source_text or not target_language:
         return jsonify({"success": False, "message": "Missing text or language"}), 400
-
-    # ── Step 0: Check if text should be skipped (email, number, URL) ────────
     if TranslationFilter.should_skip(source_text):
         print(f"[translate] Skipping non-translatable text: {source_text}")
         return jsonify({"translated_text": source_text, "skipped": True})
@@ -167,29 +156,10 @@ def fetch_url_content():
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
         }
-
-        # Add a random cache-busting query parameter to force Shopify CDN to
-        # return the freshest HTML rather than a stale cached version.
         parsed = urlparse(url)
         query_params = parse_qsl(parsed.query)
         query_params.append(("_nocache", str(int(time.time() * 1000))))
         fetch_url = parsed._replace(query=urlencode(query_params)).geturl()
-
-        # ── FIX: password-protected (dev/unlaunched) stores ────────────────
-        # A plain requests.get() with no cookies hits Shopify's storefront
-        # password gate on stores that haven't launched yet. Shopify does
-        # NOT return an error for this — it returns 200 with a page that
-        # shows a decorative, fake preview of the theme populated with
-        # placeholder demo content ("Product title", "Rs. 19.99", "Sale
-        # price", "Regular price", etc). That placeholder markup is what
-        # was getting scraped and shown in the translation grid instead of
-        # the real product data — nothing to do with caching or overlays.
-        #
-        # Fix: use a session, and if the fetched page looks like the
-        # password gate, POST the configured store password to
-        # `{origin}/password` first (this sets Shopify's storefront_digest
-        # cookie on the session), then re-fetch the real page with that
-        # cookie attached.
         session = requests.Session()
         resp = session.get(fetch_url, headers=headers, timeout=12)
         resp.raise_for_status()
@@ -213,8 +183,6 @@ def fetch_url_content():
                     timeout=12,
                     allow_redirects=True,
                 )
-                # Re-fetch the real page now that the session (hopefully)
-                # carries the storefront_digest cookie.
                 resp = session.get(fetch_url, headers=headers, timeout=12)
                 resp.raise_for_status()
                 html = resp.text
@@ -244,14 +212,6 @@ def fetch_url_content():
                         "can log in before scraping content."
                     ),
                 }), 401
-
-        # ── Diagnostics ──────────────────────────────────────────────────
-        # Log the caching-related response headers so you can confirm
-        # whether a CDN/proxy is serving from cache. If `age` is present
-        # and > 0, or `x-cache`/`cf-cache-status` says HIT, something
-        # between us and Shopify is caching despite the headers above —
-        # that points to a CDN/proxy config change being needed rather
-        # than anything fixable purely from this backend.
         cache_debug = {
             "age": resp.headers.get("Age"),
             "cache-control": resp.headers.get("Cache-Control"),
@@ -266,34 +226,11 @@ def fetch_url_content():
         MAX_HTML_LENGTH = 500_000
         if len(html) > MAX_HTML_LENGTH:
             html = html[:MAX_HTML_LENGTH]
-
-        # ── Strip navigation/chrome elements server-side ──────────────────
         soup = BeautifulSoup(html, "html.parser")
-
-        # 1. Remove semantic landmark tags entirely
         for tag in soup.find_all(["header", "footer", "nav", "aside"]):
             tag.decompose()
-
-        # 1b. Remove Shopify's built-in collection-page filter/sort/facet
-        # widget and accessibility skip-links entirely. These are theme
-        # chrome — "Featured", "Best selling", "Price, low to high",
-        # "Availability", "In stock", "Clear all", "Skip to results list",
-        # etc. are UI controls, not per-page content anyone translates
-        # item-by-item, but they were passing through untouched because
-        # the id/class regex below never accounted for them. Dawn-based
-        # themes render this widget using specific custom elements, so
-        # remove those tags outright before the class/id pass below.
         for tag in soup.find_all(["facet-filters-form", "price-range"]):
             tag.decompose()
-
-        # 2. Remove elements whose id or class is a very specific Shopify chrome
-        # pattern.  We intentionally use a TIGHT list so we don't accidentally
-        # remove content sections (e.g. an announcement banner with real text,
-        # or a hero section whose id contains the word "header").
-        #
-        # Removed from the old broad list:
-        #   announcement, menu, topbar  ← too generic, kills real content
-        #   header/footer/nav already handled above by semantic tag removal
         CHROME_RE = _re.compile(
             r"(^|[-_])(site-header|site-footer|site-nav|mobile-nav|mobile-menu|"
             r"cart-drawer|cart-notification|cart-popup|ajax-cart|minicart|"
@@ -313,8 +250,6 @@ def fetch_url_content():
             el_cls = " ".join(el.get("class", []) or [])
             if CHROME_RE.search(el_id) or CHROME_RE.search(el_cls):
                 el.decompose()
-
-        # 3. Prefer <main> content if the theme uses it; otherwise use <body>
         main_tag = soup.find("main") or soup.find("body") or soup
         cleaned_html = str(main_tag)
 

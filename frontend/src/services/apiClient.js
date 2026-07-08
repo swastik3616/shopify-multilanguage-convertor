@@ -21,7 +21,7 @@ export function persistShopFromQuery() {
   if (shop) {
     try {
       localStorage.setItem("shopify_shop", shop);
-    } catch (e) {}
+    } catch (e) { }
   }
 
   return shop;
@@ -44,16 +44,12 @@ export async function apiFetch(path, options = {}) {
     );
   }
 
-  // Build the final request URL safely:
-  // - If `path` is an absolute URL (http/https or protocol-relative), use it as-is.
-  // - Otherwise join `API_URL` and `path` ensuring there is exactly one slash between them.
   let url;
   const isAbsolute = /^(https?:)?\/\//i.test(path);
   if (isAbsolute) {
     url = path;
   } else {
     const base = (API_URL || '').toString();
-    // remove trailing slash from base and ensure path starts with a single slash
     const cleanBase = base.replace(/\/$/, '');
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     url = `${cleanBase}${cleanPath}`;
@@ -68,7 +64,7 @@ export async function apiFetch(path, options = {}) {
   if (!response.ok) {
     const bodyText = await response.text();
     let errorMessage = `API request failed ${response.status} ${response.statusText}`;
-    
+
     try {
       const jsonBody = JSON.parse(bodyText);
       if (jsonBody.message) {

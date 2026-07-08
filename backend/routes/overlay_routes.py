@@ -53,23 +53,6 @@ def save_overlay_edits():
 
         if not orig_text or not new_text:
             continue
-
-        # ── FIX ────────────────────────────────────────────────────────
-        # The identity of an overlay edit is (url, original_text,
-        # is_translation, target_language). `selector` is *metadata about*
-        # an edit (where it lives on the page), not part of what makes it
-        # unique. It used to be included in the lookup below, but it's
-        # recomputed client-side on every fetch from the live DOM
-        # (id/class/nth-of-type), so it can legitimately differ between
-        # two saves of the exact same text (Shopify injecting a different
-        # class, a sibling product card shifting position, etc).
-        #
-        # When that happened, the old filter_by(..., selector=selector)
-        # would fail to find the existing row and INSERT a duplicate
-        # instead of updating it — leaving a stale row in the table that
-        # a later read could pick up, showing old content after a "save".
-        #
-        # Do NOT add `selector` to this filter. Just update it below.
         filter_kwargs = {
             "url": url,
             "original_text": orig_text,
@@ -113,12 +96,6 @@ def get_replacements():
 
     candidate_urls = list(_candidate_urls(url))
     replacements = []
-
-    # ── FIX ────────────────────────────────────────────────────────────
-    # Order by id ASC so that if any duplicate rows still exist (e.g. from
-    # before this fix, or a race condition), the frontend can reliably
-    # apply a "last one wins" fold and get the most recently created row,
-    # rather than depending on undefined/default database ordering.
     base_edits = (
         OverlayEdit.query
         .filter(OverlayEdit.url.in_(candidate_urls), OverlayEdit.is_translation.is_(False))
@@ -158,10 +135,6 @@ def get_replacements():
 
 @overlay_bp.route("/overlay/cleanup-bad-edits", methods=["POST", "DELETE"])
 def cleanup_bad_edits():
-    """
-    ADMIN ONLY: Remove all overlay edits without selectors to fix global replacement issue.
-    This is a one-time cleanup for the product scoping bug.
-    """
     try:
         # Get stats before
         total_before = OverlayEdit.query.count()
@@ -199,13 +172,6 @@ def cleanup_bad_edits():
 
 @overlay_bp.route("/overlay/dedupe", methods=["POST"])
 def dedupe_overlay_edits():
-    """
-    ADMIN ONLY: One-time cleanup for the duplicate-row bug caused by
-    matching on `selector` in /overlay/save. For every group of rows
-    that share (url, original_text, is_translation, target_language),
-    keep only the most recently updated/created row (highest id) and
-    delete the rest, since the highest id reflects the most recent save.
-    """
     try:
         all_edits = OverlayEdit.query.order_by(OverlayEdit.id.asc()).all()
 
@@ -220,8 +186,6 @@ def dedupe_overlay_edits():
             if len(rows) <= 1:
                 kept_count += len(rows)
                 continue
-            # Rows are already in ascending id order (oldest -> newest).
-            # Keep the last one (most recently created/updated), delete the rest.
             *stale, latest = rows
             for row in stale:
                 db.session.delete(row)

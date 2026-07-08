@@ -1,10 +1,4 @@
-/**
- * Translation filter utility - client-side
- * Identifies and excludes non-translatable content (emails, phone numbers, URLs, IDs)
- */
-
 export const TranslationFilterUtils = {
-  // Regular expressions for non-translatable patterns
   patterns: {
     email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
     phone: /[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}\b/g,

@@ -7,11 +7,8 @@ import {
 } from "lucide-react";
 import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
-
-/* ─── Constants ──────────────────────────────────────────────── */
 const LANGUAGES = ["Hindi", "Marathi", "French", "German", "Spanish", "Portuguese", "Japanese", "Arabic"];
 const HEADING_TAGS = ["H1", "H2", "H3", "H4", "H5", "H6"];
-// SKIP_TAGS no longer needed — backend strips header/footer/nav before sending HTML
 const TEXT_TAGS = new Set(["SPAN", "LI", "LABEL", "SMALL", "STRONG", "EM", "B", "I", "TD", "TH", "CAPTION", "SUMMARY"]);
 const KIND_LABELS = {
   header: "Header", nav: "Navigation", main: "Main Content",
@@ -65,8 +62,6 @@ function buildElementSelector(node) {
         part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
       }
     }
-
-    // Try to use ID or class for better uniqueness
     if (current.id) {
       return "#" + current.id;
     }
@@ -298,39 +293,24 @@ function parseHtml(html) {
     });
   };
 
-  // Start with a single content section
   startSec("content");
-
-  // Walk every element — backend already stripped header/footer/nav
   const walker = doc.createTreeWalker(doc.body || doc.documentElement, NodeFilter.SHOW_ELEMENT);
   let node = walker.currentNode;
-
-  // Track all text seen globally to deduplicate identical strings across
-  // product cards — one saved edit for "Product title" should not create
-  // 16 identical rows in the workspace.
   const seenTexts = new Set();
 
   while (node) {
     const tag = node.tagName;
-
-    // Skip non-content tags
     if (["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "SVG"].includes(tag)) {
       node = walker.nextNode();
       continue;
     }
-
-    // Only capture leaf-ish elements (no block children) to avoid capturing
-    // a parent whose textContent is just the concatenation of its children.
     const isLeaf = !([...node.children].some(c =>
       ["DIV", "SECTION", "ARTICLE", "MAIN", "UL", "OL", "TABLE"].includes(c.tagName)
     ));
 
     const captureText = (resolvedTag) => {
       const t = norm(node.textContent || "");
-      // Skip empty, too short (<2 chars), or very long strings (>300 = likely
-      // a concatenated block, not a translatable phrase).
       if (!t || t.length < 2 || t.length > 300) return;
-      // Global dedup: same exact text already captured somewhere on the page
       if (seenTexts.has(t)) return;
       seenTexts.add(t);
       addEl(resolvedTag, t, node);
@@ -402,7 +382,7 @@ function ElementContent({ tag, text, translated = false }) {
   if (tag === "BUTTON")
     return (
       <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${translated ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-          : "border-slate-300 bg-slate-50 text-slate-700"}`}>
+        : "border-slate-300 bg-slate-50 text-slate-700"}`}>
         {text}
       </span>
     );
@@ -417,7 +397,7 @@ function ElementContent({ tag, text, translated = false }) {
   if (tag === "IMG")
     return (
       <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${translated ? "border-emerald-200 bg-emerald-50/60 text-emerald-700"
-          : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+        : "border-amber-200 bg-amber-50 text-amber-700"}`}>
         <ImageIcon className="h-3.5 w-3.5 shrink-0" />
         {text ? <span>{text}</span> : <span className="italic opacity-50">no alt text</span>}
       </div>
@@ -644,7 +624,7 @@ export default function TranslationPage() {
   const [translatingId, setTranslatingId] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [isSavingEdits, setIsSavingEdits] = useState(false);
-  const [viewMode, setViewMode] = useState("grid"); // "grid" or "panel"
+  const [viewMode, setViewMode] = useState("grid");
   const topRef = useRef(null);
 
   const hasContent = sections.length > 0;
@@ -652,7 +632,6 @@ export default function TranslationPage() {
   const doneEls = useMemo(() => sections.reduce((a, s) => a + s.elements.filter(e => e.translatedText).length, 0), [sections]);
   const progress = totalEls ? Math.round((doneEls / totalEls) * 100) : 0;
 
-  /* ── Normalize a URL the same way handleSaveToWebsite does ── */
   const normalizeUrl = (raw) => {
     try {
       let u = raw.trim();
@@ -668,12 +647,9 @@ export default function TranslationPage() {
   const handleFetch = async () => {
     if (!url.trim()) { setMessage("Enter a URL first."); return; }
     setFetchStatus("loading"); setMessage(""); setSections([]); setPageMeta({ title: "", description: "" }); setActiveId(null);
-
-    // Normalize URL once — same format used when saving edits
     const fetchUrl = normalizeUrl(url.trim());
 
     try {
-      // Fetch HTML and saved edits in parallel using the same normalized URL
       const [res, savedEdits] = await Promise.all([
         fetchUrlContent(fetchUrl),
         fetchOverlayEdits(fetchUrl, targetLang).catch(() => ({ base: {}, translations: {} })),
@@ -684,10 +660,6 @@ export default function TranslationPage() {
       if (res.html) {
         const { meta, sections: parsed } = parseHtml(res.html);
         setPageMeta(meta);
-
-        // Merge saved overlay edits back into parsed elements.
-        // Matching is done case-insensitively and whitespace-normalised
-        // so minor scraping differences don't break the lookup.
         const baseEntries = Object.entries(savedEdits?.base || {});
         const transEntries = Object.entries(savedEdits?.translations || {});
 
@@ -710,8 +682,6 @@ export default function TranslationPage() {
 
               let updatedEl = { ...el };
               if (savedBase) {
-                // Keep originalText as the real Shopify text so future
-                // saves still reference the correct original_text in DB
                 updatedEl.text = savedBase;
                 updatedEl.originalText = el.text;
               }
@@ -948,8 +918,8 @@ export default function TranslationPage() {
               <button
                 onClick={() => setViewMode("grid")}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${viewMode === "grid"
-                    ? "bg-[#008060] text-white shadow-sm"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  ? "bg-[#008060] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
               >
                 <Grid3x3 className="h-4 w-4" />
@@ -958,8 +928,8 @@ export default function TranslationPage() {
               <button
                 onClick={() => setViewMode("panel")}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${viewMode === "panel"
-                    ? "bg-[#008060] text-white shadow-sm"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  ? "bg-[#008060] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
               >
                 <Rows className="h-4 w-4" />
