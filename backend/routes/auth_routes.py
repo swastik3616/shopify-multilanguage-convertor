@@ -9,7 +9,6 @@ auth_bp = Blueprint("auth_routes", __name__)
 
 @auth_bp.route("/shopify/check-token", methods=["GET"])
 def shopify_check_token():
-    """Diagnostic endpoint: checks current resolved Shopify store_url and access token by calling /shop.json."""
     store_url, access_token = get_shopify_credentials()
     if not store_url or not access_token:
         return jsonify({"connected": False, "message": "No Shopify store or access token configured."}), 400

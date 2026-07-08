@@ -6,8 +6,6 @@ def migrate():
     with app.app_context():
         # Get the database URI
         db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        
-        # Simple SQLite migration since we are using sqlite:///translator.db
         if db_uri.startswith('sqlite'):
             db_path = db_uri.replace('sqlite:///', '')
             conn = sqlite3.connect(db_path)

@@ -96,16 +96,9 @@ function getTruncated(text, length = 100) {
   return text.length > length ? text.substring(0, length) + "..." : text;
 }
 
-function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOriginal, onEditTranslation }) {
-  const [editingSource, setEditingSource] = useState(false);
+function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTranslation }) {
   const [editingTranslation, setEditingTranslation] = useState(false);
-  const [sourceValue, setSourceValue] = useState(item.text || "");
   const [translationValue, setTranslationValue] = useState(item.translatedText || "");
-
-  const openSourceEditor = () => {
-    setSourceValue(item.text || "");
-    setEditingSource(true);
-  };
 
   const openTranslationEditor = () => {
     setTranslationValue(item.translatedText || "");
@@ -116,45 +109,8 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditOrigin
     <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
       <td className="px-4 py-3 text-xs text-slate-500 font-mono">{item.sectionLabel || item.sectionId}</td>
       <td className="px-4 py-3">
-        {editingSource ? (
-          <div className="flex flex-col gap-2">
-            <input
-              type="text"
-              className="input-field w-full text-sm"
-              value={sourceValue}
-              onChange={e => setSourceValue(e.target.value)}
-              autoFocus
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => { setSourceValue(item.text || ""); setEditingSource(false); }}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => { onEditOriginal(item.sectionId, item.id, sourceValue, true); setEditingSource(false); }}
-                className="rounded-lg bg-slate-900 p-1.5 text-white hover:bg-slate-800 transition"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-sm text-slate-700 break-words" title={item.text}>{getTruncated(item.text, 90)}</div>
-            <button
-              type="button"
-              onClick={openSourceEditor}
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
-              title="Edit source"
-            >
-              <Edit2 className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+        {/* Source text is read-only */}
+        <div className="text-sm text-slate-700 break-words select-text" title={item.text}>{getTruncated(item.text, 90)}</div>
       </td>
       <td className="px-4 py-3">
         {editingTranslation ? (
@@ -407,12 +363,9 @@ function ElementContent({ tag, text, translated = false }) {
 }
 
 /* ─── ElementRow ─────────────────────────────────────────────── */
-function ElementRow({ element, isTranslating, onEdit, onEditOriginal }) {
+function ElementRow({ element, isTranslating, onEdit }) {
   const [isEditingT, setIsEditingT] = useState(false);
   const [editedTextT, setEditedTextT] = useState(element.translatedText || "");
-
-  const [isEditingO, setIsEditingO] = useState(false);
-  const [editedTextO, setEditedTextO] = useState(element.text || "");
 
   const hasT = !!element.translatedText;
 
@@ -421,47 +374,12 @@ function ElementRow({ element, isTranslating, onEdit, onEditOriginal }) {
     setIsEditingT(false);
   };
 
-  const handleSaveO = () => {
-    if (onEditOriginal) onEditOriginal(editedTextO);
-    setIsEditingO(false);
-  };
-
   return (
     <div className="grid grid-cols-1 border-b border-slate-50 last:border-b-0 lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
-      {/* Original */}
-      <div className={`group flex items-start gap-3 px-5 py-4 bg-white`}>
-        <div className="min-w-0 flex-1 relative">
-          {isEditingO ? (
-            <div className="flex flex-col gap-2">
-              <textarea
-                value={editedTextO}
-                onChange={e => setEditedTextO(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-                rows={3}
-              />
-              <div className="flex gap-2 justify-end">
-                <button onClick={() => { setIsEditingO(false); setEditedTextO(element.text || ""); }} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
-                  <X className="h-4 w-4" />
-                </button>
-                <button onClick={handleSaveO} className="rounded-lg bg-slate-100 p-1.5 text-slate-700 hover:bg-slate-200 transition">
-                  <Check className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <ElementContent tag={element.tag} text={element.text} />
-              </div>
-              <button
-                onClick={() => setIsEditingO(true)}
-                className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 transition"
-                title="Edit original text"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+      {/* Original — read-only */}
+      <div className="flex items-start gap-3 px-5 py-4 bg-white">
+        <div className="min-w-0 flex-1">
+          <ElementContent tag={element.tag} text={element.text} />
         </div>
       </div>
 
@@ -603,7 +521,6 @@ function SectionRow({ section, index, targetLanguage, isActive, onFocus, transla
                 element={el}
                 isTranslating={isTranslating}
                 onEdit={(newText) => onEditElement(section.id, el.id, newText, false)}
-                onEditOriginal={(newText) => onEditElement(section.id, el.id, newText, true)}
               />
             ))}
           </motion.div>
@@ -947,7 +864,6 @@ export default function TranslationPage() {
                 targetLanguage={targetLang}
                 translatingId={translatingId}
                 onTranslateItem={handleTranslate}
-                onEditOriginal={handleEditElement}
                 onEditTranslation={handleEditElement}
               />
             ) : (
