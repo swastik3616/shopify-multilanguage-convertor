@@ -172,10 +172,20 @@ def analytics():
 
 @dashboard_bp.route("/audit-history", methods=["GET"])
 def get_audit_history():
-    logs = AuditLog.query.order_by(AuditLog.id.desc()).all()
+    days = request.args.get("days")
+    
+    query_logs = AuditLog.query
+    query_trans = db.session.query(Translation.target_language, func.count(Translation.id).label("cnt"))
+    
+    if days and days.isdigit():
+        threshold = datetime.utcnow() - timedelta(days=int(days))
+        query_logs = query_logs.filter(AuditLog.created_at >= threshold)
+        query_trans = query_trans.filter(Translation.created_at >= threshold)
+        
+    logs = query_logs.order_by(AuditLog.id.desc()).all()
     
     usage_stats = (
-        db.session.query(Translation.target_language, func.count(Translation.id).label("cnt"))
+        query_trans
         .group_by(Translation.target_language)
         .order_by(func.count(Translation.id).desc())
         .all()

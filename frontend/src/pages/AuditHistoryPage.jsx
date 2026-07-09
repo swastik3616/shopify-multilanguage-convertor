@@ -4,11 +4,12 @@ import { getAuditHistory } from "../services/auditService";
 function AuditHistoryPage() {
   const [logs, setLogs] = useState([]);
   const [overview, setOverview] = useState([]);
+  const [timeFilter, setTimeFilter] = useState("");
 
   useEffect(() => {
     const loadLogs = async () => {
       try {
-        const data = await getAuditHistory();
+        const data = await getAuditHistory(timeFilter);
         if (data && data.logs) {
           setLogs(data.logs);
           setOverview(data.overview || []);
@@ -21,7 +22,7 @@ function AuditHistoryPage() {
     };
 
     loadLogs();
-  }, []);
+  }, [timeFilter]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -30,7 +31,19 @@ function AuditHistoryPage() {
       </div>
 
       <div className="card-container p-6 mb-2">
-        <h3 className="font-semibold text-slate-900 mb-6">Language Usage Overview</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <h3 className="font-semibold text-slate-900">Language Usage Overview</h3>
+          <select 
+            className="input-field max-w-[200px] text-sm py-2 px-3 border-slate-200 shadow-sm"
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+          >
+            <option value="">All Time</option>
+            <option value="7">Last 7 Days</option>
+            <option value="15">Last 15 Days</option>
+            <option value="30">Last 1 Month</option>
+          </select>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {overview.length > 0 ? (
             overview.map((stat, idx) => (
