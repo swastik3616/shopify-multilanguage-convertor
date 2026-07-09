@@ -14,7 +14,8 @@ def _mask_token(token):
 def get_setting(key, default_value):
     setting = AppSetting.query.filter_by(key=key).first()
     if setting:
-        return json.loads(setting.value)
+        val = json.loads(setting.value)
+        return val if val is not None else default_value
     return default_value
 
 def set_setting(key, value):

@@ -51,7 +51,7 @@ def get_seo_resources():
         if "errors" in data:
             return jsonify({"success": False, "message": f"GraphQL Error: {data['errors'][0].get('message', 'Unknown error')}"}), 400
 
-        edges = (data.get("data") or {}).get("translatableResources", {}).get("edges", [])
+        edges = ((data.get("data") or {}).get("translatableResources") or {}).get("edges", [])
         resources = []
 
         for edge in edges:
@@ -141,7 +141,7 @@ def update_original_seo():
         if "errors" in data:
             return jsonify({"success": False, "message": data["errors"][0].get("message", "Unknown error")}), 400
         mutation_name = "productUpdate" if is_product else "pageUpdate"
-        user_errors = (data.get("data") or {}).get(mutation_name, {}).get("userErrors", [])
+        user_errors = ((data.get("data") or {}).get(mutation_name) or {}).get("userErrors", [])
         if user_errors:
             return jsonify({"success": False, "message": user_errors[0].get("message", "Update failed")}), 400
 
@@ -212,7 +212,7 @@ def translate_seo():
         res = requests.post(url, headers=headers, json={"query": mutation, "variables": variables})
         res.raise_for_status()
         data = res.json()
-        user_errors = (data.get("data") or {}).get("translationsRegister", {}).get("userErrors", [])
+        user_errors = ((data.get("data") or {}).get("translationsRegister") or {}).get("userErrors", [])
         
         if user_errors:
             error_msg = ", ".join([e["message"] for e in user_errors])
@@ -226,12 +226,12 @@ def translate_seo():
                 """
                 enable_res = requests.post(url, headers=headers, json={"query": enable_mutation, "variables": {"locale": locale}})
                 enable_data = enable_res.json()
-                enable_errors = (enable_data.get("data") or {}).get("shopLocaleEnable", {}).get("userErrors", [])
+                enable_errors = ((enable_data.get("data") or {}).get("shopLocaleEnable") or {}).get("userErrors", [])
                 
                 if not enable_errors:
                     retry_res = requests.post(url, headers=headers, json={"query": mutation, "variables": variables})
                     retry_data = retry_res.json()
-                    retry_user_errors = (retry_data.get("data") or {}).get("translationsRegister", {}).get("userErrors", [])
+                    retry_user_errors = ((retry_data.get("data") or {}).get("translationsRegister") or {}).get("userErrors", [])
                     if not retry_user_errors:
                         db.session.add(AuditLog(action=f"SEO Translated {resource_id.split('/')[-1]} to {locale}"))
                         db.session.commit()
