@@ -16,7 +16,7 @@ const LANGUAGE_LOCALES = {
 };
 
 function SeoPage() {
-  const [resourceType, setResourceType] = useState("products");
+  const [resourceType, setResourceType] = useState("pages");
   const [resources, setResources] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedResource, setSelectedResource] = useState(null);
@@ -388,7 +388,7 @@ function SeoPage() {
               <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-slate-500">
                 <Globe className="mb-3 h-8 w-8 text-slate-300" />
                 <p className="text-sm font-medium text-slate-900">No resource selected</p>
-                <p className="mt-1 text-sm">Select a product or page to edit its SEO metadata.</p>
+                <p className="mt-1 text-sm">Select a page to edit its SEO metadata.</p>
               </div>
             )}
           </div>

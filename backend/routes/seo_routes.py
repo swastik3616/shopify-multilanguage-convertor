@@ -13,7 +13,7 @@ def get_seo_resources():
     if request.method == "OPTIONS":
         return "", 204
 
-    resource_type = request.args.get("type", "products").lower()
+    resource_type = request.args.get("type", "pages").lower()
     store_url, access_token = get_shopify_credentials()
     if not store_url or not access_token:
         return jsonify({"success": False, "message": "Store not connected"}), 400
