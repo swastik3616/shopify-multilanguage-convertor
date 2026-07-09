@@ -4,6 +4,7 @@ from model import Translation, PageContent, AuditLog
 from utils.helpers import get_setting, get_default_provider_settings
 from sqlalchemy import func
 from datetime import datetime, timedelta
+from langdetect import detect
 
 dashboard_bp = Blueprint("dashboard_routes", __name__)
 
@@ -147,7 +148,6 @@ def analytics():
     if last_translation:
         source_language = language_settings.get("source", "en")
         try:
-            from langdetect import detect
             detected_code = detect(last_translation.source_text)
             if detected_code:
                 source_language = detected_code
@@ -173,8 +173,21 @@ def analytics():
 @dashboard_bp.route("/audit-history", methods=["GET"])
 def get_audit_history():
     logs = AuditLog.query.order_by(AuditLog.id.desc()).all()
-    return jsonify([{
-        "id": log.id,
-        "action": log.action,
-        "created_at": str(log.created_at)
-    } for log in logs])
+    
+    usage_stats = (
+        db.session.query(Translation.target_language, func.count(Translation.id).label("cnt"))
+        .group_by(Translation.target_language)
+        .order_by(func.count(Translation.id).desc())
+        .all()
+    )
+    
+    overview = [{"language": row[0], "count": row[1]} for row in usage_stats]
+    
+    return jsonify({
+        "logs": [{
+            "id": log.id,
+            "action": log.action,
+            "created_at": str(log.created_at)
+        } for log in logs],
+        "overview": overview
+    })
