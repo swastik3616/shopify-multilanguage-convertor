@@ -145,12 +145,21 @@ def analytics():
     language_settings = get_setting("language_settings", {})
     last_translation_data = None
     if last_translation:
+        source_language = language_settings.get("source", "en")
+        try:
+            from langdetect import detect
+            detected_code = detect(last_translation.source_text)
+            if detected_code:
+                source_language = detected_code
+        except Exception as e:
+            print(f"[analytics] Language detection failed or langdetect not installed: {e}")
+
         last_translation_data = {
             "id": last_translation.id,
             "source_text": last_translation.source_text,
             "target_language": last_translation.target_language,
             "translated_text": last_translation.translated_text,
-            "source_language": language_settings.get("source", "en")
+            "source_language": source_language
         }
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     return jsonify({
