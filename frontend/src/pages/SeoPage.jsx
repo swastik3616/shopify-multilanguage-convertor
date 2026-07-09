@@ -20,7 +20,7 @@ function SeoPage() {
   const [resources, setResources] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedResource, setSelectedResource] = useState(null);
-  
+
   // Original SEO editing state
   const [originalTitle, setOriginalTitle] = useState("");
   const [originalDescription, setOriginalDescription] = useState("");
@@ -34,7 +34,7 @@ function SeoPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   const [storeConnected, setStoreConnected] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
 
@@ -85,7 +85,7 @@ function SeoPage() {
 
   const handleSaveOriginal = async () => {
     if (!selectedResource) return;
-    
+
     setIsSavingOriginal(true);
     try {
       const payload = {
@@ -112,17 +112,17 @@ function SeoPage() {
       // 1. Actually translate the original content to the target language
       let newTitle = translatedTitle;
       let newDesc = translatedDescription;
-      
+
       if (originalTitle && !translatedTitle) {
         const rTitle = await translateText({ source_text: originalTitle, target_language: targetLang });
         newTitle = rTitle.translated_text || originalTitle;
       }
-      
+
       if (originalDescription && !translatedDescription) {
         const rDesc = await translateText({ source_text: originalDescription, target_language: targetLang });
         newDesc = rDesc.translated_text || originalDescription;
       }
-      
+
       setTranslatedTitle(newTitle);
       setTranslatedDescription(newDesc);
 
@@ -138,7 +138,7 @@ function SeoPage() {
         titleDigest: selectedResource.titleDigest,
         descriptionDigest: selectedResource.descriptionDigest
       };
-      
+
       await translateSeoResource(payload);
       alert("Successfully translated and saved to Shopify!");
     } catch (error) {
@@ -151,7 +151,7 @@ function SeoPage() {
 
 
 
-  const filteredResources = resources.filter(res => 
+  const filteredResources = resources.filter(res =>
     res.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -173,7 +173,6 @@ function SeoPage() {
               value={resourceType}
               onChange={(e) => setResourceType(e.target.value)}
             >
-              <option value="products">Products</option>
               <option value="pages">Pages</option>
             </select>
           </div>
@@ -235,9 +234,8 @@ function SeoPage() {
                       <button
                         type="button"
                         onClick={() => handleSelectResource(item)}
-                        className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
-                          selectedResource?.id === item.id ? "bg-emerald-50/80 ring-1 ring-inset ring-[#008060]/20" : ""
-                        }`}
+                        className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 ${selectedResource?.id === item.id ? "bg-emerald-50/80 ring-1 ring-inset ring-[#008060]/20" : ""
+                          }`}
                       >
                         <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                         <div className="mt-1 flex flex-col gap-1 text-xs text-slate-500">
@@ -276,7 +274,7 @@ function SeoPage() {
                   <h3 className="text-sm font-semibold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2">
                     Original Metadata (Shopify)
                   </h3>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between items-end mb-1">
@@ -293,7 +291,7 @@ function SeoPage() {
                         onChange={(e) => setOriginalTitle(e.target.value)}
                       />
                     </div>
-                    
+
                     <div>
                       <div className="flex justify-between items-end mb-1">
                         <label className="block text-xs font-medium text-slate-500">Original Meta Description</label>
@@ -309,7 +307,7 @@ function SeoPage() {
                         onChange={(e) => setOriginalDescription(e.target.value)}
                       />
                     </div>
-                    
+
                     <div className="pt-2">
                       <button
                         className="btn btn-secondary w-full sm:w-auto px-4 py-1.5 text-xs flex items-center justify-center gap-1"
@@ -339,7 +337,7 @@ function SeoPage() {
                       ))}
                     </select>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between items-end mb-1">
@@ -356,7 +354,7 @@ function SeoPage() {
                         onChange={(e) => setTranslatedTitle(e.target.value)}
                       />
                     </div>
-                    
+
                     <div>
                       <div className="flex justify-between items-end mb-1">
                         <label className="block text-xs font-medium text-emerald-700">Translated Meta Description</label>
@@ -372,7 +370,7 @@ function SeoPage() {
                         onChange={(e) => setTranslatedDescription(e.target.value)}
                       />
                     </div>
-                    
+
                     <div className="pt-2">
                       <button
                         className="btn btn-primary bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto px-4 py-1.5 text-xs flex items-center justify-center gap-1"
