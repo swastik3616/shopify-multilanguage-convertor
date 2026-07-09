@@ -142,15 +142,16 @@ def api_dashboard_extension():
 def analytics():
     total_translations = Translation.query.count()
     last_translation = Translation.query.order_by(Translation.id.desc()).first()
+    language_settings = get_setting("language_settings", {})
     last_translation_data = None
     if last_translation:
         last_translation_data = {
             "id": last_translation.id,
             "source_text": last_translation.source_text,
             "target_language": last_translation.target_language,
-            "translated_text": last_translation.translated_text
+            "translated_text": last_translation.translated_text,
+            "source_language": language_settings.get("source", "en")
         }
-    language_settings = get_setting("language_settings", {})
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     return jsonify({
         "total_translations": total_translations,
