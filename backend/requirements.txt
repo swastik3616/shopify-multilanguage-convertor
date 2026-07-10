@@ -5,3 +5,5 @@ python-dotenv
 gunicorn
 beautifulsoup4
 langdetect
+psycopg2-binary
+flask-sqlalchemy

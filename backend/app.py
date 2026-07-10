@@ -5,8 +5,6 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from database import db
-
 # Blueprints
 from routes.auth_routes import auth_bp
 from routes.translation_routes import translation_bp
@@ -27,24 +25,6 @@ CORS(
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     supports_credentials=False,
 )
-
-# Database configuration
-db_url = os.getenv("DATABASE_URL", "sqlite:///translator.db")
-
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db.init_app(app)
-
-with app.app_context():
-    db.create_all()
-
-    # Import AFTER app has been created to avoid circular import
-    from migrate_db import migrate
-    migrate()
 
 # Register blueprints
 app.register_blueprint(auth_bp)
@@ -68,14 +48,12 @@ def wake():
 
 @app.route("/stores")
 def stores():
-    from model import ShopifyStore
-
-    stores = ShopifyStore.query.all()
-
+    from database import execute
+    stores = execute("SELECT ID, SHOP FROM SHOPIFY_STORES", fetch="all") or []
     return jsonify([
         {
-            "id": s.id,
-            "shop": s.shop
+            "id": s["ID"],
+            "shop": s["SHOP"]
         }
         for s in stores
     ])
@@ -84,18 +62,18 @@ def stores():
 @app.route("/debug-store")
 def debug_store():
     from flask import request
-    from model import ShopifyStore
+    from database import execute
 
     shop = request.args.get("shop")
-    store = ShopifyStore.query.filter_by(shop=shop).first()
+    store = execute("SELECT SHOP, ACCESS_TOKEN FROM SHOPIFY_STORES WHERE SHOP = %s LIMIT 1", (shop,), fetch="one")
 
     if not store:
         return jsonify({"found": False})
 
     return jsonify({
         "found": True,
-        "shop": store.shop,
-        "token": store.access_token
+        "shop": store["SHOP"],
+        "token": store["ACCESS_TOKEN"]
     })
 
 
