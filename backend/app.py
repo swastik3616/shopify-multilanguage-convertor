@@ -27,22 +27,15 @@ CORS(
     supports_credentials=False,
 )
 
-# ── Database ──────────────────────────────────────────────────────────────────
-db_url = os.getenv("DATABASE_URL", "sqlite:///translator.db")
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db.init_app(app)
+# ── Database (Snowflake) ────────────────────────────────────────────────────
+db.init_app(app)   # no-op but keeps imports working
 
 with app.app_context():
-    db.create_all()
-    
-    # Auto-run basic migrations to add missing columns if they don't exist
-    from migrate_db import migrate
-    migrate()
+    try:
+        db.create_all()   # creates Snowflake tables if missing
+        print("[startup] Snowflake tables ready.")
+    except Exception as e:
+        print(f"[startup] WARNING: db.create_all() failed: {e}")
 
 # ── Register Blueprints ───────────────────────────────────────────────────────
 app.register_blueprint(auth_bp)
