@@ -105,20 +105,11 @@ class ShopifyStore(db.Model):
 
 
 class AppSetting(db.Model):
-    __tablename__ = "app_settings"
+    __tablename__ = "APP_SETTINGS"
 
-    id = db.Column(db.Integer, primary_key=True)
-
-    key = db.Column(
-        db.String(255),
-        unique=True,
-        nullable=False
-    )
-
-    value = db.Column(
-        db.Text,
-        nullable=False
-    )
+    id = db.Column("id", db.Integer, primary_key=True)
+    key = db.Column("key", db.String)
+    value = db.Column("value", db.Text)
 
 
 class OverlayEdit(db.Model):
