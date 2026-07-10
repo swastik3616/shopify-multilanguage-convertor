@@ -1,12 +1,9 @@
-venv/
-__pycache__/
-*.pyc
+# Exported database files
+postgres_export/
 
+# Environment files
 .env
 
-translator.db
-*.db
-
-instance/
-
-*.log
+# Python
+__pycache__/
+venv/
