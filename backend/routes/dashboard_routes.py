@@ -1,8 +1,6 @@
 from flask import Blueprint, jsonify, request
-from database import db
-from model import Translation, PageContent, AuditLog
+from database import execute
 from utils.helpers import get_setting, get_default_provider_settings
-from sqlalchemy import func
 from datetime import datetime, timedelta
 from langdetect import detect
 
@@ -22,64 +20,81 @@ def get_dashboard_stats():
 
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     api_keys = provider_settings.get("api_keys", {})
-    active_providers = sum(1 for key, val in api_keys.items() if val)
+    active_providers = sum(1 for val in api_keys.values() if val)
 
-    translation_count = Translation.query.count()
+    translation_count = execute("SELECT COUNT(*) AS CNT FROM TRANSLATIONS", fetch="one")["CNT"]
 
-    first_log = AuditLog.query.order_by(AuditLog.created_at.asc()).first()
-    install_time = first_log.created_at.strftime("%Y-%m-%d %H:%M") if first_log and first_log.created_at else "N/A"
+    first_log = execute(
+        "SELECT CREATED_AT FROM AUDIT_LOGS ORDER BY CREATED_AT ASC LIMIT 1", fetch="one"
+    )
+    install_time = (
+        first_log["CREATED_AT"].strftime("%Y-%m-%d %H:%M")
+        if first_log and first_log.get("CREATED_AT")
+        else "N/A"
+    )
+
     today = datetime.utcnow().date()
-    volume_by_day = []
-    day_labels = []
-
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    recent_translations = Translation.query.filter(Translation.created_at >= seven_days_ago).all()
-    
+
+    recent_rows = execute(
+        "SELECT CREATED_AT FROM TRANSLATIONS WHERE CREATED_AT >= %s",
+        (seven_days_ago,),
+        fetch="all",
+    ) or []
+
     counts_by_date = {}
-    for t in recent_translations:
-        if t.created_at:
-            d = t.created_at.date()
+    for row in recent_rows:
+        d = row["CREATED_AT"].date() if row.get("CREATED_AT") else None
+        if d:
             counts_by_date[d] = counts_by_date.get(d, 0) + 1
 
+    volume_by_day, day_labels = [], []
     for offset in range(6, -1, -1):
         day = today - timedelta(days=offset)
         label = day.strftime("%a %d").replace(" 0", " ")
         day_labels.append(label)
         volume_by_day.append(counts_by_date.get(day, 0))
 
-    # ── Recent activity ───────────────────────────────────────────────────
-    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()
-    recent_activity = [{
-        "action": log.action,
-        "time": log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else ""
-    } for log in logs]
+    log_rows = execute(
+        "SELECT ACTION, CREATED_AT FROM AUDIT_LOGS ORDER BY CREATED_AT DESC LIMIT 8",
+        fetch="all",
+    ) or []
+    recent_activity = [
+        {
+            "action": r["ACTION"],
+            "time": r["CREATED_AT"].strftime("%Y-%m-%d %H:%M") if r.get("CREATED_AT") else "",
+        }
+        for r in log_rows
+    ]
 
     return jsonify({
         "overview": {
             "activeLanguages": active_languages,
             "providers": active_providers,
             "translationRequests": translation_count,
-            "installationTime": install_time
+            "installationTime": install_time,
         },
         "analytics": {
             "volumeByDay": volume_by_day,
             "dayLabels": day_labels,
         },
-        "recentActivity": recent_activity
+        "recentActivity": recent_activity,
     })
 
 
 @dashboard_bp.route("/api/dashboard/extension", methods=["GET", "OPTIONS"])
 def api_dashboard_extension():
-    """Richer dashboard endpoint for the Shopify app-home extension."""
     if request.method == "OPTIONS":
         return "", 204
 
     try:
         import requests as req
-        total_translations = Translation.query.count()
+
+        total_translations = execute("SELECT COUNT(*) AS CNT FROM TRANSLATIONS", fetch="one")["CNT"]
+
         lang_settings = get_setting("language_settings", {})
         targets = lang_settings.get("targets", [])
+
         provider_settings = get_setting("provider_settings", get_default_provider_settings())
         provider = provider_settings.get("provider", "Not configured")
 
@@ -92,36 +107,47 @@ def api_dashboard_extension():
                 r = req.get(
                     f"https://{store_url}/admin/api/2026-04/shop.json",
                     headers={"X-Shopify-Access-Token": token},
-                    timeout=5
+                    timeout=5,
                 )
                 store_status = "Connected" if r.status_code == 200 else "Token error"
             except Exception:
                 store_status = "Unreachable"
 
-        page_count = db.session.query(PageContent.page).distinct().count()
+        page_count = execute(
+            "SELECT COUNT(DISTINCT PAGE) AS CNT FROM PAGE_CONTENTS", fetch="one"
+        )["CNT"]
 
-        most_used_row = (
-            db.session.query(Translation.target_language, func.count(Translation.id).label("cnt"))
-            .group_by(Translation.target_language)
-            .order_by(func.count(Translation.id).desc())
-            .first()
+        most_used_row = execute(
+            "SELECT TARGET_LANGUAGE FROM TRANSLATIONS "
+            "GROUP BY TARGET_LANGUAGE ORDER BY COUNT(*) DESC LIMIT 1",
+            fetch="one",
         )
-        most_used_lang = most_used_row[0] if most_used_row else (targets[0] if targets else "—")
+        most_used_lang = (
+            most_used_row["TARGET_LANGUAGE"]
+            if most_used_row
+            else (targets[0] if targets else "—")
+        )
 
-        logs = AuditLog.query.order_by(AuditLog.id.desc()).limit(5).all()
-        recent_activity = [{
-            "id": log.id,
-            "action": log.action,
-            "time": log.created_at.strftime("%b %d, %H:%M") if log.created_at else "—",
-            "status": "Success"
-        } for log in logs]
+        logs = execute(
+            "SELECT ID, ACTION, CREATED_AT FROM AUDIT_LOGS ORDER BY ID DESC LIMIT 5",
+            fetch="all",
+        ) or []
+        recent_activity = [
+            {
+                "id": r["ID"],
+                "action": r["ACTION"],
+                "time": r["CREATED_AT"].strftime("%b %d, %H:%M") if r.get("CREATED_AT") else "—",
+                "status": "Success",
+            }
+            for r in logs
+        ]
 
         return jsonify({
             "overview": {
                 "totalPages": page_count,
                 "activeLanguages": len(targets),
                 "translationRequests": total_translations,
-                "status": "Healthy"
+                "status": "Healthy",
             },
             "analytics": {
                 "translatedPages": page_count,
@@ -129,9 +155,9 @@ def api_dashboard_extension():
             },
             "settings": {
                 "currentProvider": provider,
-                "storeConnection": store_status
+                "storeConnection": store_status,
             },
-            "recentActivity": recent_activity
+            "recentActivity": recent_activity,
         })
 
     except Exception as e:
@@ -141,63 +167,82 @@ def api_dashboard_extension():
 
 @dashboard_bp.route("/analytics", methods=["GET"])
 def analytics():
-    total_translations = Translation.query.count()
-    last_translation = Translation.query.order_by(Translation.id.desc()).first()
+    total_translations = execute("SELECT COUNT(*) AS CNT FROM TRANSLATIONS", fetch="one")["CNT"]
+
+    last_row = execute(
+        "SELECT ID, SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT "
+        "FROM TRANSLATIONS ORDER BY ID DESC LIMIT 1",
+        fetch="one",
+    )
+
     language_settings = get_setting("language_settings", {})
     last_translation_data = None
-    if last_translation:
+
+    if last_row:
         source_language = language_settings.get("source", "en")
         try:
-            detected_code = detect(last_translation.source_text)
+            detected_code = detect(last_row["SOURCE_TEXT"])
             if detected_code:
                 source_language = detected_code
         except Exception as e:
-            print(f"[analytics] Language detection failed or langdetect not installed: {e}")
+            print(f"[analytics] Language detection failed: {e}")
 
         last_translation_data = {
-            "id": last_translation.id,
-            "source_text": last_translation.source_text,
-            "target_language": last_translation.target_language,
-            "translated_text": last_translation.translated_text,
-            "source_language": source_language
+            "id": last_row["ID"],
+            "source_text": last_row["SOURCE_TEXT"],
+            "target_language": last_row["TARGET_LANGUAGE"],
+            "translated_text": last_row["TRANSLATED_TEXT"],
+            "source_language": source_language,
         }
+
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     return jsonify({
         "total_translations": total_translations,
         "total_languages": len(language_settings.get("targets", [])),
         "providers": 1 if provider_settings else 0,
-        "last_translation": last_translation_data or "No translations yet"
+        "last_translation": last_translation_data or "No translations yet",
     })
 
 
 @dashboard_bp.route("/audit-history", methods=["GET"])
 def get_audit_history():
     days = request.args.get("days")
-    
-    query_logs = AuditLog.query
-    query_trans = db.session.query(Translation.target_language, func.count(Translation.id).label("cnt"))
-    
+
     if days and days.isdigit():
         threshold = datetime.utcnow() - timedelta(days=int(days))
-        query_logs = query_logs.filter(AuditLog.created_at >= threshold)
-        query_trans = query_trans.filter(Translation.created_at >= threshold)
-        
-    logs = query_logs.order_by(AuditLog.id.desc()).all()
-    
-    usage_stats = (
-        query_trans
-        .group_by(Translation.target_language)
-        .order_by(func.count(Translation.id).desc())
-        .all()
-    )
-    
-    overview = [{"language": row[0], "count": row[1]} for row in usage_stats]
-    
+        logs = execute(
+            "SELECT ID, ACTION, CREATED_AT FROM AUDIT_LOGS "
+            "WHERE CREATED_AT >= %s ORDER BY ID DESC",
+            (threshold,),
+            fetch="all",
+        ) or []
+        usage_rows = execute(
+            "SELECT TARGET_LANGUAGE, COUNT(*) AS CNT FROM TRANSLATIONS "
+            "WHERE CREATED_AT >= %s GROUP BY TARGET_LANGUAGE ORDER BY CNT DESC",
+            (threshold,),
+            fetch="all",
+        ) or []
+    else:
+        logs = execute(
+            "SELECT ID, ACTION, CREATED_AT FROM AUDIT_LOGS ORDER BY ID DESC",
+            fetch="all",
+        ) or []
+        usage_rows = execute(
+            "SELECT TARGET_LANGUAGE, COUNT(*) AS CNT FROM TRANSLATIONS "
+            "GROUP BY TARGET_LANGUAGE ORDER BY CNT DESC",
+            fetch="all",
+        ) or []
+
+    overview = [{"language": r["TARGET_LANGUAGE"], "count": r["CNT"]} for r in usage_rows]
+
     return jsonify({
-        "logs": [{
-            "id": log.id,
-            "action": log.action,
-            "created_at": str(log.created_at)
-        } for log in logs],
-        "overview": overview
+        "logs": [
+            {
+                "id": r["ID"],
+                "action": r["ACTION"],
+                "created_at": str(r["CREATED_AT"]),
+            }
+            for r in logs
+        ],
+        "overview": overview,
     })

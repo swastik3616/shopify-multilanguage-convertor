@@ -1,10 +1,6 @@
 from flask import Blueprint, jsonify, request
-from database import db
-from model import AuditLog
-from utils.helpers import (
-    get_setting, set_setting, get_default_provider_settings,
-    normalize_shopify_store_url
-)
+from database import execute
+from utils.helpers import get_setting, set_setting, get_default_provider_settings, normalize_shopify_store_url
 
 settings_bp = Blueprint("settings_routes", __name__)
 
@@ -20,9 +16,10 @@ def save_languages():
     language_settings["targets"] = data["target_languages"]
     set_setting("language_settings", language_settings)
 
-    db.session.add(AuditLog(action="Language Settings Updated"))
-    db.session.commit()
-
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        ("Language Settings Updated",),
+    )
     return jsonify({"success": True, "message": "Languages saved successfully"})
 
 
@@ -52,9 +49,10 @@ def save_provider():
     provider_settings["api_keys"][provider] = api_key
     set_setting("provider_settings", provider_settings)
 
-    db.session.add(AuditLog(action=f"Provider Updated: {provider}"))
-    db.session.commit()
-
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        (f"Provider Updated: {provider}",),
+    )
     return jsonify({"success": True, "message": "Provider saved successfully"})
 
 
@@ -76,9 +74,10 @@ def save_store_settings():
 
     set_setting("store_setting", store_setting)
 
-    db.session.add(AuditLog(action="Store Settings Updated"))
-    db.session.commit()
-
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        ("Store Settings Updated",),
+    )
     return jsonify({"success": True, "message": "Store settings saved successfully"})
 
 

@@ -1,6 +1,5 @@
 from flask import Blueprint, jsonify, request
-from database import db
-from model import Translation, AuditLog
+from database import execute
 from utils.helpers import get_setting, get_default_provider_settings
 from utils.ai_provider import get_provider_response, get_bulk_provider_response
 from utils.translation_filter import TranslationFilter
@@ -25,24 +24,30 @@ def bulk_translate():
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
     api_key = provider_settings["api_keys"].get(provider, "")
-    skip_indices = {}  
+
+    skip_indices = {}
     for i, text in enumerate(texts):
         if TranslationFilter.should_skip(text):
             skip_indices[i] = text
-    cached_map = {}
-    uncached_indices = []
+
     db_cache = {}
     chunk_size = 500
     unique_texts = list(set(texts))
 
     for i in range(0, len(unique_texts), chunk_size):
-        chunk = unique_texts[i:i + chunk_size]
-        existing = Translation.query.filter(
-            Translation.target_language == target_language,
-            Translation.source_text.in_(chunk)
-        ).all()
-        for t in existing:
-            db_cache[t.source_text] = t.translated_text
+        chunk = unique_texts[i : i + chunk_size]
+        placeholders = ", ".join(["%s"] * len(chunk))
+        rows = execute(
+            f"SELECT SOURCE_TEXT, TRANSLATED_TEXT FROM TRANSLATIONS "
+            f"WHERE TARGET_LANGUAGE = %s AND SOURCE_TEXT IN ({placeholders})",
+            (target_language, *chunk),
+            fetch="all",
+        ) or []
+        for r in rows:
+            db_cache[r["SOURCE_TEXT"]] = r["TRANSLATED_TEXT"]
+
+    cached_map = {}
+    uncached_indices = []
 
     for i, text in enumerate(texts):
         if i in skip_indices:
@@ -53,12 +58,13 @@ def bulk_translate():
             uncached_indices.append(i)
 
     cache_hits = len(texts) - len(uncached_indices) - len(skip_indices)
-    print(f"[bulk-translate] cache={cache_hits}/{len(texts)} hits | skipped={len(skip_indices)} | need_ai={len(uncached_indices)} | lang='{target_language}'")
+    print(
+        f"[bulk-translate] cache={cache_hits}/{len(texts)} hits | "
+        f"skipped={len(skip_indices)} | need_ai={len(uncached_indices)} | lang='{target_language}'"
+    )
+
     if uncached_indices:
-        uncached_dict = {
-            str(j): texts[orig_idx]
-            for j, orig_idx in enumerate(uncached_indices)
-        }
+        uncached_dict = {str(j): texts[orig_idx] for j, orig_idx in enumerate(uncached_indices)}
 
         try:
             translated_dict = get_bulk_provider_response(
@@ -71,20 +77,19 @@ def bulk_translate():
             source = texts[orig_idx]
             translated = translated_dict.get(str(j), source)
             cached_map[orig_idx] = translated
-            db.session.add(Translation(
-                source_text=source,
-                target_language=target_language,
-                translated_text=translated
-            ))
+            execute(
+                "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+                (source, target_language, translated),
+            )
 
-        db.session.commit()
     translated_texts = [cached_map.get(i, texts[i]) for i in range(len(texts))]
 
     return jsonify({
         "translations": translated_texts,
         "cache_hits": cache_hits,
         "api_calls": len(uncached_indices),
-        "skipped": len(skip_indices)
+        "skipped": len(skip_indices),
     })
 
 
@@ -99,17 +104,19 @@ def translate_text():
 
     if not source_text or not target_language:
         return jsonify({"success": False, "message": "Missing text or language"}), 400
+
     if TranslationFilter.should_skip(source_text):
         print(f"[translate] Skipping non-translatable text: {source_text}")
         return jsonify({"translated_text": source_text, "skipped": True})
 
-    existing = Translation.query.filter_by(
-        source_text=source_text,
-        target_language=target_language
-    ).first()
-
+    existing = execute(
+        "SELECT TRANSLATED_TEXT FROM TRANSLATIONS "
+        "WHERE SOURCE_TEXT = %s AND TARGET_LANGUAGE = %s LIMIT 1",
+        (source_text, target_language),
+        fetch="one",
+    )
     if existing:
-        return jsonify({"translated_text": existing.translated_text, "cached": True})
+        return jsonify({"translated_text": existing["TRANSLATED_TEXT"], "cached": True})
 
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     provider = provider_settings.get("provider", "openai")
@@ -121,12 +128,11 @@ def translate_text():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-    db.session.add(Translation(
-        source_text=source_text,
-        target_language=target_language,
-        translated_text=translated_text
-    ))
-    db.session.commit()
+    execute(
+        "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+        "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+        (source_text, target_language, translated_text),
+    )
 
     return jsonify({"translated_text": translated_text})
 
@@ -176,7 +182,7 @@ def fetch_url_content():
             store_password = get_setting("store_password", "")
             origin = f"{parsed.scheme}://{parsed.netloc}"
             if store_password:
-                login_resp = session.post(
+                session.post(
                     f"{origin}/password",
                     data={"form_type": "storefront_password", "password": store_password},
                     headers=headers,
@@ -197,31 +203,24 @@ def fetch_url_content():
                         "success": False,
                         "message": (
                             "This store is password-protected and the configured "
-                            "store password didn't unlock it. Double-check the "
-                            "password saved in settings matches the store's "
-                            "current storefront password."
+                            "store password didn't unlock it."
                         ),
                     }), 401
             else:
                 return jsonify({
                     "success": False,
                     "message": (
-                        "This store is password-protected (it's showing the "
-                        "Shopify password gate, not the real page). Add the "
-                        "store's storefront password in Settings so the fetch "
-                        "can log in before scraping content."
+                        "This store is password-protected. Add the store's storefront "
+                        "password in Settings."
                     ),
                 }), 401
+
         cache_debug = {
             "age": resp.headers.get("Age"),
             "cache-control": resp.headers.get("Cache-Control"),
             "x-cache": resp.headers.get("X-Cache"),
             "cf-cache-status": resp.headers.get("CF-Cache-Status"),
-            "x-shopify-stage": resp.headers.get("X-Shopify-Stage"),
-            "etag": resp.headers.get("ETag"),
-            "last-modified": resp.headers.get("Last-Modified"),
         }
-        print(f"[fetch-url] url={fetch_url} status={resp.status_code} cache_headers={cache_debug}")
 
         MAX_HTML_LENGTH = 500_000
         if len(html) > MAX_HTML_LENGTH:
@@ -229,24 +228,17 @@ def fetch_url_content():
         soup = BeautifulSoup(html, "html.parser")
         for tag in soup.find_all(["header", "footer", "nav", "aside"]):
             tag.decompose()
-        for tag in soup.find_all(["facet-filters-form", "price-range"]):
-            tag.decompose()
         CHROME_RE = _re.compile(
             r"(^|[-_])(site-header|site-footer|site-nav|mobile-nav|mobile-menu|"
-            r"cart-drawer|cart-notification|cart-popup|ajax-cart|minicart|"
-            r"login-modal|account-modal|search-modal|search-drawer|"
-            r"predictive-search|cookie-banner|gdpr-banner|"
-            r"language-switcher|currency-switcher|"
-            r"facets?|facet-filters?|active-facets|"
-            r"sort-by|sorting|collection-sort|"
-            r"filter-drawer|filter-button|mobile-facets|"
-            r"skip-to-content|skip-to-results|skip-link)([-_]|$)",
+            r"cart-drawer|cart-notification|language-switcher|currency-switcher|"
+            r"facets?|facet-filters?|active-facets|sort-by|filter-drawer|"
+            r"cookie-banner|gdpr-banner|skip-to-content)([-_]|$)",
             _re.IGNORECASE,
         )
         for el in soup.find_all(True):
-            if el.parent is None:          # already removed by a parent decompose
+            if el.parent is None:
                 continue
-            el_id  = el.get("id", "") or ""
+            el_id = el.get("id", "") or ""
             el_cls = " ".join(el.get("class", []) or [])
             if CHROME_RE.search(el_id) or CHROME_RE.search(el_cls):
                 el.decompose()
@@ -260,18 +252,23 @@ def fetch_url_content():
 
 @translation_bp.route("/translations", methods=["GET"])
 def get_translations():
-    records = Translation.query.all()
+    rows = execute(
+        "SELECT ID, SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT FROM TRANSLATIONS",
+        fetch="all",
+    ) or []
     return jsonify([{
-        "id": item.id,
-        "source_text": item.source_text,
-        "target_language": item.target_language,
-        "translated_text": item.translated_text
-    } for item in records])
+        "id": r["ID"],
+        "source_text": r["SOURCE_TEXT"],
+        "target_language": r["TARGET_LANGUAGE"],
+        "translated_text": r["TRANSLATED_TEXT"],
+    } for r in rows])
+
 
 @translation_bp.route("/translations/manual", methods=["POST", "OPTIONS"])
 def create_manual_translation():
     if request.method == "OPTIONS":
         return "", 204
+
     data = request.json
     source_text = data.get("source_text")
     target_language = data.get("target_language")
@@ -280,19 +277,39 @@ def create_manual_translation():
     if not source_text or not target_language or not translated_text:
         return jsonify({"success": False, "message": "Missing fields"}), 400
 
-    existing = Translation.query.filter_by(source_text=source_text, target_language=target_language).first()
+    existing = execute(
+        "SELECT ID FROM TRANSLATIONS WHERE SOURCE_TEXT = %s AND TARGET_LANGUAGE = %s LIMIT 1",
+        (source_text, target_language),
+        fetch="one",
+    )
     if existing:
-        existing.translated_text = translated_text
-        db.session.commit()
-        return jsonify({"success": True, "id": existing.id})
+        execute(
+            "UPDATE TRANSLATIONS SET TRANSLATED_TEXT = %s WHERE ID = %s",
+            (translated_text, existing["ID"]),
+        )
+        execute(
+            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+            (f"Manual Translation Updated: {existing['ID']}",),
+        )
+        return jsonify({"success": True, "id": existing["ID"]})
 
-    new_t = Translation(source_text=source_text, target_language=target_language, translated_text=translated_text)
-    db.session.add(new_t)
-    db.session.commit()
-    db.session.add(AuditLog(action=f"Manual Translation Created: {new_t.id}"))
-    db.session.commit()
-    return jsonify({"success": True, "id": new_t.id})
-
+    execute(
+        "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+        "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+        (source_text, target_language, translated_text),
+    )
+    new_row = execute(
+        "SELECT ID FROM TRANSLATIONS WHERE SOURCE_TEXT = %s AND TARGET_LANGUAGE = %s "
+        "ORDER BY ID DESC LIMIT 1",
+        (source_text, target_language),
+        fetch="one",
+    )
+    new_id = new_row["ID"] if new_row else None
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        (f"Manual Translation Created: {new_id}",),
+    )
+    return jsonify({"success": True, "id": new_id})
 
 
 @translation_bp.route("/translations/<int:translation_id>", methods=["PUT", "OPTIONS"])
@@ -301,18 +318,24 @@ def update_translation(translation_id):
         return "", 204
 
     data = request.json
-    translation = Translation.query.get(translation_id)
-
-    if not translation:
+    row = execute(
+        "SELECT ID, TRANSLATED_TEXT FROM TRANSLATIONS WHERE ID = %s LIMIT 1",
+        (translation_id,),
+        fetch="one",
+    )
+    if not row:
         return jsonify({"success": False, "message": "Translation not found"}), 404
 
-    translation.translated_text = data.get("translated_text", translation.translated_text)
-    db.session.commit()
-
-    db.session.add(AuditLog(action=f"Translation Updated: {translation_id}"))
-    db.session.commit()
-
-    return jsonify({"success": True, "message": "Translation updated", "id": translation.id})
+    new_text = data.get("translated_text", row["TRANSLATED_TEXT"])
+    execute(
+        "UPDATE TRANSLATIONS SET TRANSLATED_TEXT = %s WHERE ID = %s",
+        (new_text, translation_id),
+    )
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        (f"Translation Updated: {translation_id}",),
+    )
+    return jsonify({"success": True, "message": "Translation updated", "id": translation_id})
 
 
 @translation_bp.route("/translations/<int:translation_id>", methods=["DELETE", "OPTIONS"])
@@ -320,15 +343,17 @@ def delete_translation(translation_id):
     if request.method == "OPTIONS":
         return "", 204
 
-    translation = Translation.query.get(translation_id)
-
-    if not translation:
+    row = execute(
+        "SELECT ID FROM TRANSLATIONS WHERE ID = %s LIMIT 1",
+        (translation_id,),
+        fetch="one",
+    )
+    if not row:
         return jsonify({"success": False, "message": "Translation not found"}), 404
 
-    db.session.delete(translation)
-    db.session.commit()
-
-    db.session.add(AuditLog(action=f"Translation Deleted: {translation_id}"))
-    db.session.commit()
-
+    execute("DELETE FROM TRANSLATIONS WHERE ID = %s", (translation_id,))
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        (f"Translation Deleted: {translation_id}",),
+    )
     return jsonify({"success": True, "message": "Translation deleted"})

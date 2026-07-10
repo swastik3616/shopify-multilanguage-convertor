@@ -1,6 +1,5 @@
 from flask import Blueprint, jsonify, request
-from database import db
-from model import PageContent, Translation, AuditLog
+from database import execute
 from utils.helpers import get_setting, get_default_provider_settings, get_shopify_credentials
 from utils.shopify_client import fetch_shopify_pages, fetch_shopify_products, fetch_shopify_collections, extract_text_from_html
 from utils.ai_provider import get_provider_response
@@ -11,12 +10,12 @@ import re
 
 content_bp = Blueprint("content_routes", __name__)
 
+
 def push_update_to_shopify(page, key, text):
     store_url, access_token = get_shopify_credentials()
     if not store_url or not access_token:
         return
     headers = {"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"}
-    
     try:
         if page == "product" and key.startswith("product_"):
             parts = key.split("_")
@@ -29,7 +28,7 @@ def push_update_to_shopify(page, key, text):
                 elif field == "desc":
                     payload["product"]["body_html"] = text
                 requests.put(f"https://{store_url}/admin/api/2026-04/products/{product_id}.json", headers=headers, json=payload, timeout=10)
-        
+
         elif page == "collection" and key.startswith("collection_"):
             parts = key.split("_")
             if len(parts) >= 3:
@@ -45,6 +44,40 @@ def push_update_to_shopify(page, key, text):
         print(f"Error updating Shopify: {e}")
 
 
+def _pc_exists(page, key):
+    """Check if a PageContent row exists."""
+    row = execute(
+        "SELECT ID FROM PAGE_CONTENTS WHERE PAGE = %s AND KEY = %s LIMIT 1",
+        (page, key),
+        fetch="one",
+    )
+    return row
+
+
+def _pc_upsert(page, key, source_text, html_tag=None, section_id=None, resource_id=None):
+    """Insert or update a PageContent row."""
+    existing = _pc_exists(page, key)
+    if existing:
+        execute(
+            "UPDATE PAGE_CONTENTS SET SOURCE_TEXT=%s, HTML_TAG=%s, SECTION_ID=%s, RESOURCE_ID=%s "
+            "WHERE ID=%s",
+            (source_text, html_tag, section_id, resource_id, existing["ID"]),
+        )
+        return existing["ID"]
+    else:
+        execute(
+            "INSERT INTO PAGE_CONTENTS (PAGE, KEY, SOURCE_TEXT, HTML_TAG, SECTION_ID, RESOURCE_ID) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (page, key, source_text, html_tag, section_id, resource_id),
+        )
+        new_row = execute(
+            "SELECT ID FROM PAGE_CONTENTS WHERE PAGE=%s AND KEY=%s LIMIT 1",
+            (page, key),
+            fetch="one",
+        )
+        return new_row["ID"] if new_row else None
+
+
 def seed_shopify_page_contents_legacy(page):
     """Fallback legacy sync using Shopify Admin API."""
     imported = 0
@@ -54,8 +87,8 @@ def seed_shopify_page_contents_legacy(page):
             for shopify_page in pages:
                 title = shopify_page.get("title", "")
                 body = extract_text_from_html(shopify_page.get("body_html", ""))
-                if title and not PageContent.query.filter_by(page="home", key=title).first():
-                    db.session.add(PageContent(page="home", key=title, source_text=body or title))
+                if title and not _pc_exists("home", title):
+                    _pc_upsert("home", title, body or title)
                     imported += 1
 
             products = fetch_shopify_products(3)
@@ -63,12 +96,12 @@ def seed_shopify_page_contents_legacy(page):
                 title = product.get("title", f"Product {idx+1}")
                 body = extract_text_from_html(product.get("body_html", ""))
                 key = f"featured_product_{idx+1}_title"
-                if not PageContent.query.filter_by(page="home", key=key).first():
-                    db.session.add(PageContent(page="home", key=key, source_text=title))
+                if not _pc_exists("home", key):
+                    _pc_upsert("home", key, title)
                     imported += 1
                 key = f"featured_product_{idx+1}_desc"
-                if body and not PageContent.query.filter_by(page="home", key=key).first():
-                    db.session.add(PageContent(page="home", key=key, source_text=body))
+                if body and not _pc_exists("home", key):
+                    _pc_upsert("home", key, body)
                     imported += 1
 
         elif page == "product":
@@ -77,13 +110,13 @@ def seed_shopify_page_contents_legacy(page):
                 title = product.get("title", "")
                 body = extract_text_from_html(product.get("body_html", ""))
                 key = f"product_{product.get('id', idx)}_title"
-                if title and not PageContent.query.filter_by(page="product", key=key).first():
-                    db.session.add(PageContent(page="product", key=key, source_text=title))
+                if title and not _pc_exists("product", key):
+                    _pc_upsert("product", key, title)
                     imported += 1
                 if body:
                     key = f"product_{product.get('id', idx)}_desc"
-                    if not PageContent.query.filter_by(page="product", key=key).first():
-                        db.session.add(PageContent(page="product", key=key, source_text=body))
+                    if not _pc_exists("product", key):
+                        _pc_upsert("product", key, body)
                         imported += 1
 
         elif page == "collection":
@@ -92,23 +125,20 @@ def seed_shopify_page_contents_legacy(page):
                 title = collection.get("title", "")
                 body = extract_text_from_html(collection.get("body_html", ""))
                 key = f"collection_{collection.get('id', idx)}_title"
-                if title and not PageContent.query.filter_by(page="collection", key=key).first():
-                    db.session.add(PageContent(page="collection", key=key, source_text=title))
+                if title and not _pc_exists("collection", key):
+                    _pc_upsert("collection", key, title)
                     imported += 1
                 if body:
                     key = f"collection_{collection.get('id', idx)}_desc"
-                    if not PageContent.query.filter_by(page="collection", key=key).first():
-                        db.session.add(PageContent(page="collection", key=key, source_text=body))
+                    if not _pc_exists("collection", key):
+                        _pc_upsert("collection", key, body)
                         imported += 1
 
-        if imported:
-            db.session.commit()
-            print(f"Seeded {imported} {page} content item(s) from Shopify store")
-
+        print(f"Seeded {imported} {page} content item(s) from Shopify store")
     except Exception as e:
         print(f"Error seeding {page} content from Shopify: {str(e)}")
-
     return imported
+
 
 def seed_shopify_page_contents(page):
     """Scrape live storefront HTML to extract real sections and tags."""
@@ -118,9 +148,8 @@ def seed_shopify_page_contents(page):
 
     imported = 0
     headers = {"User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"}
-    
     urls_to_scrape = []
-    
+
     if page == "home":
         urls_to_scrape.append((f"https://{store_url}/", None))
     elif page == "product":
@@ -159,45 +188,24 @@ def seed_shopify_page_contents(page):
 
         for section_idx, section in enumerate(sections):
             section_id = section.get("id")
-            
             for elem_idx, element in enumerate(section.find_all(target_tags)):
                 text = element.get_text(separator=" ", strip=True)
                 if not text or len(text) < 2:
                     continue
-                
                 html_tag = element.name.lower()
-                
-                # Resolve product ID if this block is a product card
                 item_resource_id = page_resource_id
                 if not item_resource_id:
                     prod_div = element.find_parent(attrs={"data-product-id": True})
                     if prod_div:
                         try:
                             item_resource_id = int(prod_div["data-product-id"])
-                        except:
+                        except Exception:
                             pass
-                
                 key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"
-                
-                existing = PageContent.query.filter_by(page=page, key=key).first()
-                if existing:
-                    existing.source_text = text
-                    existing.html_tag = html_tag
-                    existing.section_id = section_id
-                    existing.resource_id = item_resource_id
-                else:
-                    db.session.add(PageContent(
-                        page=page,
-                        key=key,
-                        source_text=text,
-                        html_tag=html_tag,
-                        section_id=section_id,
-                        resource_id=item_resource_id
-                    ))
+                _pc_upsert(page, key, text, html_tag, section_id, item_resource_id)
                 imported += 1
 
     if imported > 0:
-        db.session.commit()
         print(f"Scraped {imported} {page} content item(s) from live storefront")
     else:
         print(f"Scraping returned 0 items for {page}. Falling back to legacy API sync.")
@@ -211,10 +219,7 @@ def get_contents_store_status():
     if request.method == "OPTIONS":
         return "", 204
     store_url, access_token = get_shopify_credentials()
-    return jsonify({
-        "connected": bool(store_url and access_token),
-        "store_url": store_url or None,
-    })
+    return jsonify({"connected": bool(store_url and access_token), "store_url": store_url or None})
 
 
 @content_bp.route("/contents/fetch-and-parse", methods=["POST", "OPTIONS"])
@@ -240,56 +245,33 @@ def fetch_and_parse_url():
 
     soup = BeautifulSoup(html, "html.parser")
     target_tags = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "button", "a", "span", "label"]
-    
     imported = 0
+
     title_tag = soup.find("title")
     if title_tag and title_tag.text:
         text = title_tag.get_text(strip=True)
         if text:
-            existing = PageContent.query.filter_by(page=page, key="meta_title").first()
-            if existing:
-                existing.source_text = text
-            else:
-                db.session.add(PageContent(page=page, key="meta_title", source_text=text, html_tag="title", section_id="META"))
+            _pc_upsert(page, "meta_title", text, "title", "META")
             imported += 1
 
     sections = soup.find_all("div", id=re.compile(r"^shopify-section-"))
     if not sections:
         body = soup.find("body")
-        if body:
-            sections = [body]
-        else:
-            sections = [soup]
-    
+        sections = [body] if body else [soup]
+
     for section_idx, section in enumerate(sections):
         if not section:
             continue
         section_id = section.get("id") or "main_body"
-        
         for elem_idx, element in enumerate(section.find_all(target_tags)):
             text = element.get_text(separator=" ", strip=True)
             if not text or len(text) < 2:
                 continue
-            
             html_tag = element.name.lower()
             key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"
-            
-            existing = PageContent.query.filter_by(page=page, key=key).first()
-            if existing:
-                existing.source_text = text
-                existing.html_tag = html_tag
-                existing.section_id = section_id
-            else:
-                db.session.add(PageContent(
-                    page=page,
-                    key=key,
-                    source_text=text,
-                    html_tag=html_tag,
-                    section_id=section_id
-                ))
+            _pc_upsert(page, key, text, html_tag, section_id)
             imported += 1
 
-    db.session.commit()
     return jsonify({"success": True, "message": f"Extracted and saved {imported} elements.", "imported": imported})
 
 
@@ -303,21 +285,16 @@ def sync_contents():
 
     store_url, access_token = get_shopify_credentials()
     if not store_url or not access_token:
-        return jsonify({
-            "success": False,
-            "message": "No Shopify store connected. Add your store URL and access token in Store Settings.",
-            "imported": 0,
-        }), 400
+        return jsonify({"success": False, "message": "No Shopify store connected.", "imported": 0}), 400
 
     if page not in ["home", "product", "collection"]:
-        return jsonify({
-            "success": False,
-            "message": f"The '{page}' page is not synced from Shopify.",
-            "imported": 0,
-        }), 400
+        return jsonify({"success": False, "message": f"The '{page}' page is not synced from Shopify.", "imported": 0}), 400
 
     imported = seed_shopify_page_contents(page)
-    total = PageContent.query.filter_by(page=page).count()
+    total_row = execute(
+        "SELECT COUNT(*) AS CNT FROM PAGE_CONTENTS WHERE PAGE = %s", (page,), fetch="one"
+    )
+    total = total_row["CNT"] if total_row else 0
 
     return jsonify({
         "success": True,
@@ -335,19 +312,24 @@ def get_contents():
     if page:
         if page in ["home", "product", "collection"]:
             seed_shopify_page_contents(page)
-        records = PageContent.query.filter_by(page=page).order_by(PageContent.key).all()
+        rows = execute(
+            "SELECT ID, PAGE, KEY, SOURCE_TEXT, HTML_TAG, SECTION_ID, RESOURCE_ID "
+            "FROM PAGE_CONTENTS WHERE PAGE = %s ORDER BY KEY",
+            (page,),
+            fetch="all",
+        ) or []
     else:
-        records = PageContent.query.order_by(PageContent.page, PageContent.key).all()
+        rows = execute(
+            "SELECT ID, PAGE, KEY, SOURCE_TEXT, HTML_TAG, SECTION_ID, RESOURCE_ID "
+            "FROM PAGE_CONTENTS ORDER BY PAGE, KEY",
+            fetch="all",
+        ) or []
 
     return jsonify([{
-        "id": item.id,
-        "page": item.page,
-        "key": item.key,
-        "source_text": item.source_text,
-        "html_tag": getattr(item, 'html_tag', None),
-        "section_id": getattr(item, 'section_id', None),
-        "resource_id": getattr(item, 'resource_id', None)
-    } for item in records])
+        "id": r["ID"], "page": r["PAGE"], "key": r["KEY"],
+        "source_text": r["SOURCE_TEXT"], "html_tag": r["HTML_TAG"],
+        "section_id": r["SECTION_ID"], "resource_id": r["RESOURCE_ID"],
+    } for r in rows])
 
 
 @content_bp.route("/contents", methods=["POST", "OPTIONS"])
@@ -363,17 +345,11 @@ def create_content():
     if not page or not key or not source_text:
         return jsonify({"success": False, "message": "page, key, and source_text are required"}), 400
 
-    if PageContent.query.filter_by(page=page, key=key).first():
+    if _pc_exists(page, key):
         return jsonify({"success": False, "message": "Content item already exists for this page and key"}), 400
 
-    content = PageContent(page=page, key=key, source_text=source_text)
-    db.session.add(content)
-    db.session.commit()
-
-    return jsonify({"success": True, "content": {
-        "id": content.id, "page": content.page,
-        "key": content.key, "source_text": content.source_text
-    }})
+    new_id = _pc_upsert(page, key, source_text)
+    return jsonify({"success": True, "content": {"id": new_id, "page": page, "key": key, "source_text": source_text}})
 
 
 @content_bp.route("/contents/import", methods=["POST", "OPTIONS"])
@@ -392,43 +368,50 @@ def import_content():
     if not key or not source_text:
         return jsonify({"success": False, "message": "key and source_text are required"}), 400
 
-    existing = PageContent.query.filter_by(page=page, key=key).first()
+    existing = _pc_exists(page, key)
     if existing:
-        existing.source_text = source_text
-        content = existing
+        execute(
+            "UPDATE PAGE_CONTENTS SET SOURCE_TEXT=%s WHERE ID=%s",
+            (source_text, existing["ID"]),
+        )
+        content_id = existing["ID"]
         updated = True
     else:
-        content = PageContent(page=page, key=key, source_text=source_text)
-        db.session.add(content)
+        content_id = _pc_upsert(page, key, source_text)
         updated = False
 
     translation_saved = False
     if target_language and translated_text:
-        existing_t = Translation.query.filter_by(
-            source_text=content.source_text,
-            target_language=target_language
-        ).first()
-        if existing_t:
-            existing_t.translated_text = translated_text
+        t_existing = execute(
+            "SELECT ID FROM TRANSLATIONS WHERE SOURCE_TEXT=%s AND TARGET_LANGUAGE=%s LIMIT 1",
+            (source_text, target_language),
+            fetch="one",
+        )
+        if t_existing:
+            execute(
+                "UPDATE TRANSLATIONS SET TRANSLATED_TEXT=%s WHERE ID=%s",
+                (translated_text, t_existing["ID"]),
+            )
         else:
-            db.session.add(Translation(
-                source_text=content.source_text,
-                target_language=target_language,
-                translated_text=translated_text
-            ))
+            execute(
+                "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+                (source_text, target_language, translated_text),
+            )
         translation_saved = True
 
-    db.session.commit()
     audit_action = f"Content Imported: {page}/{key}"
     if source_url:
         audit_action += f" from {source_url}"
-    db.session.add(AuditLog(action=audit_action))
-    db.session.commit()
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        (audit_action,),
+    )
 
     return jsonify({
         "success": True, "updated": updated, "translation_saved": translation_saved,
         "message": f"Content {'updated' if updated else 'saved'} to Translations library.",
-        "content": {"id": content.id, "page": content.page, "key": content.key, "source_text": content.source_text}
+        "content": {"id": content_id, "page": page, "key": key, "source_text": source_text},
     })
 
 
@@ -438,41 +421,44 @@ def update_content(content_id):
         return "", 204
 
     data = request.json
-    content = PageContent.query.get(content_id)
-    if not content:
+    row = execute(
+        "SELECT ID, PAGE, KEY, SOURCE_TEXT FROM PAGE_CONTENTS WHERE ID=%s LIMIT 1",
+        (content_id,), fetch="one",
+    )
+    if not row:
         return jsonify({"success": False, "message": "Content item not found"}), 404
 
-    page = data.get("page", content.page).strip()
-    key = data.get("key", content.key).strip()
-    source_text = data.get("source_text", content.source_text).strip()
+    page = data.get("page", row["PAGE"]).strip()
+    key = data.get("key", row["KEY"]).strip()
+    source_text = data.get("source_text", row["SOURCE_TEXT"]).strip()
 
     if not page or not key or not source_text:
         return jsonify({"success": False, "message": "page, key, and source_text are required"}), 400
 
-    if PageContent.query.filter(PageContent.page == page, PageContent.key == key, PageContent.id != content_id).first():
+    conflict = execute(
+        "SELECT ID FROM PAGE_CONTENTS WHERE PAGE=%s AND KEY=%s AND ID != %s LIMIT 1",
+        (page, key, content_id), fetch="one",
+    )
+    if conflict:
         return jsonify({"success": False, "message": "Another content item already uses this page and key"}), 400
 
-    content.page = page
-    content.key = key
-    content.source_text = source_text
-    db.session.commit()
-
-    # Push to Shopify so it shows on the website
+    execute(
+        "UPDATE PAGE_CONTENTS SET PAGE=%s, KEY=%s, SOURCE_TEXT=%s WHERE ID=%s",
+        (page, key, source_text, content_id),
+    )
     push_update_to_shopify(page, key, source_text)
 
-    return jsonify({"success": True, "content": {
-        "id": content.id, "page": content.page,
-        "key": content.key, "source_text": content.source_text
-    }})
+    return jsonify({"success": True, "content": {"id": content_id, "page": page, "key": key, "source_text": source_text}})
 
 
 @content_bp.route("/contents/<int:content_id>", methods=["DELETE"])
 def delete_content(content_id):
-    content = PageContent.query.get(content_id)
-    if not content:
+    row = execute(
+        "SELECT ID FROM PAGE_CONTENTS WHERE ID=%s LIMIT 1", (content_id,), fetch="one"
+    )
+    if not row:
         return jsonify({"success": False, "message": "Content item not found"}), 404
-    db.session.delete(content)
-    db.session.commit()
+    execute("DELETE FROM PAGE_CONTENTS WHERE ID=%s", (content_id,))
     return jsonify({"success": True, "message": "Content item deleted"})
 
 
@@ -486,18 +472,19 @@ def translate_content(content_id):
     if not target_language:
         return jsonify({"success": False, "message": "Missing target language"}), 400
 
-    content = PageContent.query.get(content_id)
-    if not content:
+    row = execute(
+        "SELECT ID, SOURCE_TEXT FROM PAGE_CONTENTS WHERE ID=%s LIMIT 1",
+        (content_id,), fetch="one",
+    )
+    if not row:
         return jsonify({"success": False, "message": "Content item not found"}), 404
 
-    # ── Check if content should be skipped (email, number, URL) ────────────
-    if TranslationFilter.should_skip(content.source_text):
-        print(f"[translate_content] Skipping non-translatable content: {content.source_text}")
+    source_text = row["SOURCE_TEXT"]
+
+    if TranslationFilter.should_skip(source_text):
         return jsonify({
-            "success": True,
-            "translated_text": content.source_text,
-            "skipped": True,
-            "message": "Content excluded from translation (email, number, or URL)"
+            "success": True, "translated_text": source_text, "skipped": True,
+            "message": "Content excluded from translation (email, number, or URL)",
         })
 
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
@@ -506,15 +493,13 @@ def translate_content(content_id):
     api_key = provider_settings["api_keys"].get(provider, "")
 
     try:
-        translated_text = get_provider_response(provider, model, api_key, content.source_text, target_language)
+        translated_text = get_provider_response(provider, model, api_key, source_text, target_language)
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-    db.session.add(Translation(
-        source_text=content.source_text,
-        target_language=target_language,
-        translated_text=translated_text
-    ))
-    db.session.commit()
-
+    execute(
+        "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+        "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+        (source_text, target_language, translated_text),
+    )
     return jsonify({"success": True, "translated_text": translated_text})

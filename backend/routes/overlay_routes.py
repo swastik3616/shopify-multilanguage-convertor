@@ -1,22 +1,19 @@
 from flask import Blueprint, jsonify, request
 from urllib.parse import urlparse
-from database import db
-from model import OverlayEdit
+from database import execute
 
 overlay_bp = Blueprint("overlay_routes", __name__)
+
 
 def _candidate_urls(raw_url):
     variants = set()
     if not raw_url:
         return variants
-
     raw_url = raw_url.strip()
     variants.add(raw_url)
-
     parsed = urlparse(raw_url)
     if not parsed.scheme or not parsed.netloc:
         return variants
-
     base = f"{parsed.scheme}://{parsed.netloc}"
     path = parsed.path or "/"
     variants.add(base + path)
@@ -53,35 +50,32 @@ def save_overlay_edits():
 
         if not orig_text or not new_text:
             continue
-        filter_kwargs = {
-            "url": url,
-            "original_text": orig_text,
-            "is_translation": is_trans,
-            "target_language": target_lang,
-        }
 
-        existing = OverlayEdit.query.filter_by(**filter_kwargs).first()
+        existing = execute(
+            "SELECT ID FROM OVERLAY_EDITS "
+            "WHERE URL = %s AND ORIGINAL_TEXT = %s AND IS_TRANSLATION = %s AND TARGET_LANGUAGE IS NOT DISTINCT FROM %s "
+            "LIMIT 1",
+            (url, orig_text, is_trans, target_lang),
+            fetch="one",
+        )
 
         if existing:
-            existing.new_text = new_text
-            existing.selector = selector
-            existing.element_tag = element_tag
-            existing.field_name = field_name
+            execute(
+                "UPDATE OVERLAY_EDITS SET NEW_TEXT=%s, SELECTOR=%s, ELEMENT_TAG=%s, FIELD_NAME=%s "
+                "WHERE ID=%s",
+                (new_text, selector, element_tag, field_name, existing["ID"]),
+            )
         else:
-            db.session.add(OverlayEdit(
-                url=url,
-                original_text=orig_text,
-                new_text=new_text,
-                is_translation=is_trans,
-                target_language=target_lang,
-                selector=selector,
-                element_tag=element_tag,
-                field_name=field_name,
-            ))
+            execute(
+                "INSERT INTO OVERLAY_EDITS "
+                "(URL, ORIGINAL_TEXT, NEW_TEXT, IS_TRANSLATION, TARGET_LANGUAGE, SELECTOR, ELEMENT_TAG, FIELD_NAME) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (url, orig_text, new_text, is_trans, target_lang, selector, element_tag, field_name),
+            )
         saved_count += 1
 
-    db.session.commit()
     return jsonify({"success": True, "message": f"Saved {saved_count} overlay edits."})
+
 
 @overlay_bp.route("/overlay/replacements", methods=["GET", "OPTIONS"])
 def get_replacements():
@@ -96,103 +90,98 @@ def get_replacements():
 
     candidate_urls = list(_candidate_urls(url))
     replacements = []
-    base_edits = (
-        OverlayEdit.query
-        .filter(OverlayEdit.url.in_(candidate_urls), OverlayEdit.is_translation.is_(False))
-        .order_by(OverlayEdit.id.asc())
-        .all()
-    )
-    for edit in base_edits:
+
+    placeholders = ", ".join(["%s"] * len(candidate_urls))
+    base_rows = execute(
+        f"SELECT ORIGINAL_TEXT, NEW_TEXT, SELECTOR, ELEMENT_TAG, FIELD_NAME "
+        f"FROM OVERLAY_EDITS WHERE URL IN ({placeholders}) AND IS_TRANSLATION = FALSE "
+        f"ORDER BY ID ASC",
+        tuple(candidate_urls),
+        fetch="all",
+    ) or []
+
+    for r in base_rows:
         replacements.append({
-            "original_text": edit.original_text,
-            "new_text": edit.new_text,
-            "selector": edit.selector,
-            "element_tag": edit.element_tag,
-            "field_name": edit.field_name,
+            "original_text": r["ORIGINAL_TEXT"],
+            "new_text": r["NEW_TEXT"],
+            "selector": r["SELECTOR"],
+            "element_tag": r["ELEMENT_TAG"],
+            "field_name": r["FIELD_NAME"],
             "is_translation": False,
             "target_language": None,
         })
 
     if target_lang:
-        trans_edits = (
-            OverlayEdit.query
-            .filter_by(url=url, is_translation=True, target_language=target_lang)
-            .order_by(OverlayEdit.id.asc())
-            .all()
-        )
-        for edit in trans_edits:
+        trans_rows = execute(
+            "SELECT ORIGINAL_TEXT, NEW_TEXT, SELECTOR, ELEMENT_TAG, FIELD_NAME, TARGET_LANGUAGE "
+            "FROM OVERLAY_EDITS WHERE URL = %s AND IS_TRANSLATION = TRUE AND TARGET_LANGUAGE = %s "
+            "ORDER BY ID ASC",
+            (url, target_lang),
+            fetch="all",
+        ) or []
+        for r in trans_rows:
             replacements.append({
-                "original_text": edit.original_text,
-                "new_text": edit.new_text,
-                "selector": edit.selector,
-                "element_tag": edit.element_tag,
-                "field_name": edit.field_name,
+                "original_text": r["ORIGINAL_TEXT"],
+                "new_text": r["NEW_TEXT"],
+                "selector": r["SELECTOR"],
+                "element_tag": r["ELEMENT_TAG"],
+                "field_name": r["FIELD_NAME"],
                 "is_translation": True,
-                "target_language": edit.target_language,
+                "target_language": r["TARGET_LANGUAGE"],
             })
 
     return jsonify({"replacements": replacements})
 
+
 @overlay_bp.route("/overlay/cleanup-bad-edits", methods=["POST", "DELETE"])
 def cleanup_bad_edits():
     try:
-        # Get stats before
-        total_before = OverlayEdit.query.count()
-        with_selector = OverlayEdit.query.filter(OverlayEdit.selector.isnot(None)).count()
-        without_selector = OverlayEdit.query.filter(OverlayEdit.selector.is_(None)).count()
+        total_before = execute("SELECT COUNT(*) AS CNT FROM OVERLAY_EDITS", fetch="one")["CNT"]
+        without_selector = execute(
+            "SELECT COUNT(*) AS CNT FROM OVERLAY_EDITS WHERE SELECTOR IS NULL", fetch="one"
+        )["CNT"]
+        with_selector = total_before - without_selector
 
-        # Delete bad edits
-        deleted_count = OverlayEdit.query.filter(OverlayEdit.selector.is_(None)).delete()
-        db.session.commit()
-
-        # Get stats after
-        total_after = OverlayEdit.query.count()
+        execute("DELETE FROM OVERLAY_EDITS WHERE SELECTOR IS NULL")
+        total_after = execute("SELECT COUNT(*) AS CNT FROM OVERLAY_EDITS", fetch="one")["CNT"]
 
         return jsonify({
             "success": True,
-            "message": f"Cleaned up {deleted_count} bad edits without selectors",
+            "message": f"Cleaned up {without_selector} bad edits without selectors",
             "stats": {
-                "before": {
-                    "total": total_before,
-                    "with_selector": with_selector,
-                    "without_selector": without_selector
-                },
-                "after": {
-                    "total": total_after,
-                    "deleted": deleted_count
-                }
-            }
+                "before": {"total": total_before, "with_selector": with_selector, "without_selector": without_selector},
+                "after": {"total": total_after, "deleted": without_selector},
+            },
         })
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @overlay_bp.route("/overlay/dedupe", methods=["POST"])
 def dedupe_overlay_edits():
     try:
-        all_edits = OverlayEdit.query.order_by(OverlayEdit.id.asc()).all()
+        all_rows = execute(
+            "SELECT ID, URL, ORIGINAL_TEXT, IS_TRANSLATION, TARGET_LANGUAGE "
+            "FROM OVERLAY_EDITS ORDER BY ID ASC",
+            fetch="all",
+        ) or []
 
         groups = {}
-        for edit in all_edits:
-            key = (edit.url, edit.original_text, edit.is_translation, edit.target_language)
-            groups.setdefault(key, []).append(edit)
+        for row in all_rows:
+            key = (row["URL"], row["ORIGINAL_TEXT"], row["IS_TRANSLATION"], row["TARGET_LANGUAGE"])
+            groups.setdefault(key, []).append(row["ID"])
 
         deleted_count = 0
         kept_count = 0
-        for key, rows in groups.items():
-            if len(rows) <= 1:
-                kept_count += len(rows)
+        for key, ids in groups.items():
+            if len(ids) <= 1:
+                kept_count += len(ids)
                 continue
-            *stale, latest = rows
-            for row in stale:
-                db.session.delete(row)
+            *stale_ids, _ = ids
+            for stale_id in stale_ids:
+                execute("DELETE FROM OVERLAY_EDITS WHERE ID = %s", (stale_id,))
                 deleted_count += 1
             kept_count += 1
-
-        db.session.commit()
 
         return jsonify({
             "success": True,
@@ -201,30 +190,20 @@ def dedupe_overlay_edits():
                 "groups_found": len(groups),
                 "duplicates_removed": deleted_count,
                 "rows_kept": kept_count,
-            }
+            },
         })
     except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 @overlay_bp.route("/overlay/clear-all", methods=["POST", "DELETE", "GET"])
 def clear_all_overlay_edits():
-    """
-    ADMIN ONLY: Completely wipe the OverlayEdit database table to start fresh.
-    """
     try:
-        deleted_count = OverlayEdit.query.delete()
-        db.session.commit()
+        deleted_count = execute("SELECT COUNT(*) AS CNT FROM OVERLAY_EDITS", fetch="one")["CNT"]
+        execute("DELETE FROM OVERLAY_EDITS")
         return jsonify({
             "success": True,
-            "message": f"Successfully deleted all {deleted_count} saved overlay edits/translations from the database."
+            "message": f"Successfully deleted all {deleted_count} saved overlay edits/translations from the database.",
         })
     except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500

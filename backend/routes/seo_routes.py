@@ -1,7 +1,6 @@
 import requests
 from flask import Blueprint, jsonify, request
-from database import db
-from model import AuditLog, PageContent
+from database import execute
 from utils.helpers import get_setting, get_default_provider_settings, get_shopify_credentials
 from utils.ai_provider import get_provider_response
 
@@ -37,10 +36,7 @@ def get_seo_resources():
     }
     """ % graphql_type
 
-    headers = {
-        "X-Shopify-Access-Token": access_token,
-        "Content-Type": "application/json"
-    }
+    headers = {"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"}
     url = f"https://{store_url}/admin/api/2026-04/graphql.json"
 
     try:
@@ -76,7 +72,7 @@ def get_seo_resources():
                 "originalMetaTitle": meta_title,
                 "titleDigest": meta_title_digest,
                 "originalMetaDescription": meta_desc,
-                "descriptionDigest": meta_desc_digest
+                "descriptionDigest": meta_desc_digest,
             })
 
         return jsonify({"success": True, "resources": resources})
@@ -84,7 +80,7 @@ def get_seo_resources():
     except requests.exceptions.RequestException as e:
         status_code = e.response.status_code if e.response else 500
         if status_code == 401:
-            return jsonify({"success": False, "message": "Shopify authentication failed. Access token may be invalid."}), 401
+            return jsonify({"success": False, "message": "Shopify authentication failed."}), 401
         return jsonify({"success": False, "message": str(e)}), status_code
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -145,20 +141,26 @@ def update_original_seo():
         if user_errors:
             return jsonify({"success": False, "message": user_errors[0].get("message", "Update failed")}), 400
 
-        # Also store in the database
+        # Store in Snowflake
         db_key = f"seo_{resource_id.split('/')[-1]}"
         db_source_text = f"Title: {meta_title}\nDescription: {meta_desc}"
-        existing = PageContent.query.filter_by(page="seo", key=db_key).first()
+        existing = execute(
+            "SELECT ID FROM PAGE_CONTENTS WHERE PAGE='seo' AND KEY=%s LIMIT 1",
+            (db_key,), fetch="one",
+        )
         if existing:
-            existing.source_text = db_source_text
+            execute("UPDATE PAGE_CONTENTS SET SOURCE_TEXT=%s WHERE ID=%s", (db_source_text, existing["ID"]))
         else:
-            new_content = PageContent(page="seo", key=db_key, source_text=db_source_text)
-            db.session.add(new_content)
-        
-        db.session.add(AuditLog(action=f"Updated SEO for {db_key}"))
-        db.session.commit()
-
+            execute(
+                "INSERT INTO PAGE_CONTENTS (PAGE, KEY, SOURCE_TEXT) VALUES ('seo', %s, %s)",
+                (db_key, db_source_text),
+            )
+        execute(
+            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+            (f"Updated SEO for {db_key}",),
+        )
         return jsonify({"success": True})
+
     except requests.exceptions.RequestException as e:
         status_code = e.response.status_code if e.response else 500
         if status_code == 401:
@@ -213,7 +215,7 @@ def translate_seo():
         res.raise_for_status()
         data = res.json()
         user_errors = ((data.get("data") or {}).get("translationsRegister") or {}).get("userErrors", [])
-        
+
         if user_errors:
             error_msg = ", ".join([e["message"] for e in user_errors])
             if "not a valid locale" in error_msg.lower() or "not enabled" in error_msg.lower():
@@ -227,22 +229,26 @@ def translate_seo():
                 enable_res = requests.post(url, headers=headers, json={"query": enable_mutation, "variables": {"locale": locale}})
                 enable_data = enable_res.json()
                 enable_errors = ((enable_data.get("data") or {}).get("shopLocaleEnable") or {}).get("userErrors", [])
-                
+
                 if not enable_errors:
                     retry_res = requests.post(url, headers=headers, json={"query": mutation, "variables": variables})
                     retry_data = retry_res.json()
                     retry_user_errors = ((retry_data.get("data") or {}).get("translationsRegister") or {}).get("userErrors", [])
                     if not retry_user_errors:
-                        db.session.add(AuditLog(action=f"SEO Translated {resource_id.split('/')[-1]} to {locale}"))
-                        db.session.commit()
+                        execute(
+                            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+                            (f"SEO Translated {resource_id.split('/')[-1]} to {locale}",),
+                        )
                         return jsonify({"success": True, "message": f"Translations registered (Auto-enabled {locale} locale)"})
                     else:
                         error_msg = ", ".join([e["message"] for e in retry_user_errors])
 
             return jsonify({"success": False, "message": f"GraphQL Error: {error_msg}"}), 400
 
-        db.session.add(AuditLog(action=f"SEO Translated {resource_id.split('/')[-1]} to {locale}"))
-        db.session.commit()
+        execute(
+            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+            (f"SEO Translated {resource_id.split('/')[-1]} to {locale}",),
+        )
         return jsonify({"success": True, "message": "Translations registered"})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500

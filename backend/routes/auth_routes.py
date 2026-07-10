@@ -1,11 +1,17 @@
 import os
 import requests
 from flask import Blueprint, jsonify, request, redirect
-from database import db
-from model import ShopifyStore
-from utils.helpers import get_shop_from_request, get_current_store, normalize_shopify_store_url, get_shopify_credentials, _mask_token
+from database import execute
+from utils.helpers import (
+    get_shop_from_request,
+    get_current_store,
+    normalize_shopify_store_url,
+    get_shopify_credentials,
+    _mask_token,
+)
 
 auth_bp = Blueprint("auth_routes", __name__)
+
 
 @auth_bp.route("/shopify/check-token", methods=["GET"])
 def shopify_check_token():
@@ -16,7 +22,6 @@ def shopify_check_token():
     try:
         headers = {"X-Shopify-Access-Token": access_token}
         res = requests.get(f"https://{store_url}/admin/api/2026-04/shop.json", headers=headers, timeout=10)
-        body = None
         try:
             body = res.json()
         except Exception:
@@ -27,7 +32,7 @@ def shopify_check_token():
             "status_code": res.status_code,
             "response": body,
             "store_url": store_url,
-            "masked_token": _mask_token(access_token)
+            "masked_token": _mask_token(access_token),
         }), (200 if res.ok else 401)
     except Exception as e:
         print("Shopify check-token error:", str(e))
@@ -41,8 +46,8 @@ def shopify_test():
     if not store:
         return jsonify({"success": False, "message": "No Shopify store connected for this shop"}), 404
 
-    headers = {"X-Shopify-Access-Token": store.access_token}
-    response = requests.get(f"https://{store.shop}/admin/api/2026-04/shop.json", headers=headers)
+    headers = {"X-Shopify-Access-Token": store["ACCESS_TOKEN"]}
+    response = requests.get(f"https://{store['SHOP']}/admin/api/2026-04/shop.json", headers=headers)
     return jsonify(response.json())
 
 
@@ -68,29 +73,32 @@ def auth_callback():
         json={
             "client_id": os.getenv("SHOPIFY_CLIENT_ID"),
             "client_secret": os.getenv("SHOPIFY_CLIENT_SECRET"),
-            "code": code
-        }
+            "code": code,
+        },
     )
 
     token_data = response.json()
-    store = ShopifyStore.query.filter_by(
-        shop=normalize_shopify_store_url(shop)
-    ).first()
-
     atok = token_data.get("access_token", "")
     if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
         atok = atok[1:-1]
     if isinstance(atok, str) and atok.lower().startswith("bearer "):
         atok = atok.split(None, 1)[1]
 
-    if not store:
-        store = ShopifyStore(
-            shop=normalize_shopify_store_url(shop),
-            access_token=atok
+    shop_normalized = normalize_shopify_store_url(shop)
+    existing = execute(
+        "SELECT ID FROM SHOPIFY_STORES WHERE SHOP = %s LIMIT 1",
+        (shop_normalized,),
+        fetch="one",
+    )
+    if existing:
+        execute(
+            "UPDATE SHOPIFY_STORES SET ACCESS_TOKEN = %s WHERE SHOP = %s",
+            (atok, shop_normalized),
         )
-        db.session.add(store)
     else:
-        store.access_token = atok
+        execute(
+            "INSERT INTO SHOPIFY_STORES (SHOP, ACCESS_TOKEN) VALUES (%s, %s)",
+            (shop_normalized, atok),
+        )
 
-    db.session.commit()
     return "Installation successful! You can now close this tab and return to the app."
