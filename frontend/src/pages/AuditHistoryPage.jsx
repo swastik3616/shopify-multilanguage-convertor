@@ -39,6 +39,7 @@ function AuditHistoryPage() {
             onChange={(e) => setTimeFilter(e.target.value)}
           >
             <option value="">All Time</option>
+            <option value="3">Last 3 Days</option>
             <option value="7">Last 7 Days</option>
             <option value="15">Last 15 Days</option>
             <option value="30">Last 1 Month</option>
