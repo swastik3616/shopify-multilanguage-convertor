@@ -5,4 +5,3 @@ python-dotenv
 gunicorn
 beautifulsoup4
 langdetect
-snowflake-connector-python

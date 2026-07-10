@@ -1,13 +1,3 @@
-"""
-model.py  –  Plain-Python model classes backed by Snowflake.
-
-Each class exposes:
-  • Class.query  –  a QueryProxy that supports .all(), .first(),
-                    .filter_by(), .filter(), .count(),
-                    .order_by(), .limit(), .get()
-  • instance._save()   – INSERT or UPDATE
-  • instance._delete() – DELETE
-"""
 from datetime import datetime
 from database import execute
 
@@ -32,7 +22,6 @@ def _row_to(cls, row):
 # ── QueryProxy ────────────────────────────────────────────────────────────────
 
 class QueryProxy:
-    """Fluent query builder — thin Snowflake wrapper matching SQLAlchemy's API."""
 
     def __init__(self, cls):
         self._cls    = cls
@@ -53,7 +42,6 @@ class QueryProxy:
         return qp
 
     def filter(self, *exprs):
-        """Accept raw SnowflakeExpr objects produced by model attribute magic."""
         qp = self._clone()
         for expr in exprs:
             qp._wheres.append((expr.sql, expr.val))
