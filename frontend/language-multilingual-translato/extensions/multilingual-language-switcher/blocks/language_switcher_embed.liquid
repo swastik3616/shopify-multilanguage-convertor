@@ -62,20 +62,15 @@
   const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
 
-  const ALL_LANGUAGES = [
-    { lang: 'English',    flag: '🇺🇸' },
-    { lang: 'French',     flag: '🇫🇷' },
-    { lang: 'German',     flag: '🇩🇪' },
-    { lang: 'Spanish',    flag: '🇪🇸' },
-    { lang: 'Hindi',      flag: '🇮🇳' },
-    { lang: 'Arabic',     flag: '🇸🇦' },
-    { lang: 'Japanese',   flag: '🇯🇵' },
-    { lang: 'Portuguese', flag: '🇧🇷' },
-    { lang: 'Marathi',    flag: '🇮🇳' },
-    { lang: 'Italian',    flag: '🇮🇹' },
-    { lang: 'Chinese',    flag: '🇨🇳' },
-    { lang: 'Korean',     flag: '🇰🇷' }
-  ];
+  // Helper to get a flag emoji for common languages, or fallback to the code
+  function getBadge(code) {
+    const map = {
+      'en': '🇺🇸', 'fr': '🇫🇷', 'de': '🇩🇪', 'es': '🇪🇸', 'hi': '🇮🇳',
+      'ar': '🇸🇦', 'ja': '🇯🇵', 'pt': '🇧🇷', 'mr': '🇮🇳', 'it': '🇮🇹',
+      'zh': '🇨🇳', 'ko': '🇰🇷'
+    };
+    return map[code.toLowerCase()] || code.toUpperCase();
+  }
 
   const btn      = document.getElementById('lsw-embed-btn');
   const dropdown = document.getElementById('lsw-embed-dropdown');
@@ -86,18 +81,26 @@
   const optCont  = document.getElementById('lsw-embed-options');
 
   let sourceLanguage = 'English';
-  let activeLanguages = ALL_LANGUAGES;
+  let activeLanguages = [];
 
   try {
-    const res = await fetch(`${BACKEND}/get-languages`);
+    // Fetch directly from the database using the admin parameter
+    const res = await fetch(`${BACKEND}/get-languages?admin=true`);
     if (res.ok) {
       const data = await res.json();
-      if (data.source) {
-        sourceLanguage = data.source;
+      
+      const sourceObj = data.find(l => l.status === 'Source' || l.status === 'Both');
+      if (sourceObj) {
+        sourceLanguage = sourceObj.name;
       }
-      const selectedLangs = [data.source, ...(data.targets || [])].filter(Boolean);
-      if (selectedLangs.length > 0) {
-        activeLanguages = ALL_LANGUAGES.filter(item => selectedLangs.includes(item.lang));
+      
+      // Filter out 'None'
+      const active = data.filter(l => l.status !== 'None');
+      if (active.length > 0) {
+        activeLanguages = active.map(item => ({
+          lang: item.name,
+          flag: getBadge(item.code)
+        }));
       }
     }
   } catch (e) {
