@@ -30,15 +30,37 @@ def save_languages():
 @settings_bp.route("/get-languages", methods=["GET"])
 def get_languages():
     langs = Language.query.order_by("name").all()
-    result = []
+    
+    if request.args.get("admin") == "true":
+        result = []
+        for l in langs:
+            result.append({
+                "id": l.id,
+                "name": l.name,
+                "code": l.code,
+                "status": l.status
+            })
+        return jsonify(result)
+        
+    # Legacy format for storefront widget
+    source = None
+    targets = []
     for l in langs:
-        result.append({
-            "id": l.id,
-            "name": l.name,
-            "code": l.code,
-            "status": l.status
-        })
-    return jsonify(result)
+        if l.status == "Source" or l.status == "Both":
+            if not source:
+                source = l.name
+            else:
+                targets.append(l.name) # Fallback if multiple sources
+        elif l.status == "Target":
+            targets.append(l.name)
+            
+    if not source:
+        source = "English"
+        
+    return jsonify({
+        "source": source,
+        "targets": targets
+    })
 
 
 @settings_bp.route("/get-provider", methods=["GET"])

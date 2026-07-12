@@ -1,7 +1,7 @@
 import { API_URL, apiFetch } from "./apiClient";
 
 export const getLanguages = async () => {
-  const response = await apiFetch(`${API_URL}/get-languages`);
+  const response = await apiFetch(`${API_URL}/get-languages?admin=true`);
   return response.json();
 };
 
