@@ -1,33 +1,20 @@
 import { useState, useEffect } from "react";
 import { saveLanguages, getLanguages } from "../services/languageService";
 
-const ALL_TARGET_LANGUAGES = [
-  "French", "German", "Spanish", "Hindi", "Arabic",
-  "Japanese", "Portuguese", "Marathi", "Italian", "Chinese", "Korean"
-];
-
-const ALL_SOURCE_LANGUAGES = [
-  "English", "French", "German", "Spanish", "Hindi", "Japanese",
-  "Portuguese", "Italian", "Chinese", "Korean", "Arabic"
-];
-
 function LanguagesPage() {
-  const [sourceLanguage, setSourceLanguage] = useState("English");
-  const [targetLanguages, setTargetLanguages] = useState([]);
+  const [languages, setLanguages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
+  const [changes, setChanges] = useState({});
 
   // Load saved settings on mount
   useEffect(() => {
     const fetchLanguages = async () => {
       try {
         const data = await getLanguages();
-        if (data.source) {
-          setSourceLanguage(data.source);
-        }
-        if (Array.isArray(data.targets) && data.targets.length > 0) {
-          setTargetLanguages(data.targets);
+        if (Array.isArray(data)) {
+          setLanguages(data);
         }
       } catch (error) {
         console.error("Failed to load language settings:", error);
@@ -44,27 +31,32 @@ function LanguagesPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleLanguageChange = (language) => {
-    if (targetLanguages.includes(language)) {
-      setTargetLanguages(targetLanguages.filter((item) => item !== language));
-    } else {
-      setTargetLanguages([...targetLanguages, language]);
-    }
+  const handleStatusChange = (id, newStatus) => {
+    setLanguages(prev => prev.map(lang => 
+      lang.id === id ? { ...lang, status: newStatus } : lang
+    ));
+    setChanges(prev => ({
+      ...prev,
+      [id]: newStatus
+    }));
   };
 
   const handleSave = async () => {
-    if (targetLanguages.length === 0) {
-      showToast("error", "Please select at least one target language.");
+    const updates = Object.entries(changes).map(([id, status]) => ({
+      id: parseInt(id),
+      status
+    }));
+
+    if (updates.length === 0) {
+      showToast("error", "No changes to save.");
       return;
     }
 
     setSaving(true);
     try {
-      const response = await saveLanguages({
-        source_language: sourceLanguage,
-        target_languages: targetLanguages,
-      });
+      const response = await saveLanguages({ languages: updates });
       showToast("success", response.message || "Languages saved successfully!");
+      setChanges({}); // Reset changes after successful save
     } catch (error) {
       console.error(error);
       showToast("error", "Failed to save settings. Please try again.");
@@ -73,21 +65,16 @@ function LanguagesPage() {
     }
   };
 
-  // Target languages list excludes the currently selected source language
-  const availableTargets = ALL_TARGET_LANGUAGES.filter(
-    (lang) => lang !== sourceLanguage
-  );
-
   if (loading) {
     return (
-      <div className="flex flex-col gap-8 max-w-3xl">
+      <div className="flex flex-col gap-8 max-w-5xl">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Languages</h1>
         </div>
         <div className="card-container p-12 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-[#008060] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-slate-500">Loading saved language settings...</p>
+            <p className="text-sm text-slate-500">Loading languages...</p>
           </div>
         </div>
       </div>
@@ -95,7 +82,7 @@ function LanguagesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 max-w-3xl">
+    <div className="flex flex-col gap-8 max-w-5xl">
       {/* Toast Notification */}
       {toast && (
         <div
@@ -114,84 +101,7 @@ function LanguagesPage() {
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Languages</h1>
-      </div>
-
-      <div className="card-container flex flex-col">
-        <div className="p-6 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-900 mb-1">Language Settings</h3>
-          <p className="text-sm text-slate-500">
-            Configure your store's source language and the languages customers can switch to.
-          </p>
-        </div>
-
-        <div className="p-6 flex flex-col gap-8">
-          {/* Source Language */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Source Language
-            </label>
-            <select
-              className="input-field w-full md:max-w-md bg-white border-slate-200 text-slate-900"
-              value={sourceLanguage}
-              onChange={(e) => {
-                const newSource = e.target.value;
-                setSourceLanguage(newSource);
-                if (targetLanguages.includes(newSource)) {
-                  setTargetLanguages(targetLanguages.filter((l) => l !== newSource));
-                }
-              }}
-            >
-              {ALL_SOURCE_LANGUAGES.map((lang) => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-500 mt-2">
-              This is the original language your store content is written in. It will always be available on your storefront.
-            </p>
-          </div>
-
-          {/* Target Languages */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Target Languages
-            </label>
-            <p className="text-xs text-slate-500 mb-3">
-              Only the languages you select here will appear in the language switcher on your store.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {availableTargets.map((lang) => (
-                <label
-                  key={lang}
-                  className="relative flex items-start p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center h-5">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 text-[#008060] border-slate-300 rounded focus:ring-[#008060]"
-                      checked={targetLanguages.includes(lang)}
-                      onChange={() => handleLanguageChange(lang)}
-                    />
-                  </div>
-                  <div className="ml-3 flex flex-col">
-                    <span className="text-sm font-medium text-slate-900">{lang}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            {targetLanguages.length > 0 && (
-              <p className="text-xs text-[#008060] font-medium mt-3">
-                ✓ {targetLanguages.length} language{targetLanguages.length > 1 ? "s" : ""} selected:{" "}
-                {targetLanguages.join(", ")}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-xl flex items-center justify-between">
-          <p className="text-xs text-slate-400">
-            Changes apply to your storefront immediately after saving.
-          </p>
+        {Object.keys(changes).length > 0 && (
           <button
             className="btn btn-primary px-6 py-2 flex items-center gap-2"
             onClick={handleSave}
@@ -200,8 +110,62 @@ function LanguagesPage() {
             {saving && (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             )}
-            {saving ? "Saving..." : "Save Settings"}
+            {saving ? "Saving..." : "Save Changes"}
           </button>
+        )}
+      </div>
+
+      <div className="card-container flex flex-col">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="font-semibold text-slate-900 mb-1">Language Settings</h3>
+          <p className="text-sm text-slate-500">
+            Configure your store's source and target languages from the list below.
+          </p>
+        </div>
+
+        <div className="p-0 overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-medium">ID</th>
+                <th className="px-6 py-4 font-medium">Language</th>
+                <th className="px-6 py-4 font-medium">Code</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {languages.map((lang) => (
+                <tr key={lang.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-6 py-4 text-sm text-slate-500">{lang.id}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{lang.name}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">
+                    <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-mono text-xs">
+                      {lang.code}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <select
+                      className="input-field py-1.5 px-3 text-sm min-w-[120px]"
+                      value={lang.status}
+                      onChange={(e) => handleStatusChange(lang.id, e.target.value)}
+                    >
+                      <option value="None">None</option>
+                      <option value="Source">Source</option>
+                      <option value="Target">Target</option>
+                      <option value="Both">Both</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {languages.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-slate-500 text-sm">
+                    No languages found. Did you run the database seed script?
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

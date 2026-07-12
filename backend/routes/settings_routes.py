@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from database import execute
+from model import Language
 from utils.helpers import get_setting, set_setting, get_default_provider_settings, normalize_shopify_store_url
 
 settings_bp = Blueprint("settings_routes", __name__)
@@ -11,10 +12,13 @@ def save_languages():
         return "", 204
 
     data = request.json
-    language_settings = get_setting("language_settings", {})
-    language_settings["source"] = data["source_language"]
-    language_settings["targets"] = data["target_languages"]
-    set_setting("language_settings", language_settings)
+    updates = data.get("languages", [])
+    
+    for item in updates:
+        lang = Language.query.get(item["id"])
+        if lang:
+            lang.status = item["status"]
+            lang._save()
 
     execute(
         "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
@@ -25,7 +29,16 @@ def save_languages():
 
 @settings_bp.route("/get-languages", methods=["GET"])
 def get_languages():
-    return jsonify(get_setting("language_settings", {}))
+    langs = Language.query.order_by("name").all()
+    result = []
+    for l in langs:
+        result.append({
+            "id": l.id,
+            "name": l.name,
+            "code": l.code,
+            "status": l.status
+        })
+    return jsonify(result)
 
 
 @settings_bp.route("/get-provider", methods=["GET"])

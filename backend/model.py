@@ -505,3 +505,39 @@ class OverlayEdit(Model):
 
     def _delete(self):
         execute("DELETE FROM OVERLAY_EDITS WHERE ID=%s", (self._id,))
+
+
+class Language(Model):
+    __tablename__ = "languages"
+
+    id     = _ColRef("ID")
+    name   = _ColRef("NAME")
+    code   = _ColRef("CODE")
+    status = _ColRef("STATUS")
+
+    def __init__(self, name, code, status="None"):
+        self._id     = None
+        self._name   = name
+        self._code   = code
+        self._status = status
+
+    def __getattr__(self, name):
+        priv = f"_{name}"
+        if priv in self.__dict__:
+            return self.__dict__[priv]
+        raise AttributeError(name)
+
+    def _save(self):
+        if self._id is None:
+            execute(
+                "INSERT INTO LANGUAGES (NAME, CODE, STATUS) VALUES (%s, %s, %s)",
+                (self._name, self._code, self._status),
+            )
+        else:
+            execute(
+                "UPDATE LANGUAGES SET STATUS=%s WHERE ID=%s",
+                (self._status, self._id),
+            )
+
+    def _delete(self):
+        execute("DELETE FROM LANGUAGES WHERE ID=%s", (self._id,))
