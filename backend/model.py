@@ -528,15 +528,20 @@ class Language(Model):
         raise AttributeError(name)
 
     def _save(self):
-        if self._id is None:
+        obj_id = getattr(self, "id", getattr(self, "_id", None))
+        status = getattr(self, "status", getattr(self, "_status", None))
+        name = getattr(self, "name", getattr(self, "_name", None))
+        code = getattr(self, "code", getattr(self, "_code", None))
+        
+        if obj_id is None:
             execute(
                 "INSERT INTO LANGUAGES (NAME, CODE, STATUS) VALUES (%s, %s, %s)",
-                (self._name, self._code, self._status),
+                (name, code, status),
             )
         else:
             execute(
                 "UPDATE LANGUAGES SET STATUS=%s WHERE ID=%s",
-                (self._status, self._id),
+                (status, obj_id),
             )
 
     def _delete(self):
