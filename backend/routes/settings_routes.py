@@ -14,11 +14,15 @@ def save_languages():
     data = request.json
     updates = data.get("languages", [])
     
-    for item in updates:
-        lang = Language.query.get(item["id"])
-        if lang:
-            lang.status = item["status"]
-            lang._save()
+    try:
+        for item in updates:
+            lang = Language.query.get(item["id"])
+            if lang:
+                lang.status = item["status"]
+                lang._save()
+    except Exception as e:
+        import traceback
+        return jsonify({"success": False, "message": str(e), "traceback": traceback.format_exc()}), 500
 
     return jsonify({"success": True, "message": "Languages saved successfully"})
 

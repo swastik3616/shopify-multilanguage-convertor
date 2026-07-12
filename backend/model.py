@@ -528,10 +528,10 @@ class Language(Model):
         raise AttributeError(name)
 
     def _save(self):
-        obj_id = getattr(self, "id", getattr(self, "_id", None))
-        status = getattr(self, "status", getattr(self, "_status", None))
-        name = getattr(self, "name", getattr(self, "_name", None))
-        code = getattr(self, "code", getattr(self, "_code", None))
+        obj_id = self.__dict__.get("id", self.__dict__.get("_id"))
+        status = self.__dict__.get("status", self.__dict__.get("_status"))
+        name = self.__dict__.get("name", self.__dict__.get("_name"))
+        code = self.__dict__.get("code", self.__dict__.get("_code"))
         
         if obj_id is None:
             execute(
