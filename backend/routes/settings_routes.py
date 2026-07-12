@@ -20,10 +20,6 @@ def save_languages():
             lang.status = item["status"]
             lang._save()
 
-    execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
-        ("Language Settings Updated",),
-    )
     return jsonify({"success": True, "message": "Languages saved successfully"})
 
 
