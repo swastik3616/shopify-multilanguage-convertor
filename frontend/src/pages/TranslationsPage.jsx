@@ -551,7 +551,18 @@ export default function TranslationPage() {
 
   useEffect(() => {
     getLanguages().then(data => {
-      const targets = data.targets || [];
+      let targets = [];
+      
+      // Handle array response (admin=true format)
+      if (Array.isArray(data)) {
+        targets = data
+          .filter(l => l.status === "Target" || l.status === "Both")
+          .map(l => l.name);
+      } else {
+        // Handle object response (legacy format)
+        targets = data.targets || [];
+      }
+      
       if (targets.length > 0) {
         setAvailableLangs(targets);
         setTargetLang(targets[0]);
