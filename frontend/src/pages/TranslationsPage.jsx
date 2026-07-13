@@ -8,6 +8,7 @@ import {
 import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
 import { getLanguages } from "../services/languageService";
+import { getStoreSettings } from "../services/storeSettingsService";
 
 const HEADING_TAGS = ["H1", "H2", "H3", "H4", "H5", "H6"];
 const TEXT_TAGS = new Set(["SPAN", "LI", "LABEL", "SMALL", "STRONG", "EM", "B", "I", "TD", "TH", "CAPTION", "SUMMARY"]);
@@ -545,6 +546,8 @@ export default function TranslationPage() {
   const [sections, setSections] = useState([]);
   const [availableLangs, setAvailableLangs] = useState([]);
   const [targetLang, setTargetLang] = useState("");
+  // The hostname of the configured store (e.g. "mystore.myshopify.com")
+  const [storeHost, setStoreHost] = useState("");
 
   useEffect(() => {
     getLanguages().then(data => {
@@ -554,6 +557,16 @@ export default function TranslationPage() {
         setTargetLang(targets[0]);
       }
     }).catch(err => console.error("Failed to fetch languages:", err));
+
+    // Load the configured store URL so we can enforce it
+    getStoreSettings().then(cfg => {
+      const rawUrl = cfg?.store_url || "";
+      if (rawUrl) {
+        // Strip scheme + trailing slashes to get a bare hostname
+        const host = rawUrl.replace(/^https?:\/\//i, "").replace(/\/.*$/, "").toLowerCase();
+        setStoreHost(host);
+      }
+    }).catch(() => { /* ignore — guard is also on backend */ });
   }, []);
   const [fetchStatus, setFetchStatus] = useState("idle");
   const [message, setMessage] = useState("");
@@ -584,6 +597,23 @@ export default function TranslationPage() {
     if (!url.trim()) { setMessage("Enter a URL first."); return; }
     setFetchStatus("loading"); setMessage(""); setSections([]); setPageMeta({ title: "", description: "" }); setActiveId(null);
     const fetchUrl = normalizeUrl(url.trim());
+
+    // Client-side store-domain guard
+    if (storeHost) {
+      try {
+        const reqHost = new URL(fetchUrl).hostname.toLowerCase();
+        if (reqHost !== storeHost) {
+          setFetchStatus("error");
+          setMessage(
+            `Only pages from your store (${storeHost}) can be fetched. ` +
+            `The URL you entered points to "${reqHost}".`
+          );
+          return;
+        }
+      } catch {
+        // malformed URL — let backend handle it
+      }
+    }
 
     try {
       const [res, savedEdits] = await Promise.all([
@@ -768,9 +798,15 @@ export default function TranslationPage() {
               <input
                 value={url} onChange={e => setUrl(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleFetch()}
-                placeholder="https://yourstore.com/products/example"
+                placeholder={storeHost ? `https://${storeHost}/products/example` : "https://yourstore.myshopify.com/products/example"}
                 className="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
               />
+              {storeHost && (
+                <span className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0">
+                  <Globe className="h-3.5 w-3.5" />
+                  {storeHost}
+                </span>
+              )}
               <select
                 value={targetLang} onChange={e => setTargetLang(e.target.value)}
                 className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"

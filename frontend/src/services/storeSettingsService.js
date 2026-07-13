@@ -9,6 +9,11 @@ export const saveStoreSettings = async (data) => {
   return response.json();
 };
 
+export const getStoreSettings = async () => {
+  const response = await apiFetch("/get-store-settings");
+  return response.json();
+};
+
 export const checkShopifyToken = async () => {
   const response = await apiFetch("/shopify/check-token");
 

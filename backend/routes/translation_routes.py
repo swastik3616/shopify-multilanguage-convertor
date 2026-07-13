@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from database import execute
-from utils.helpers import get_setting, get_default_provider_settings, get_provider_settings
+from utils.helpers import get_setting, get_default_provider_settings, get_provider_settings, get_shopify_credentials, normalize_shopify_store_url
 from utils.ai_provider import get_provider_response, get_bulk_provider_response
 from utils.translation_filter import TranslationFilter
 import requests
@@ -150,6 +150,37 @@ def fetch_url_content():
 
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
+
+    # ── Store-domain enforcement ───────────────────────────────────────────────
+    # Only allow fetching pages that belong to the configured store.
+    try:
+        from urllib.parse import urlparse as _urlparse
+        requested_host = _urlparse(url).hostname or ""
+
+        store_url, _ = get_shopify_credentials()
+        # Fallback: try the legacy store_setting key
+        if not store_url:
+            store_cfg = get_setting("store_setting", {})
+            store_url = normalize_shopify_store_url(store_cfg.get("store_url", ""))
+
+        if store_url:
+            # Normalise the store hostname — strip any scheme / trailing slash
+            store_host = normalize_shopify_store_url(store_url).lower().split("/")[0]
+            req_host   = requested_host.lower()
+
+            # Accept exact match OR the .myshopify.com canonical + any custom domain
+            # that is an exact match (we can't enumerate custom domains automatically).
+            if req_host != store_host:
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        f"Access denied: you can only fetch pages from your configured store "
+                        f"({store_host}). The requested URL belongs to '{req_host}'."
+                    )
+                }), 403
+    except Exception as _guard_err:
+        # If the guard itself fails, fail open with a warning — don't block legitimate use.
+        print(f"[fetch-url] store-domain guard error: {_guard_err}")
 
     try:
         from bs4 import BeautifulSoup
