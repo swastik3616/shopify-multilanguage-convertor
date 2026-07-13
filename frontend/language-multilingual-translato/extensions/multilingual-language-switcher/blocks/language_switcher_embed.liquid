@@ -94,8 +94,8 @@
         sourceLanguage = sourceObj.name;
       }
       
-      // Filter out 'None'
-      const active = data.filter(l => l.status !== 'None');
+      // Filter out non-selected languages
+      const active = data.filter(l => ['Source', 'Target', 'Both'].includes(l.status));
       if (active.length > 0) {
         activeLanguages = active.map(item => ({
           lang: item.name,

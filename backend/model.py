@@ -36,9 +36,9 @@ class QueryProxy:
         qp = self._clone()
         for col, val in kwargs.items():
             if val is None:
-                qp._wheres.append((f'"{col.upper()}" IS NULL', None))
+                qp._wheres.append((f'{col} IS NULL', None))
             else:
-                qp._wheres.append((f'"{col.upper()}" = %s', val))
+                qp._wheres.append((f'{col} = %s', val))
         return qp
 
     def filter(self, *exprs):
@@ -119,9 +119,9 @@ class QueryProxy:
             return self
         placeholders = ", ".join(["%s"] * len(values))
         qp = self._clone()
-        qp._wheres.append((f'"{col.upper()}" IN ({placeholders})', None))
+        qp._wheres.append((f'{col} IN ({placeholders})', None))
         # inject multiple values
-        qp._wheres[-1] = (f'"{col.upper()}" IN ({placeholders})', values)
+        qp._wheres[-1] = (f'{col} IN ({placeholders})', values)
         return qp
 
     # ── misc ──────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ class _OrderExpr:
         self.direction = direction
 
     def __str__(self):
-        return f'"{self.col.upper()}" {self.direction}'
+        return f'{self.col} {self.direction}'
 
     def asc(self):
         return _OrderExpr(self.col, "ASC")
@@ -201,21 +201,21 @@ class _ColRef:
         self.col_name = col_name
 
     def __eq__(self, other):
-        return _Expr(f'"{self.col_name}" = %s', other)
+        return _Expr(f'{self.col_name} = %s', other)
 
     def in_(self, values):
         placeholders = ", ".join(["%s"] * len(values))
-        return _Expr(f'"{self.col_name}" IN ({placeholders})', values)
+        return _Expr(f'{self.col_name} IN ({placeholders})', values)
 
     def is_(self, val):
         if val is None:
-            return _Expr(f'"{self.col_name}" IS NULL')
-        return _Expr(f'"{self.col_name}" IS NOT NULL')
+            return _Expr(f'{self.col_name} IS NULL')
+        return _Expr(f'{self.col_name} IS NOT NULL')
 
     def isnot(self, val):
         if val is None:
-            return _Expr(f'"{self.col_name}" IS NOT NULL')
-        return _Expr(f'"{self.col_name}" = %s', val)
+            return _Expr(f'{self.col_name} IS NOT NULL')
+        return _Expr(f'{self.col_name} = %s', val)
 
     def asc(self):
         return _OrderExpr(self.col_name, "ASC")
@@ -224,10 +224,10 @@ class _ColRef:
         return _OrderExpr(self.col_name, "DESC")
 
     def __str__(self):
-        return f'"{self.col_name}"'
+        return f'{self.col_name}'
 
     def __ge__(self, other):
-        return _Expr(f'"{self.col_name}" >= %s', other)
+        return _Expr(f'{self.col_name} >= %s', other)
 
 
 # ── Base model ────────────────────────────────────────────────────────────────
