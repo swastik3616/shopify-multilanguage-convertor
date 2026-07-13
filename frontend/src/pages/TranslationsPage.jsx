@@ -180,7 +180,7 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
           disabled={translatingId === item.sectionId}
           className="inline-flex items-center justify-center rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
         >
-          {translatingId === item.sectionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+          {translatingId === item.sectionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
         </button>
       </td>
     </tr>
@@ -201,7 +201,6 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
           <tr className="divide-x divide-slate-200">
-            <th className="px-4 py-3 text-left font-semibold text-slate-700 w-32">Section</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">Source Text</th>
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[22rem]">{targetLanguage}</th>
             <th className="px-4 py-3 text-center font-semibold text-slate-700 w-32">Actions</th>
