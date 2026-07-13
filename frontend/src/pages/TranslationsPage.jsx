@@ -102,7 +102,6 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
   const [editingTranslation, setEditingTranslation] = useState(false);
   const [translationValue, setTranslationValue] = useState(item.translatedText || "");
 
-  // Keep local state in sync when parent updates translatedText (e.g. after auto-translate)
   useEffect(() => {
     if (!editingTranslation) {
       setTranslationValue(item.translatedText || "");
@@ -121,22 +120,22 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
 
   return (
     <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
-      {/* Source Language Column */}
+      {/* Column 1: Source Language Text */}
       <td className="px-4 py-3">
         <div className="text-sm text-slate-700 break-words select-text" title={item.text}>
           {getTruncated(item.text, 90)}
         </div>
       </td>
 
-      {/* Target Language Label Column */}
+      {/* Column 2: Target Language Name */}
       <td className="px-4 py-3">
         <div className="text-sm font-medium text-slate-600 whitespace-nowrap">
-          {item.targetLanguage || ""}
+          {item.targetLanguage || "—"}
         </div>
       </td>
 
-      {/* Translation Column (Fills when button clicked) */}
-      <td className="px-4 py-3">
+      {/* Column 3: Translation / Not translated */}
+      <td className="px-4 py-3 min-w-0">
         {editingTranslation ? (
           <div className="flex flex-col gap-2">
             <textarea
@@ -165,16 +164,16 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
           </div>
         ) : item.translatedText ? (
           <div className="flex items-start justify-between gap-3 group">
-            <div className="text-sm text-emerald-900 break-words" title={item.translatedText}>
+            <div className="text-sm text-emerald-900 break-words flex-1" title={item.translatedText}>
               {getTruncated(item.translatedText, 90)}
             </div>
             <button
               type="button"
               onClick={openTranslationEditor}
-              className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-100 transition"
+              className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100 transition"
               title="Edit translation"
             >
-              <Edit2 className="h-4 w-4" />
+              <Edit2 className="h-3.5 w-3.5" />
             </button>
           </div>
         ) : (
@@ -183,24 +182,33 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
             <button
               type="button"
               onClick={openTranslationEditor}
-              className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+              className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
               title="Add translation"
             >
-              <Edit2 className="h-4 w-4" />
+              <Edit2 className="h-3.5 w-3.5" />
             </button>
           </div>
         )}
       </td>
 
-      {/* Action Button Column */}
+      {/* Column 4: Action Button */}
       <td className="px-4 py-3 text-center">
         <button
           onClick={() => onTranslateItem(item.sectionId)}
           disabled={translatingId === item.sectionId}
-          className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
         >
-          {translatingId === item.sectionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
-          <span className="ml-1.5">{translatingId === item.sectionId ? "..." : "Translate"}</span>
+          {translatingId === item.sectionId ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Translating...
+            </>
+          ) : (
+            <>
+              <Languages className="h-3.5 w-3.5" />
+              Translate
+            </>
+          )}
         </button>
       </td>
     </tr>
@@ -222,9 +230,9 @@ function TranslationGrid({ items, targetLanguage, translatingId, onTranslateItem
         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
           <tr className="divide-x divide-slate-200">
             <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[250px]">Source Language</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[120px]">Target Language</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[250px]">{targetLanguage || "Translation"}</th>
-            <th className="px-4 py-3 text-center font-semibold text-slate-700 w-40">Action</th>
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[100px]">Target</th>
+            <th className="px-4 py-3 text-left font-semibold text-slate-700 min-w-[250px]">Translation</th>
+            <th className="px-4 py-3 text-center font-semibold text-slate-700 w-48">Action</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
