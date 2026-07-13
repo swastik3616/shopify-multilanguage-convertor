@@ -4,9 +4,13 @@ from utils.helpers import get_setting, get_default_provider_settings, get_shopif
 from utils.shopify_client import fetch_shopify_pages, fetch_shopify_products, fetch_shopify_collections, extract_text_from_html
 from utils.ai_provider import get_provider_response
 from utils.translation_filter import TranslationFilter
+from utils.url_validator import validate_shopify_url
 import requests
 from bs4 import BeautifulSoup
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 content_bp = Blueprint("content_routes", __name__)
 
@@ -224,6 +228,24 @@ def get_contents_store_status():
 
 @content_bp.route("/contents/fetch-and-parse", methods=["POST", "OPTIONS"])
 def fetch_and_parse_url():
+    """
+    Fetch a URL and parse HTML to extract translatable content.
+    
+    Security: Only URLs from the configured Shopify store are allowed.
+    
+    Request body:
+        {
+            "url": "https://mystore.myshopify.com/products/example",
+            "page": "product" (optional)
+        }
+    
+    Response:
+        {
+            "success": true,
+            "message": "Extracted and saved X elements.",
+            "imported": X
+        }
+    """
     if request.method == "OPTIONS":
         return "", 204
 
@@ -232,47 +254,75 @@ def fetch_and_parse_url():
     page = data.get("page", "other").strip()
 
     if not url:
+        logger.warning("[fetch_and_parse_url] Missing URL in request")
         return jsonify({"success": False, "message": "URL is required"}), 400
+
+    # Add scheme if missing
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = f"https://{url}"
+
+    # ────────────────────────────────────────────────────────────────────────────
+    # URL SECURITY: Validate that URL belongs to configured Shopify store
+    # ────────────────────────────────────────────────────────────────────────────
+    validation = validate_shopify_url(url)
+    if not validation['valid']:
+        logger.warning(f"[fetch_and_parse_url] URL validation failed: {validation['message']}")
+        return jsonify({"success": False, "message": validation['message']}), 403
 
     headers = {"User-Agent": "Mozilla/5.0 (compatible; ShopifyTranslatorBot/1.0; +content-fetch)"}
     try:
+        logger.info(f"[fetch_and_parse_url] Fetching validated URL: {url}")
         resp = requests.get(url, headers=headers, timeout=15)
         if resp.status_code != 200:
+            logger.warning(f"[fetch_and_parse_url] Failed to fetch URL: status_code={resp.status_code}")
             return jsonify({"success": False, "message": f"Failed to fetch {url}. Status: {resp.status_code}"}), 400
         html = resp.text
+    except requests.Timeout:
+        logger.error(f"[fetch_and_parse_url] Request timeout for URL: {url}")
+        return jsonify({"success": False, "message": "Request timed out while fetching the URL"}), 504
+    except requests.RequestException as e:
+        logger.error(f"[fetch_and_parse_url] Request error: {e}")
+        return jsonify({"success": False, "message": f"Error fetching url: {str(e)}"}), 503
     except Exception as e:
-        return jsonify({"success": False, "message": f"Error fetching url: {str(e)}"}), 400
+        logger.error(f"[fetch_and_parse_url] Unexpected error: {e}")
+        return jsonify({"success": False, "message": f"Error fetching url: {str(e)}"}), 500
 
-    soup = BeautifulSoup(html, "html.parser")
-    target_tags = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "button", "a", "span", "label"]
-    imported = 0
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        target_tags = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "button", "a", "span", "label"]
+        imported = 0
 
-    title_tag = soup.find("title")
-    if title_tag and title_tag.text:
-        text = title_tag.get_text(strip=True)
-        if text:
-            _pc_upsert(page, "meta_title", text, "title", "META")
-            imported += 1
+        title_tag = soup.find("title")
+        if title_tag and title_tag.text:
+            text = title_tag.get_text(strip=True)
+            if text:
+                _pc_upsert(page, "meta_title", text, "title", "META")
+                imported += 1
 
-    sections = soup.find_all("div", id=re.compile(r"^shopify-section-"))
-    if not sections:
-        body = soup.find("body")
-        sections = [body] if body else [soup]
+        sections = soup.find_all("div", id=re.compile(r"^shopify-section-"))
+        if not sections:
+            body = soup.find("body")
+            sections = [body] if body else [soup]
 
-    for section_idx, section in enumerate(sections):
-        if not section:
-            continue
-        section_id = section.get("id") or "main_body"
-        for elem_idx, element in enumerate(section.find_all(target_tags)):
-            text = element.get_text(separator=" ", strip=True)
-            if not text or len(text) < 2:
+        for section_idx, section in enumerate(sections):
+            if not section:
                 continue
-            html_tag = element.name.lower()
-            key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"
-            _pc_upsert(page, key, text, html_tag, section_id)
-            imported += 1
+            section_id = section.get("id") or "main_body"
+            for elem_idx, element in enumerate(section.find_all(target_tags)):
+                text = element.get_text(separator=" ", strip=True)
+                if not text or len(text) < 2:
+                    continue
+                html_tag = element.name.lower()
+                key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"
+                _pc_upsert(page, key, text, html_tag, section_id)
+                imported += 1
 
-    return jsonify({"success": True, "message": f"Extracted and saved {imported} elements.", "imported": imported})
+        logger.info(f"[fetch_and_parse_url] Successfully parsed URL and extracted {imported} elements")
+        return jsonify({"success": True, "message": f"Extracted and saved {imported} elements.", "imported": imported})
+    
+    except Exception as e:
+        logger.error(f"[fetch_and_parse_url] Error parsing HTML: {e}")
+        return jsonify({"success": False, "message": f"Error parsing content: {str(e)}"}), 500
 
 
 @content_bp.route("/contents/sync", methods=["POST", "OPTIONS"])

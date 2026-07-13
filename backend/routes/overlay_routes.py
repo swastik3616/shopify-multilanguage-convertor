@@ -1,7 +1,10 @@
 from flask import Blueprint, jsonify, request
 from urllib.parse import urlparse
 from database import execute
+from utils.url_validator import validate_shopify_url
+import logging
 
+logger = logging.getLogger(__name__)
 overlay_bp = Blueprint("overlay_routes", __name__)
 
 
@@ -28,15 +31,49 @@ def _candidate_urls(raw_url):
 
 @overlay_bp.route("/overlay/save", methods=["POST", "OPTIONS"])
 def save_overlay_edits():
+    """
+    Save overlay edits (translations or base text modifications) for a URL.
+    
+    Security: Only URLs from the configured Shopify store are allowed.
+    
+    Request body:
+        {
+            "url": "https://mystore.myshopify.com/products/example",
+            "edits": [
+                {
+                    "original_text": "Original text",
+                    "new_text": "New text",
+                    "is_translation": false,
+                    "target_language": null,
+                    "selector": "body > div.product",
+                    "element_tag": "h1",
+                    "field_name": null
+                }
+            ]
+        }
+    """
     if request.method == "OPTIONS":
         return "", 204
 
-    data = request.json
+    data = request.json or {}
     url = data.get("url", "").strip()
     edits = data.get("edits", [])
 
     if not url:
+        logger.warning("[save_overlay_edits] Missing URL in request")
         return jsonify({"success": False, "message": "URL is required"}), 400
+
+    # Add scheme if missing
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = f"https://{url}"
+
+    # ────────────────────────────────────────────────────────────────────────────
+    # URL SECURITY: Validate that URL belongs to configured Shopify store
+    # ────────────────────────────────────────────────────────────────────────────
+    validation = validate_shopify_url(url)
+    if not validation['valid']:
+        logger.warning(f"[save_overlay_edits] URL validation failed: {validation['message']}")
+        return jsonify({"success": False, "message": validation['message']}), 403
 
     saved_count = 0
     for edit in edits:
@@ -74,11 +111,36 @@ def save_overlay_edits():
             )
         saved_count += 1
 
+    logger.info(f"[save_overlay_edits] Saved {saved_count} overlay edits for URL: {url}")
     return jsonify({"success": True, "message": f"Saved {saved_count} overlay edits."})
 
 
 @overlay_bp.route("/overlay/replacements", methods=["GET", "OPTIONS"])
 def get_replacements():
+    """
+    Get overlay replacements (edits) for a URL.
+    
+    Security: Only URLs from the configured Shopify store are allowed.
+    
+    Query parameters:
+        - url: URL to fetch replacements for (required)
+        - target_language: Target language code (optional)
+    
+    Response:
+        {
+            "replacements": [
+                {
+                    "original_text": "Original text",
+                    "new_text": "New text",
+                    "selector": "body > div.product",
+                    "element_tag": "h1",
+                    "field_name": null,
+                    "is_translation": false,
+                    "target_language": null
+                }
+            ]
+        }
+    """
     if request.method == "OPTIONS":
         return "", 204
 
@@ -86,7 +148,20 @@ def get_replacements():
     target_lang = request.args.get("target_language")
 
     if not url:
+        logger.warning("[get_replacements] Missing URL in request")
         return jsonify({"replacements": {}})
+
+    # Add scheme if missing
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = f"https://{url}"
+
+    # ────────────────────────────────────────────────────────────────────────────
+    # URL SECURITY: Validate that URL belongs to configured Shopify store
+    # ────────────────────────────────────────────────────────────────────────────
+    validation = validate_shopify_url(url)
+    if not validation['valid']:
+        logger.warning(f"[get_replacements] URL validation failed: {validation['message']}")
+        return jsonify({"success": False, "message": validation['message']}), 403
 
     candidate_urls = list(_candidate_urls(url))
     replacements = []
@@ -130,6 +205,7 @@ def get_replacements():
                 "target_language": r["TARGET_LANGUAGE"],
             })
 
+    logger.info(f"[get_replacements] Retrieved {len(replacements)} replacements for URL: {url}")
     return jsonify({"replacements": replacements})
 
 

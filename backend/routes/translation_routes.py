@@ -3,7 +3,11 @@ from database import execute
 from utils.helpers import get_setting, get_default_provider_settings, get_provider_settings, get_shopify_credentials, normalize_shopify_store_url
 from utils.ai_provider import get_provider_response, get_bulk_provider_response
 from utils.translation_filter import TranslationFilter
+from utils.url_validator import validate_shopify_url, get_store_domain
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 translation_bp = Blueprint("translation_routes", __name__)
 
@@ -140,47 +144,51 @@ def translate_text():
 @translation_bp.route("/fetch-url", methods=["POST", "OPTIONS"])
 @translation_bp.route("/api/fetch-url", methods=["POST", "OPTIONS"])
 def fetch_url_content():
+    """
+    Fetch and parse HTML content from a URL.
+    
+    Security: Only URLs from the configured Shopify store are allowed.
+    
+    Request body:
+        {
+            "url": "https://mystore.myshopify.com/products/example"
+        }
+    
+    Response:
+        {
+            "success": true,
+            "html": "<cleaned HTML content>",
+            "_cache_debug": { cache headers info }
+        }
+    
+    Errors:
+        - 400: URL is required
+        - 403: URL does not belong to configured store
+        - 401: Store is password-protected
+        - 500: Other errors
+    """
     if request.method == "OPTIONS":
         return "", 204
 
-    data = request.json
+    data = request.json or {}
     url = data.get("url", "").strip()
+    
+    # Validate URL is provided
     if not url:
+        logger.warning("[fetch_url_content] Missing URL in request")
         return jsonify({"success": False, "message": "URL is required"}), 400
 
+    # Add scheme if missing
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
-    # ── Store-domain enforcement ───────────────────────────────────────────────
-    # Only allow fetching pages that belong to the configured store.
-    try:
-        from urllib.parse import urlparse as _urlparse
-        requested_host = _urlparse(url).hostname or ""
-
-        store_url, _ = get_shopify_credentials()
-        # Fallback: try the legacy store_setting key
-        if not store_url:
-            store_cfg = get_setting("store_setting", {})
-            store_url = normalize_shopify_store_url(store_cfg.get("store_url", ""))
-
-        if store_url:
-            # Normalise the store hostname — strip any scheme / trailing slash
-            store_host = normalize_shopify_store_url(store_url).lower().split("/")[0]
-            req_host   = requested_host.lower()
-
-            # Accept exact match OR the .myshopify.com canonical + any custom domain
-            # that is an exact match (we can't enumerate custom domains automatically).
-            if req_host != store_host:
-                return jsonify({
-                    "success": False,
-                    "message": (
-                        f"Access denied: you can only fetch pages from your configured store "
-                        f"({store_host}). The requested URL belongs to '{req_host}'."
-                    )
-                }), 403
-    except Exception as _guard_err:
-        # If the guard itself fails, fail open with a warning — don't block legitimate use.
-        print(f"[fetch-url] store-domain guard error: {_guard_err}")
+    # ────────────────────────────────────────────────────────────────────────────
+    # URL SECURITY: Validate that URL belongs to configured Shopify store
+    # ────────────────────────────────────────────────────────────────────────────
+    validation = validate_shopify_url(url)
+    if not validation['valid']:
+        logger.warning(f"[fetch_url_content] URL validation failed: {validation['message']}")
+        return jsonify({"success": False, "message": validation['message']}), 403
 
     try:
         from bs4 import BeautifulSoup
@@ -193,15 +201,19 @@ def fetch_url_content():
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
         }
+        
         parsed = urlparse(url)
         query_params = parse_qsl(parsed.query)
         query_params.append(("_nocache", str(int(time.time() * 1000))))
         fetch_url = parsed._replace(query=urlencode(query_params)).geturl()
+        
+        logger.info(f"[fetch_url_content] Fetching validated URL: {url}")
         session = requests.Session()
         resp = session.get(fetch_url, headers=headers, timeout=12)
         resp.raise_for_status()
         html = resp.text
 
+        # ──── Handle password-protected stores ────────────────────────────────
         looks_like_password_gate = (
             'name="password"' in html
             or 'id="password"' in html
@@ -230,6 +242,7 @@ def fetch_url_content():
                     or "storefront_password" in html.lower()
                 )
                 if still_gated:
+                    logger.warning("[fetch_url_content] Store password-protected; invalid password")
                     return jsonify({
                         "success": False,
                         "message": (
@@ -238,6 +251,7 @@ def fetch_url_content():
                         ),
                     }), 401
             else:
+                logger.info("[fetch_url_content] Store is password-protected; no password configured")
                 return jsonify({
                     "success": False,
                     "message": (
@@ -253,12 +267,16 @@ def fetch_url_content():
             "cf-cache-status": resp.headers.get("CF-Cache-Status"),
         }
 
+        # ──── Clean and parse HTML ─────────────────────────────────────────────
         MAX_HTML_LENGTH = 500_000
         if len(html) > MAX_HTML_LENGTH:
             html = html[:MAX_HTML_LENGTH]
+            logger.info(f"[fetch_url_content] Truncated HTML to {MAX_HTML_LENGTH} characters")
+        
         soup = BeautifulSoup(html, "html.parser")
         for tag in soup.find_all(["header", "footer", "nav", "aside"]):
             tag.decompose()
+        
         CHROME_RE = _re.compile(
             r"(^|[-_])(site-header|site-footer|site-nav|mobile-nav|mobile-menu|"
             r"cart-drawer|cart-notification|language-switcher|currency-switcher|"
@@ -273,12 +291,33 @@ def fetch_url_content():
             el_cls = " ".join(el.get("class", []) or [])
             if CHROME_RE.search(el_id) or CHROME_RE.search(el_cls):
                 el.decompose()
+        
         main_tag = soup.find("main") or soup.find("body") or soup
         cleaned_html = str(main_tag)
 
+        logger.info(f"[fetch_url_content] Successfully fetched and cleaned URL: {url}")
         return jsonify({"success": True, "html": cleaned_html, "_cache_debug": cache_debug})
+    
+    except requests.Timeout:
+        logger.error(f"[fetch_url_content] Request timeout for URL: {url}")
+        return jsonify({
+            "success": False,
+            "message": "Request timed out. The page took too long to load."
+        }), 504
+    
+    except requests.RequestException as e:
+        logger.error(f"[fetch_url_content] Request error: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Failed to fetch the page: {str(e)}"
+        }), 503
+    
     except Exception as e:
-        return jsonify({"success": False, "message": f"Unable to fetch content: {str(e)}"}), 500
+        logger.error(f"[fetch_url_content] Unexpected error: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Unable to fetch content: {str(e)}"
+        }), 500
 
 
 @translation_bp.route("/translations", methods=["GET"])
