@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from database import execute
-from utils.helpers import get_setting, get_default_provider_settings
+from utils.helpers import get_setting, get_default_provider_settings, get_provider_settings
 from utils.ai_provider import get_provider_response, get_bulk_provider_response
 from utils.translation_filter import TranslationFilter
 import requests
@@ -20,10 +20,10 @@ def bulk_translate():
     if not texts or not target_language:
         return jsonify({"success": False, "message": "Missing texts or language"}), 400
 
-    provider_settings = get_setting("provider_settings", get_default_provider_settings())
+    provider_settings = get_provider_settings()
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
-    api_key = provider_settings["api_keys"].get(provider, "")
+    api_key = provider_settings.get("api_keys", {}).get(provider, "")
 
     skip_indices = {}
     for i, text in enumerate(texts):
@@ -118,10 +118,10 @@ def translate_text():
     if existing:
         return jsonify({"translated_text": existing["TRANSLATED_TEXT"], "cached": True})
 
-    provider_settings = get_setting("provider_settings", get_default_provider_settings())
+    provider_settings = get_provider_settings()
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
-    api_key = provider_settings["api_keys"].get(provider, "")
+    api_key = provider_settings.get("api_keys", {}).get(provider, "")
 
     try:
         translated_text = get_provider_response(provider, model, api_key, source_text, target_language)

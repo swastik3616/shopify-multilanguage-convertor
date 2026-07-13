@@ -200,6 +200,17 @@ def seed_database():
             STATUS VARCHAR(20) DEFAULT 'None'
         )
     """)
+
+    print("Creating provider_settings table...")
+    execute("""
+        CREATE TABLE IF NOT EXISTS PROVIDER_SETTINGS (
+            ID SERIAL PRIMARY KEY,
+            PROVIDER VARCHAR(50) NOT NULL UNIQUE,
+            MODEL VARCHAR(100) NOT NULL,
+            API_KEY TEXT NOT NULL DEFAULT '',
+            UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     
     print(f"Seeding {len(LANGUAGES)} languages...")
     for lang in LANGUAGES:

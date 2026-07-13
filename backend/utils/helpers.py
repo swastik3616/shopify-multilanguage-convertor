@@ -53,6 +53,53 @@ def get_default_provider_settings():
     }
 
 
+def get_provider_settings():
+    """Read provider config from the dedicated PROVIDER_SETTINGS table.
+    Falls back to the legacy APP_SETTINGS JSON blob if no rows exist yet."""
+    rows = execute(
+        "SELECT PROVIDER, MODEL, API_KEY FROM PROVIDER_SETTINGS ORDER BY UPDATED_AT DESC LIMIT 1",
+        fetch="all",
+    )
+    if rows:
+        # Build the same shape the rest of the code expects
+        row = rows[0]
+        provider = row["PROVIDER"]
+        # Also load API keys for all providers so nothing breaks
+        all_keys_rows = execute(
+            "SELECT PROVIDER, API_KEY FROM PROVIDER_SETTINGS",
+            fetch="all",
+        ) or []
+        api_keys = {r["PROVIDER"]: r["API_KEY"] for r in all_keys_rows}
+        return {
+            "provider": provider,
+            "model": row["MODEL"],
+            "api_keys": api_keys,
+        }
+    # Fallback: legacy JSON blob
+    return get_setting("provider_settings", get_default_provider_settings())
+
+
+def set_provider_settings(provider, model, api_key):
+    """Upsert a row in PROVIDER_SETTINGS for the given provider."""
+    existing = execute(
+        "SELECT ID FROM PROVIDER_SETTINGS WHERE PROVIDER = %s LIMIT 1",
+        (provider,),
+        fetch="one",
+    )
+    if existing:
+        execute(
+            "UPDATE PROVIDER_SETTINGS SET MODEL = %s, API_KEY = %s, UPDATED_AT = CURRENT_TIMESTAMP "
+            "WHERE PROVIDER = %s",
+            (model, api_key, provider),
+        )
+    else:
+        execute(
+            "INSERT INTO PROVIDER_SETTINGS (PROVIDER, MODEL, API_KEY, UPDATED_AT) "
+            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
+            (provider, model, api_key),
+        )
+
+
 def normalize_shopify_store_url(store_url):
     """Strip scheme and trailing slashes — store URL must be hostname only."""
     if not store_url:

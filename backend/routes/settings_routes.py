@@ -1,7 +1,11 @@
 from flask import Blueprint, jsonify, request
 from database import execute
 from model import Language
-from utils.helpers import get_setting, set_setting, get_default_provider_settings, normalize_shopify_store_url
+from utils.helpers import (
+    get_setting, set_setting, get_default_provider_settings,
+    get_provider_settings, set_provider_settings,
+    normalize_shopify_store_url
+)
 
 settings_bp = Blueprint("settings_routes", __name__)
 
@@ -65,7 +69,20 @@ def get_languages():
 
 @settings_bp.route("/get-provider", methods=["GET"])
 def get_provider():
-    return jsonify(get_setting("provider_settings", get_default_provider_settings()))
+    settings = get_provider_settings()
+    # Mask the API key before sending to frontend
+    active_provider = settings.get("provider", "openai")
+    masked_keys = {}
+    for p, k in settings.get("api_keys", {}).items():
+        if k:
+            masked_keys[p] = k[:4] + "..." + k[-4:] if len(k) > 8 else "****"
+        else:
+            masked_keys[p] = ""
+    return jsonify({
+        "provider": active_provider,
+        "model": settings.get("model", "gpt-3.5-turbo"),
+        "api_keys": masked_keys,
+    })
 
 
 @settings_bp.route("/save-provider", methods=["POST", "OPTIONS"])
@@ -75,20 +92,27 @@ def save_provider():
 
     data = request.json
     provider = data.get("provider", "openai")
-    model = data.get("model", "gpt-3.5-turbo")
+    model = data.get("model", "")
     api_key = data.get("api_key", "")
 
-    provider_settings = get_setting("provider_settings", get_default_provider_settings())
-    provider_settings["provider"] = provider
-    provider_settings["model"] = model
-    provider_settings["api_keys"][provider] = api_key
-    set_setting("provider_settings", provider_settings)
+    if not provider:
+        return jsonify({"success": False, "message": "Provider is required"}), 400
+    if not model:
+        return jsonify({"success": False, "message": "Model name is required"}), 400
+    if not api_key:
+        return jsonify({"success": False, "message": "API key is required"}), 400
+
+    try:
+        set_provider_settings(provider, model, api_key)
+    except Exception as e:
+        import traceback
+        return jsonify({"success": False, "message": str(e), "traceback": traceback.format_exc()}), 500
 
     execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
-        (f"Provider Updated: {provider}",),
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
+        (f"Provider Updated: {provider} / {model}",),
     )
-    return jsonify({"success": True, "message": "Provider saved successfully"})
+    return jsonify({"success": True, "message": f"Provider '{provider}' saved successfully"})
 
 
 @settings_bp.route("/save-store-settings", methods=["POST", "OPTIONS"])

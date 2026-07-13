@@ -35,6 +35,21 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(seo_bp)
 app.register_blueprint(overlay_bp)
 
+# ── Ensure PROVIDER_SETTINGS table exists (idempotent) ────────────────────────
+try:
+    from database import execute as _execute
+    _execute("""
+        CREATE TABLE IF NOT EXISTS PROVIDER_SETTINGS (
+            ID SERIAL PRIMARY KEY,
+            PROVIDER VARCHAR(50) NOT NULL UNIQUE,
+            MODEL VARCHAR(100) NOT NULL,
+            API_KEY TEXT NOT NULL DEFAULT '',
+            UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+except Exception as _e:
+    print(f"[startup] PROVIDER_SETTINGS table check failed: {_e}")
+
 
 @app.route("/")
 def home():
