@@ -33,51 +33,102 @@ def parse_bulk_json_response(response_text):
         cleaned_text = clean_bulk_response_text(response_text)
         return json.loads(cleaned_text)
 
+def call_provider(provider_id_or_name, prompt):
+    """
+    Generic request engine that:
+    1. Loads provider configuration from database.
+    2. Builds headers dynamically.
+    3. Builds the request payload dynamically.
+    4. Replaces placeholders.
+    5. Sends HTTP request.
+    6. Parses the response using configured response path.
+    7. Returns translated text.
+    """
+    from database import execute
+    
+    row = None
+    if provider_id_or_name:
+        try:
+            pid = int(provider_id_or_name)
+            row = execute("SELECT * FROM AI_PROVIDERS WHERE ID = %s LIMIT 1", (pid,), fetch="one")
+        except ValueError:
+            row = execute("SELECT * FROM AI_PROVIDERS WHERE PROVIDER_NAME = %s LIMIT 1", (provider_id_or_name,), fetch="one")
+    
+    if not row:
+        row = execute("SELECT * FROM AI_PROVIDERS WHERE IS_ACTIVE = TRUE LIMIT 1", fetch="one")
+        if not row:
+            raise Exception("No active AI provider configured.")
+
+    base_url = row.get("BASE_URL")
+    endpoint = row.get("ENDPOINT")
+    method = row.get("METHOD", "POST").upper()
+    auth_type = row.get("AUTH_TYPE")
+    auth_header = row.get("AUTH_HEADER")
+    api_key = row.get("API_KEY") or ""
+    req_template_str = row.get("REQUEST_TEMPLATE") or "{}"
+    resp_mapping = row.get("RESPONSE_MAPPING") or ""
+    headers_str = row.get("HEADERS")
+    model = row.get("MODEL") or ""
+    timeout = row.get("TIMEOUT") or 60
+
+    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+    url = url.replace("{{model}}", model)
+    url = url.replace("{{api_key}}", api_key)
+
+    headers = {}
+    if headers_str:
+        try:
+            headers = json.loads(headers_str)
+        except json.JSONDecodeError:
+            pass
+
+    if auth_type and auth_header and api_key:
+        if auth_type.lower() == "bearer":
+            headers[auth_header] = f"Bearer {api_key}"
+        elif auth_type.lower() == "header":
+            headers[auth_header] = api_key
+
+    # Escape the prompt so it can be safely injected into the JSON template string
+    if isinstance(prompt, str):
+        prompt_escaped = json.dumps(prompt)[1:-1]
+    else:
+        prompt_escaped = json.dumps(json.dumps(prompt))[1:-1]
+
+    req_body_str = req_template_str.replace("{{model}}", model)
+    req_body_str = req_body_str.replace("{{prompt}}", prompt_escaped)
+    req_body_str = req_body_str.replace("{{temperature}}", "0.3")
+    req_body_str = req_body_str.replace("{{max_tokens}}", "4096")
+    
+    try:
+        payload = json.loads(req_body_str)
+    except json.JSONDecodeError as e:
+        raise Exception(f"Invalid request template JSON after placeholder replacement: {e}")
+
+    res = requests.request(method, url, headers=headers, json=payload, timeout=timeout)
+    res.raise_for_status()
+
+    resp_json = res.json()
+    
+    parts = re.split(r'\.|\[|\]', resp_mapping)
+    parts = [p for p in parts if p]
+    
+    val = resp_json
+    for p in parts:
+        if isinstance(val, list) and p.isdigit():
+            val = val[int(p)]
+        elif isinstance(val, dict):
+            val = val.get(p)
+        else:
+            raise Exception(f"Failed to parse response at path '{p}'")
+
+    if not isinstance(val, str):
+        val = str(val)
+        
+    return val.strip()
+
 def get_provider_response(provider, model, api_key, source_text, target_language):
     prompt = f"Translate the following text to {target_language}. Only return the translated text without any quotes or explanations.\n\nText: {source_text}"
-    try:
-        if provider == "openai":
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
-            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            return res.json()["choices"][0]["message"]["content"].strip()
-            
-        elif provider == "gemini":
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
-            payload = {"contents": [{"parts":[{"text": prompt}]}]}
-            res = requests.post(url, headers=headers, json=payload)
-            res.raise_for_status()
-            return res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            
-        elif provider == "claude":
-            headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
-            payload = {"model": model, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]}
-            res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
-            res.raise_for_status()
-            return res.json()["content"][0]["text"].strip()
-            
-        elif provider == "groq":
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            return res.json()["choices"][0]["message"]["content"].strip()
-            
-        elif provider == "ollama":
-            url = "http://localhost:11434/api/generate"
-            payload = {"model": model, "prompt": prompt, "stream": False}
-            res = requests.post(url, json=payload)
-            res.raise_for_status()
-            return res.json()["response"].strip()
-            
-        else:
-            return f"{source_text} translated to {target_language} (Mock - Unknown Provider)"
-            
-    except Exception as e:
-        print(f"Provider Error ({provider}):", str(e))
-        raise Exception(f"Failed to translate using {provider}: {str(e)}")
+    return call_provider(provider, prompt)
 
 def get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language):
     prompt = (
@@ -87,60 +138,16 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
         f"Input: {json.dumps(source_texts_dict)}"
     )
     
-    def try_single_fallbacks():
+    try:
+        response_text = call_provider(provider, prompt)
+        parsed = parse_bulk_json_response(response_text)
+        if not isinstance(parsed, dict) or not parsed:
+            raise ValueError("Parsed result is not a valid JSON object or is empty.")
+        return parsed
+    except Exception as e:
+        print(f"Bulk Translation Error ({provider}):", str(e))
+        print("Falling back to single item translation...")
         fallback = {}
         for key, text in source_texts_dict.items():
             fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
         return fallback
-
-    try:
-        response_text = ""
-        if provider == "openai":
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
-            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            response_text = res.json()["choices"][0]["message"]["content"].strip()
-            
-        elif provider == "gemini":
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
-            payload = {"contents": [{"parts":[{"text": prompt}]}]}
-            res = requests.post(url, headers=headers, json=payload)
-            res.raise_for_status()
-            response_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            
-        elif provider == "claude":
-            headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
-            payload = {"model": model, "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]}
-            res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
-            res.raise_for_status()
-            response_text = res.json()["content"][0]["text"].strip()
-            
-        elif provider == "groq":
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
-            res.raise_for_status()
-            response_text = res.json()["choices"][0]["message"]["content"].strip()
-            
-        elif provider == "ollama":
-            url = "http://localhost:11434/api/generate"
-            payload = {"model": model, "prompt": prompt, "stream": False, "format": "json"}
-            res = requests.post(url, json=payload)
-            res.raise_for_status()
-            response_text = res.json()["response"].strip()
-            
-        else:
-            return try_single_fallbacks()
-
-        parsed = parse_bulk_json_response(response_text)
-        if not isinstance(parsed, dict) or not parsed:
-            raise ValueError("Parsed result is not a valid JSON object or is empty.")
-            
-        return parsed
-
-    except Exception as e:
-        print(f"Bulk Translation Error ({provider}):", str(e))
-        print("Falling back to single item translation...")
-        return try_single_fallbacks()

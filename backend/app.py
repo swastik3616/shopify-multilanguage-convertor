@@ -35,20 +35,67 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(seo_bp)
 app.register_blueprint(overlay_bp)
 
-# ── Ensure PROVIDER_SETTINGS table exists (idempotent) ────────────────────────
+# ── Ensure AI_PROVIDERS table exists (idempotent) ────────────────────────
 try:
     from database import execute as _execute
     _execute("""
-        CREATE TABLE IF NOT EXISTS PROVIDER_SETTINGS (
+        CREATE TABLE IF NOT EXISTS AI_PROVIDERS (
             ID SERIAL PRIMARY KEY,
-            PROVIDER VARCHAR(50) NOT NULL UNIQUE,
-            MODEL VARCHAR(100) NOT NULL,
-            API_KEY TEXT NOT NULL DEFAULT '',
+            PROVIDER_NAME VARCHAR(50) NOT NULL UNIQUE,
+            BASE_URL VARCHAR(255) NOT NULL,
+            ENDPOINT VARCHAR(255) NOT NULL,
+            METHOD VARCHAR(10) NOT NULL DEFAULT 'POST',
+            AUTH_TYPE VARCHAR(50) NOT NULL,
+            AUTH_HEADER VARCHAR(100),
+            API_KEY TEXT,
+            REQUEST_TEMPLATE TEXT NOT NULL,
+            RESPONSE_MAPPING VARCHAR(255) NOT NULL,
+            HEADERS TEXT,
+            MODEL VARCHAR(100),
+            TIMEOUT INTEGER DEFAULT 60,
+            STREAMING_SUPPORTED BOOLEAN DEFAULT FALSE,
+            IS_ACTIVE BOOLEAN DEFAULT FALSE,
             UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    count = _execute("SELECT COUNT(*) AS CNT FROM AI_PROVIDERS", fetch="one")
+    if count and count["CNT"] == 0:
+        req_tpl = '{"model": "{{model}}", "messages": [{"role": "user", "content": "{{prompt}}"}], "temperature": {{temperature}}}'
+        headers_tpl = '{"Content-Type": "application/json"}'
+        _execute("""
+            INSERT INTO AI_PROVIDERS (
+                PROVIDER_NAME, BASE_URL, ENDPOINT, METHOD, AUTH_TYPE, AUTH_HEADER, 
+                REQUEST_TEMPLATE, RESPONSE_MAPPING, HEADERS, MODEL, IS_ACTIVE
+            ) VALUES (
+                'openai', 'https://api.openai.com', '/v1/chat/completions', 'POST', 'Bearer', 'Authorization',
+                %s, 'choices[0].message.content', %s, 'gpt-3.5-turbo', TRUE
+            )
+        """, (req_tpl, headers_tpl))
+        
+        req_tpl_groq = '{"model": "{{model}}", "messages": [{"role": "system", "content": "You are a translation API. Always return ONLY valid JSON."}, {"role": "user", "content": "{{prompt}}"}], "temperature": 0, "max_tokens": {{max_tokens}}}'
+        _execute("""
+            INSERT INTO AI_PROVIDERS (
+                PROVIDER_NAME, BASE_URL, ENDPOINT, METHOD, AUTH_TYPE, AUTH_HEADER, 
+                REQUEST_TEMPLATE, RESPONSE_MAPPING, HEADERS, MODEL, IS_ACTIVE
+            ) VALUES (
+                'groq', 'https://api.groq.com', '/openai/v1/chat/completions', 'POST', 'Bearer', 'Authorization',
+                %s, 'choices[0].message.content', %s, 'llama3-8b-8192', FALSE
+            )
+        """, (req_tpl_groq, headers_tpl))
+
+        req_tpl_gemini = '{"contents": [{"parts": [{"text": "{{prompt}}"}]}]}'
+        _execute("""
+            INSERT INTO AI_PROVIDERS (
+                PROVIDER_NAME, BASE_URL, ENDPOINT, METHOD, AUTH_TYPE, AUTH_HEADER, 
+                REQUEST_TEMPLATE, RESPONSE_MAPPING, HEADERS, MODEL, IS_ACTIVE
+            ) VALUES (
+                'gemini', 'https://generativelanguage.googleapis.com', '/v1beta/models/{{model}}:generateContent?key={{api_key}}', 'POST', 'Query', '',
+                %s, 'candidates[0].content.parts[0].text', %s, 'gemini-1.5-flash', FALSE
+            )
+        """, (req_tpl_gemini, headers_tpl))
 except Exception as _e:
-    print(f"[startup] PROVIDER_SETTINGS table check failed: {_e}")
+    print(f"[startup] AI_PROVIDERS table check failed: {_e}")
 
 
 @app.route("/")
