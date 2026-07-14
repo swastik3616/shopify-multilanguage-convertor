@@ -158,11 +158,34 @@ def translate_text():
         print("TRANSLATED:", repr(translated_text))
         print("=" * 80)
 
-        # TEMPORARY: Skip DB insert
+        existing_translation = execute(
+            """
+            SELECT ID
+            FROM TRANSLATIONS
+            WHERE SOURCE_TEXT = %s
+            AND TARGET_LANGUAGE = %s
+            LIMIT 1
+            """,
+            (source_text, target_language),
+            fetch="one"
+        )
+
+        if existing_translation:
+            execute(
+                "UPDATE TRANSLATIONS SET TRANSLATED_TEXT = %s, CREATED_AT = CURRENT_TIMESTAMP() WHERE ID = %s",
+                (translated_text, existing_translation["ID"]),
+            )
+        else:
+            execute(
+                "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+                (source_text, target_language, translated_text),
+            )
+
         return jsonify({
             "success": True,
             "translated_text": translated_text,
-            "debug": "Database insert skipped"
+            "cached": False,
         })
 
     except Exception as e:
