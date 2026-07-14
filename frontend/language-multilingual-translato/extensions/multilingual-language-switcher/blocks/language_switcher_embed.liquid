@@ -187,7 +187,11 @@
     let n;
     while ((n = walker.nextNode())) { 
       nodes.push(n); 
-      texts.push(n.nodeValue.trim()); 
+      
+      if (n.__lsw_orig_node_text === undefined) {
+        n.__lsw_orig_node_text = n.nodeValue;
+      }
+      texts.push(n.__lsw_orig_node_text.trim()); 
       
       // Capture original text before translation so overlay replacements can match it later
       let p = n.parentElement;
@@ -213,7 +217,13 @@
         const translations = data.translations;
         for (let i = 0; i < nodes.length; i++) {
           if (translations && translations[i]) {
-            nodes[i].nodeValue = translations[i];
+            const orig = nodes[i].__lsw_orig_node_text;
+            const trimmed = orig.trim();
+            if (trimmed) {
+              nodes[i].nodeValue = orig.replace(trimmed, translations[i]);
+            } else {
+              nodes[i].nodeValue = translations[i];
+            }
           }
         }
       }

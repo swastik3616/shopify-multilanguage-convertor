@@ -158,11 +158,15 @@ def translate_text():
         print("TRANSLATED:", repr(translated_text))
         print("=" * 80)
 
-        # TEMPORARY: Skip DB insert
+        execute(
+            "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+            (source_text, target_language, translated_text),
+        )
+
         return jsonify({
             "success": True,
-            "translated_text": translated_text,
-            "debug": "Database insert skipped"
+            "translated_text": translated_text
         })
 
     except Exception as e:
