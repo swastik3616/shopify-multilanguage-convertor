@@ -102,51 +102,77 @@ def translate_text():
     if request.method == "OPTIONS":
         return "", 204
 
-    data = request.json
+    data = request.json or {}
+
     source_text = data.get("source_text", "")
     target_language = data.get("target_language", "")
 
     if not source_text or not target_language:
-        return jsonify({"success": False, "message": "Missing text or language"}), 400
+        return jsonify({
+            "success": False,
+            "message": "Missing text or language"
+        }), 400
 
     if TranslationFilter.should_skip(source_text):
-        print(f"[translate] Skipping non-translatable text: {source_text}")
-        return jsonify({"translated_text": source_text, "skipped": True})
+        return jsonify({
+            "translated_text": source_text,
+            "skipped": True
+        })
 
     existing = execute(
-        "SELECT TRANSLATED_TEXT FROM TRANSLATIONS "
-        "WHERE SOURCE_TEXT = %s AND TARGET_LANGUAGE = %s LIMIT 1",
+        """
+        SELECT TRANSLATED_TEXT
+        FROM TRANSLATIONS
+        WHERE SOURCE_TEXT = %s
+        AND TARGET_LANGUAGE = %s
+        LIMIT 1
+        """,
         (source_text, target_language),
-        fetch="one",
+        fetch="one"
     )
+
     if existing:
-        return jsonify({"translated_text": existing["TRANSLATED_TEXT"], "cached": True})
+        return jsonify({
+            "translated_text": existing["TRANSLATED_TEXT"],
+            "cached": True
+        })
 
     provider_settings = get_provider_settings()
+
     provider = provider_settings.get("provider", "openai")
     model = provider_settings.get("model", "gpt-3.5-turbo")
     api_key = provider_settings.get("api_keys", {}).get(provider, "")
 
     try:
-        translated_text = get_provider_response(provider, model, api_key, source_text, target_language)
+        translated_text = get_provider_response(
+            provider,
+            model,
+            api_key,
+            source_text,
+            target_language
+        )
+
+        print("=" * 80)
+        print("SOURCE:", repr(source_text))
+        print("TARGET:", repr(target_language))
+        print("TRANSLATED:", repr(translated_text))
+        print("=" * 80)
+
+        # TEMPORARY: Skip DB insert
+        return jsonify({
+            "success": True,
+            "translated_text": translated_text,
+            "debug": "Database insert skipped"
+        })
+
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-    
-    print("=" * 50)
-    print("SOURCE:", repr(source_text))
-    print("TARGET:", repr(target_language))
-    print("TRANSLATED:", repr(translated_text))
-    print("TYPE:", type(translated_text))
-    print("=" * 50)
+        import traceback
+        traceback.print_exc()
 
-    execute(
-        "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-        "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
-        (source_text, target_language, translated_text),
-    )
-
-    return jsonify({"translated_text": translated_text})
-
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 @translation_bp.route("/fetch-url", methods=["POST", "OPTIONS"])
 @translation_bp.route("/api/fetch-url", methods=["POST", "OPTIONS"])
