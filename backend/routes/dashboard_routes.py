@@ -15,8 +15,6 @@ def get_dashboard_stats():
     lang_settings = get_setting("language_settings", {})
     targets = lang_settings.get("targets", [])
     active_languages = len(targets)
-    if lang_settings.get("source"):
-        active_languages += 1
 
     provider_settings = get_setting("provider_settings", get_default_provider_settings())
     api_keys = provider_settings.get("api_keys", {})
