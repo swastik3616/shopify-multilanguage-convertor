@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronRight, PanelLeft,
   Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap,
 } from "lucide-react";
-import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits } from "../services/translationPageService";
+import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits, fetchShopifyPages } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
 import { getLanguages } from "../services/languageService";
 import { getStoreSettings } from "../services/storeSettingsService";
@@ -576,6 +576,7 @@ export default function TranslationPage() {
   const [targetLang, setTargetLang] = useState("");
   // The hostname of the configured store (e.g. "mystore.myshopify.com")
   const [storeHost, setStoreHost] = useState("");
+  const [storePages, setStorePages] = useState([]);
 
   useEffect(() => {
     getLanguages().then(data => {
@@ -606,6 +607,12 @@ export default function TranslationPage() {
         setStoreHost(host);
       }
     }).catch(() => { /* ignore — guard is also on backend */ });
+
+    fetchShopifyPages().then(res => {
+      if (res.success && res.pages) {
+        setStorePages(res.pages);
+      }
+    }).catch(err => console.error("Failed to fetch shopify pages:", err));
   }, []);
   const [fetchStatus, setFetchStatus] = useState("idle");
   const [message, setMessage] = useState("");
@@ -834,12 +841,26 @@ export default function TranslationPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <input
-                value={url} onChange={e => setUrl(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleFetch()}
-                placeholder={storeHost ? `https://${storeHost}/products/example` : "https://yourstore.myshopify.com/products/example"}
-                className="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
-              />
+              <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                <input
+                  value={url} onChange={e => setUrl(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleFetch()}
+                  placeholder={storeHost ? `https://${storeHost}/products/example` : "https://yourstore.myshopify.com/products/example"}
+                  className="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
+                />
+                {storePages.length > 0 && (
+                  <select
+                    value=""
+                    onChange={e => { if(e.target.value) setUrl(e.target.value); }}
+                    className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white max-w-[200px] cursor-pointer"
+                  >
+                    <option value="">Choose a Page...</option>
+                    {storePages.map((p, i) => (
+                      <option key={i} value={p.url}>{p.title}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               {storeHost && (
                 <span className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0">
                   <Globe className="h-3.5 w-3.5" />

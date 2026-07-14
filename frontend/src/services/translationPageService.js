@@ -9,6 +9,11 @@ export const fetchUrlContent = async (url) => {
   return response.json();
 };
 
+export const fetchShopifyPages = async () => {
+  const response = await apiFetch(`${API_URL}/contents/shopify-pages`);
+  return response.json();
+};
+
 export const saveOverlayEdits = async (url, edits) => {
   const response = await apiFetch(`${API_URL}/overlay/save`, {
     method: "POST",

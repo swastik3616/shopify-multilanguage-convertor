@@ -225,6 +225,32 @@ def get_contents_store_status():
     store_url, access_token = get_shopify_credentials()
     return jsonify({"connected": bool(store_url and access_token), "store_url": store_url or None})
 
+@content_bp.route("/contents/shopify-pages", methods=["GET", "OPTIONS"])
+def get_shopify_page_urls():
+    if request.method == "OPTIONS":
+        return "", 204
+        
+    store_url, access_token = get_shopify_credentials()
+    if not store_url or not access_token:
+        return jsonify({"success": False, "message": "No Shopify store connected."}), 400
+        
+    pages = fetch_shopify_pages()
+    
+    urls = []
+    # Add home page by default
+    urls.append({"title": "Home Page", "url": f"https://{store_url}/"})
+    
+    for p in pages:
+        handle = p.get("handle")
+        title = p.get("title")
+        if handle and title:
+            urls.append({
+                "title": title,
+                "url": f"https://{store_url}/pages/{handle}"
+            })
+            
+    return jsonify({"success": True, "pages": urls})
+
 
 @content_bp.route("/contents/fetch-and-parse", methods=["POST", "OPTIONS"])
 def fetch_and_parse_url():

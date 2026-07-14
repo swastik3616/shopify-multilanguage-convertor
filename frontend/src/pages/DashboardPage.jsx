@@ -5,14 +5,14 @@ import { Languages, Plug, ArrowRightLeft, Clock, RefreshCw, AlertTriangle } from
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { apiFetch } from "../services/apiClient";
 
-const REFRESH_INTERVAL_MS = 30_000; // auto-refresh every 30 s
+const REFRESH_INTERVAL_MS = 30_000; // auto-refresh every 30 s]
 
 async function fetchDashboard() {
   const res = await apiFetch("/api/dashboard", { headers: { Accept: "application/json" } });
   const p = await res.json();
   return {
-    overview:       p?.overview       ?? null,
-    analytics:      p?.analytics      ?? null,
+    overview: p?.overview ?? null,
+    analytics: p?.analytics ?? null,
     recentActivity: Array.isArray(p?.recentActivity) ? p.recentActivity : [],
   };
 }
@@ -32,10 +32,10 @@ function LiveDot() {
 }
 
 function DashboardPage() {
-  const navigate  = useNavigate();
-  const [data,    setData]    = useState(null);
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
+  const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState(null);
 
   const load = useCallback(async (silent = false) => {
@@ -64,20 +64,20 @@ function DashboardPage() {
   const stats = useMemo(() => {
     const o = data?.overview;
     return [
-      { title: "Languages",    value: o?.activeLanguages      ?? "—", icon: Languages,    trend: "Configured" },
-      { title: "Providers",    value: o?.providers            ?? "—", icon: Plug,          trend: "Active"      },
-      { title: "Translations", value: o?.translationRequests  ?? "—", icon: ArrowRightLeft, trend: "All time"   },
-      { title: "Installed",    value: o?.installationTime     ?? "—", icon: Clock,          trend: "First seen" },
+      { title: "Languages", value: o?.activeLanguages ?? "—", icon: Languages, trend: "Configured" },
+      { title: "Providers", value: o?.providers ?? "—", icon: Plug, trend: "Active" },
+      { title: "Translations", value: o?.translationRequests ?? "—", icon: ArrowRightLeft, trend: "All time" },
+      { title: "Installed", value: o?.installationTime ?? "—", icon: Clock, trend: "First seen" },
     ];
   }, [data]);
 
   /* ── Chart data — uses real dates from backend ── */
   const chartData = useMemo(() => {
-    const vols   = data?.analytics?.volumeByDay;
+    const vols = data?.analytics?.volumeByDay;
     const labels = data?.analytics?.dayLabels;
     if (Array.isArray(vols) && vols.length) {
       return vols.map((val, i) => ({
-        name:         labels?.[i] ?? `Day ${i + 1}`,
+        name: labels?.[i] ?? `Day ${i + 1}`,
         translations: val,
       }));
     }
@@ -112,7 +112,7 @@ function DashboardPage() {
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Dashboard</h1>
           {!loading && (
             <span className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
-              <LiveDot/> Live
+              <LiveDot /> Live
             </span>
           )}
         </div>
@@ -127,7 +127,7 @@ function DashboardPage() {
             disabled={loading}
             className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}/>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
           <button className="btn btn-primary px-4 py-2" onClick={() => navigate("/translations")}>
@@ -140,7 +140,7 @@ function DashboardPage() {
       {error && !loading && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5"/>
+            <AlertTriangle className="h-5 w-5" />
             <span className="text-sm font-medium">{error}</span>
           </div>
           <button onClick={() => load(false)} className="text-sm font-semibold hover:underline">Retry</button>
@@ -152,12 +152,12 @@ function DashboardPage() {
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="card-container p-6">
-              <Skeleton className="h-4 w-20 mb-4"/>
-              <Skeleton className="h-8 w-16"/>
+              <Skeleton className="h-4 w-20 mb-4" />
+              <Skeleton className="h-8 w-16" />
             </div>
           ))
         ) : (
-          stats.map((item, i) => <StatCard key={i} {...item}/>)
+          stats.map((item, i) => <StatCard key={i} {...item} />)
         )}
       </div>
 
@@ -169,7 +169,7 @@ function DashboardPage() {
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-slate-900">Translation Volume</h3>
-              {!loading && <LiveDot/>}
+              {!loading && <LiveDot />}
             </div>
             <span className="text-xs text-slate-400">Last 7 days</span>
           </div>
@@ -183,7 +183,7 @@ function DashboardPage() {
 
           {loading ? (
             <div className="h-72 w-full">
-              <Skeleton className="h-full w-full"/>
+              <Skeleton className="h-full w-full" />
             </div>
           ) : (
             <div className="h-72 w-full">
@@ -191,11 +191,11 @@ function DashboardPage() {
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTranslations" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#008060" stopOpacity={0.15}/>
-                      <stop offset="95%" stopColor="#008060" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#008060" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#008060" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis
                     dataKey="name"
                     axisLine={false} tickLine={false}
@@ -227,16 +227,16 @@ function DashboardPage() {
         <div className="card-container p-6 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-semibold text-slate-900">Recent Activity</h3>
-            {!loading && <LiveDot/>}
+            {!loading && <LiveDot />}
           </div>
           <div className="flex flex-col gap-4 flex-1 overflow-y-auto max-h-72">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="flex gap-3">
-                  <Skeleton className="w-8 h-8 rounded-full shrink-0"/>
+                  <Skeleton className="w-8 h-8 rounded-full shrink-0" />
                   <div className="w-full">
-                    <Skeleton className="h-4 w-3/4 mb-2"/>
-                    <Skeleton className="h-3 w-1/2"/>
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-1/2" />
                   </div>
                 </div>
               ))
@@ -248,7 +248,7 @@ function DashboardPage() {
               recentActivity.map((item, i) => (
                 <div key={i} className="flex gap-3 items-start">
                   <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
-                    <ArrowRightLeft className="h-3.5 w-3.5 text-emerald-600"/>
+                    <ArrowRightLeft className="h-3.5 w-3.5 text-emerald-600" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-slate-900 font-medium truncate">{item.action || "—"}</p>
