@@ -9,6 +9,33 @@ import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits, fetchShopifyPages
 import { translateText } from "../services/translationService";
 import { getLanguages } from "../services/languageService";
 import { getStoreSettings } from "../services/storeSettingsService";
+import { API_URL, apiFetch } from "../services/apiClient";
+
+async function bulkTranslateElements(elements, targetLang) {
+  // Build a numbered dict of translatable items
+  const translatables = elements
+    .map((el, idx) => ({ idx, text: el.text }))
+    .filter(({ text }) => text && text.trim());
+  
+  if (!translatables.length) return elements;
+
+  const inputDict = {};
+  translatables.forEach(({ text }, i) => { inputDict[String(i)] = text; });
+
+  const res = await apiFetch(`${API_URL}/bulk-translate`, {
+    method: "POST",
+    body: JSON.stringify({ texts: Object.values(inputDict), target_language: targetLang }),
+  });
+  const data = await res.json();
+  const translatedArr = data.translations || [];
+
+  // Map results back to each element by index in translatables
+  const updatedElements = elements.map(el => ({ ...el }));
+  translatables.forEach(({ idx }, i) => {
+    updatedElements[idx] = { ...updatedElements[idx], translatedText: translatedArr[i] ?? elements[idx].translatedText ?? "" };
+  });
+  return updatedElements;
+}
 
 const HEADING_TAGS = ["H1", "H2", "H3", "H4", "H5", "H6"];
 const TEXT_TAGS = new Set(["SPAN", "LI", "LABEL", "SMALL", "STRONG", "EM", "B", "I", "TD", "TH", "CAPTION", "SUMMARY"]);
@@ -722,14 +749,12 @@ export default function TranslationPage() {
   const handleTranslate = async (sectionId) => {
     const section = sections.find(s => s.id === sectionId);
     if (!section) return;
-    const payload = buildPayload(section);
-    if (!payload.trim()) return;
+    const translatables = section.elements.filter(e => e.translatable && e.text);
+    if (!translatables.length) return;
     setTranslatingId(sectionId);
     try {
-      const res = await translateText({ source_text: payload, target_language: targetLang });
-      const { elements, mismatch } = applyResult(section, res.translated_text || "");
-      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, elements, mismatch } : s));
-      if (mismatch) setMessage(`Section "${section.label}" — translation count mismatch, please review.`);
+      const updatedElements = await bulkTranslateElements(section.elements, targetLang);
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, elements: updatedElements, mismatch: false } : s));
     } catch (err) {
       setMessage(err.message || "Translation failed.");
     } finally {

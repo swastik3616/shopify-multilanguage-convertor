@@ -150,11 +150,21 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
         print("Falling back to single item translation with rate limiting...")
         fallback = {}
         for key, text in source_texts_dict.items():
-            try:
-                fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
-                # Sleep briefly to avoid 429 Too Many Requests, especially for Groq (30 RPM limit)
-                time.sleep(2.5)
-            except Exception as single_e:
-                print(f"Single item translation failed for '{text}':", str(single_e))
-                fallback[key] = text # Fallback to original text if completely failed
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
+                    # Sleep to stay within Groq's free-tier RPM limit (~30 RPM = 1 req/2s)
+                    time.sleep(3.5)
+                    break
+                except Exception as single_e:
+                    err_msg = str(single_e)
+                    if "429" in err_msg and attempt < max_retries - 1:
+                        wait = 5 * (attempt + 1)  # 5s, then 10s backoff
+                        print(f"Rate limited (429), retrying in {wait}s... (attempt {attempt+1}/{max_retries})")
+                        time.sleep(wait)
+                    else:
+                        print(f"Single item translation failed for '{text}':", err_msg)
+                        fallback[key] = text  # Fallback to original text if completely failed
+                        break
         return fallback
