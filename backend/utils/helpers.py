@@ -54,49 +54,74 @@ def get_default_provider_settings():
 
 
 def get_provider_settings():
-    """Read provider config from the dedicated PROVIDER_SETTINGS table.
-    Falls back to the legacy APP_SETTINGS JSON blob if no rows exist yet."""
-    rows = execute(
-        "SELECT PROVIDER, MODEL, API_KEY FROM PROVIDER_SETTINGS ORDER BY UPDATED_AT DESC LIMIT 1",
-        fetch="all",
-    )
-    if rows:
-        # Build the same shape the rest of the code expects
-        row = rows[0]
-        provider = row["PROVIDER"]
-        # Also load API keys for all providers so nothing breaks
-        all_keys_rows = execute(
-            "SELECT PROVIDER, API_KEY FROM PROVIDER_SETTINGS",
-            fetch="all",
-        ) or []
-        api_keys = {r["PROVIDER"]: r["API_KEY"] for r in all_keys_rows}
-        return {
-            "provider": provider,
-            "model": row["MODEL"],
-            "api_keys": api_keys,
-        }
-    # Fallback: legacy JSON blob
-    return get_setting("provider_settings", get_default_provider_settings())
+    """Read provider config from the dynamic AI_PROVIDERS table."""
+    active_row = execute("SELECT PROVIDER_NAME, MODEL FROM AI_PROVIDERS WHERE IS_ACTIVE = TRUE LIMIT 1", fetch="one")
+    
+    provider = "openai"
+    model = "gpt-3.5-turbo"
+    if active_row:
+        provider = active_row["PROVIDER_NAME"]
+        model = active_row["MODEL"]
+
+    all_keys_rows = execute("SELECT PROVIDER_NAME, API_KEY FROM AI_PROVIDERS", fetch="all") or []
+    api_keys = {r["PROVIDER_NAME"]: r["API_KEY"] or "" for r in all_keys_rows}
+    
+    for p in ["openai", "gemini", "claude", "groq", "ollama"]:
+        if p not in api_keys:
+            api_keys[p] = ""
+
+    return {
+        "provider": provider,
+        "model": model,
+        "api_keys": api_keys,
+    }
 
 
 def set_provider_settings(provider, model, api_key):
-    """Upsert a row in PROVIDER_SETTINGS for the given provider."""
+    """Update active provider and its API key in AI_PROVIDERS."""
+    execute("UPDATE AI_PROVIDERS SET IS_ACTIVE = FALSE")
+    
     existing = execute(
-        "SELECT ID FROM PROVIDER_SETTINGS WHERE PROVIDER = %s LIMIT 1",
+        "SELECT ID FROM AI_PROVIDERS WHERE PROVIDER_NAME = %s LIMIT 1",
         (provider,),
         fetch="one",
     )
     if existing:
         execute(
-            "UPDATE PROVIDER_SETTINGS SET MODEL = %s, API_KEY = %s, UPDATED_AT = CURRENT_TIMESTAMP "
-            "WHERE PROVIDER = %s",
+            "UPDATE AI_PROVIDERS SET MODEL = %s, API_KEY = %s, IS_ACTIVE = TRUE, UPDATED_AT = CURRENT_TIMESTAMP "
+            "WHERE PROVIDER_NAME = %s",
             (model, api_key, provider),
         )
     else:
+        # Seed missing providers safely
+        default_base_url = "https://api.openai.com"
+        default_endpoint = "/v1/chat/completions"
+        auth_type = "Bearer"
+        auth_header = "Authorization"
+        headers_tpl = '{"Content-Type": "application/json"}'
+        req_tpl = '{"model": "{{model}}", "messages": [{"role": "user", "content": "{{prompt}}"}]}'
+        resp_map = 'choices[0].message.content'
+
+        if provider == "claude":
+            default_base_url = "https://api.anthropic.com"
+            default_endpoint = "/v1/messages"
+            auth_type = "Header"
+            auth_header = "x-api-key"
+            headers_tpl = '{"anthropic-version": "2023-06-01", "content-type": "application/json"}'
+            req_tpl = '{"model": "{{model}}", "max_tokens": 4096, "messages": [{"role": "user", "content": "{{prompt}}"}]}'
+            resp_map = 'content[0].text'
+        elif provider == "ollama":
+            default_base_url = "http://localhost:11434"
+            default_endpoint = "/api/generate"
+            auth_type = ""
+            auth_header = ""
+            req_tpl = '{"model": "{{model}}", "prompt": "{{prompt}}", "stream": false, "format": "json"}'
+            resp_map = 'response'
+            
         execute(
-            "INSERT INTO PROVIDER_SETTINGS (PROVIDER, MODEL, API_KEY, UPDATED_AT) "
-            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
-            (provider, model, api_key),
+            "INSERT INTO AI_PROVIDERS (PROVIDER_NAME, BASE_URL, ENDPOINT, METHOD, AUTH_TYPE, AUTH_HEADER, REQUEST_TEMPLATE, RESPONSE_MAPPING, HEADERS, MODEL, API_KEY, IS_ACTIVE, UPDATED_AT) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, CURRENT_TIMESTAMP)",
+            (provider, default_base_url, default_endpoint, 'POST', auth_type, auth_header, req_tpl, resp_map, headers_tpl, model, api_key),
         )
 
 
