@@ -131,6 +131,7 @@ def get_provider_response(provider, model, api_key, source_text, target_language
     return call_provider(provider, prompt)
 
 def get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language):
+    import time
     prompt = (
         f"You are a professional translator. Translate the following JSON object's values to {target_language}. "
         "Return ONLY a valid JSON object with the exact same keys and the translated values. "
@@ -146,8 +147,14 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
         return parsed
     except Exception as e:
         print(f"Bulk Translation Error ({provider}):", str(e))
-        print("Falling back to single item translation...")
+        print("Falling back to single item translation with rate limiting...")
         fallback = {}
         for key, text in source_texts_dict.items():
-            fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
+            try:
+                fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
+                # Sleep briefly to avoid 429 Too Many Requests, especially for Groq (30 RPM limit)
+                time.sleep(2.5)
+            except Exception as single_e:
+                print(f"Single item translation failed for '{text}':", str(single_e))
+                fallback[key] = text # Fallback to original text if completely failed
         return fallback
