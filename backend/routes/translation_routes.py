@@ -131,6 +131,13 @@ def translate_text():
         translated_text = get_provider_response(provider, model, api_key, source_text, target_language)
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+    
+    print("=" * 50)
+    print("SOURCE:", repr(source_text))
+    print("TARGET:", repr(target_language))
+    print("TRANSLATED:", repr(translated_text))
+    print("TYPE:", type(translated_text))
+    print("=" * 50)
 
     execute(
         "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
