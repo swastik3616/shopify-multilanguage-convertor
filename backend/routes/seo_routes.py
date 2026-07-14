@@ -156,7 +156,7 @@ def update_original_seo():
                 (db_key, db_source_text),
             )
         execute(
-            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
             (f"Updated SEO for {db_key}",),
         )
         return jsonify({"success": True})
@@ -236,7 +236,7 @@ def translate_seo():
                     retry_user_errors = ((retry_data.get("data") or {}).get("translationsRegister") or {}).get("userErrors", [])
                     if not retry_user_errors:
                         execute(
-                            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+                            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
                             (f"SEO Translated {resource_id.split('/')[-1]} to {locale}",),
                         )
                         return jsonify({"success": True, "message": f"Translations registered (Auto-enabled {locale} locale)"})
@@ -246,7 +246,7 @@ def translate_seo():
             return jsonify({"success": False, "message": f"GraphQL Error: {error_msg}"}), 400
 
         execute(
-            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
             (f"SEO Translated {resource_id.split('/')[-1]} to {locale}",),
         )
         return jsonify({"success": True, "message": "Translations registered"})

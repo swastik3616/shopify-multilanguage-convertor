@@ -83,7 +83,7 @@ def bulk_translate():
             cached_map[orig_idx] = translated
             execute(
                 "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
                 (source, target_language, translated),
             )
 
@@ -160,7 +160,7 @@ def translate_text():
 
         execute(
             "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
             (source_text, target_language, translated_text),
         )
 
@@ -395,14 +395,14 @@ def create_manual_translation():
             (translated_text, existing["ID"]),
         )
         execute(
-            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+            "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
             (f"Manual Translation Updated: {existing['ID']}",),
         )
         return jsonify({"success": True, "id": existing["ID"]})
 
     execute(
         "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-        "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+        "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
         (source_text, target_language, translated_text),
     )
     new_row = execute(
@@ -413,7 +413,7 @@ def create_manual_translation():
     )
     new_id = new_row["ID"] if new_row else None
     execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
         (f"Manual Translation Created: {new_id}",),
     )
     return jsonify({"success": True, "id": new_id})
@@ -439,7 +439,7 @@ def update_translation(translation_id):
         (new_text, translation_id),
     )
     execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
         (f"Translation Updated: {translation_id}",),
     )
     return jsonify({"success": True, "message": "Translation updated", "id": translation_id})
@@ -460,7 +460,7 @@ def delete_translation(translation_id):
 
     execute("DELETE FROM TRANSLATIONS WHERE ID = %s", (translation_id,))
     execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
         (f"Translation Deleted: {translation_id}",),
     )
     return jsonify({"success": True, "message": "Translation deleted"})

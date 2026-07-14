@@ -471,7 +471,7 @@ def import_content():
         else:
             execute(
                 "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
                 (source_text, target_language, translated_text),
             )
         translation_saved = True
@@ -480,7 +480,7 @@ def import_content():
     if source_url:
         audit_action += f" from {source_url}"
     execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
         (audit_action,),
     )
 
@@ -587,13 +587,13 @@ def translate_content(content_id):
 
     if existing_translation:
         execute(
-            "UPDATE TRANSLATIONS SET TRANSLATED_TEXT = %s, CREATED_AT = CURRENT_TIMESTAMP() WHERE ID = %s",
+            "UPDATE TRANSLATIONS SET TRANSLATED_TEXT = %s, CREATED_AT = CURRENT_TIMESTAMP WHERE ID = %s",
             (translated_text, existing_translation["ID"]),
         )
     else:
         execute(
             "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP())",
+            "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
             (source_text, target_language, translated_text),
         )
 

@@ -134,7 +134,7 @@ def save_store_settings():
     set_setting("store_setting", store_setting)
 
     execute(
-        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP())",
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
         ("Store Settings Updated",),
     )
     return jsonify({"success": True, "message": "Store settings saved successfully"})
