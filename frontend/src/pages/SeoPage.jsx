@@ -211,8 +211,19 @@ function SeoPage() {
           <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
             <Search className="h-4 w-4 text-[#008060]" />
             <div>
-              <h2 className="font-semibold text-slate-900">Original Resources</h2>
-              <p className="text-xs text-slate-500">Select an item to edit its SEO data</p>
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                Original Resources
+                {resources.length > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                    {resources.length} {resourceType}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {resources.length > 0
+                  ? `You have ${resources.length} ${resourceType} that require SEO translation.`
+                  : "Select an item to edit its SEO data"}
+              </p>
             </div>
           </div>
 

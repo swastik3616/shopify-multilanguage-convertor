@@ -254,24 +254,6 @@ def get_shopify_page_urls():
 
 @content_bp.route("/contents/fetch-and-parse", methods=["POST", "OPTIONS"])
 def fetch_and_parse_url():
-    """
-    Fetch a URL and parse HTML to extract translatable content.
-    
-    Security: Only URLs from the configured Shopify store are allowed.
-    
-    Request body:
-        {
-            "url": "https://mystore.myshopify.com/products/example",
-            "page": "product" (optional)
-        }
-    
-    Response:
-        {
-            "success": true,
-            "message": "Extracted and saved X elements.",
-            "imported": X
-        }
-    """
     if request.method == "OPTIONS":
         return "", 204
 
