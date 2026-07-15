@@ -173,7 +173,9 @@ function SeoPage() {
               value={resourceType}
               onChange={(e) => setResourceType(e.target.value)}
             >
+              <option value="shop">Home Page</option>
               <option value="pages">Pages</option>
+              <option value="products">Products</option>
             </select>
           </div>
           <div className="relative">
