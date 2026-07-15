@@ -17,12 +17,7 @@ def get_seo_resources():
     if not store_url or not access_token:
         return jsonify({"success": False, "message": "Store not connected"}), 400
 
-    if resource_type == "products":
-        graphql_type = "PRODUCT"
-    elif resource_type == "shop":
-        graphql_type = "SHOP"
-    else:
-        graphql_type = "PAGE"
+    graphql_type = "PRODUCT" if resource_type == "products" else "PAGE"
     query = """
     query {
       translatableResources(first: 50, resourceType: %s) {
@@ -110,10 +105,6 @@ def update_original_seo():
 
     headers = {"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"}
     is_product = "Product" in resource_id
-    is_shop = "Shop" in resource_id
-
-    if is_shop:
-        return jsonify({"success": False, "message": "Updating the original Home Page SEO must be done directly in the Shopify admin Preferences. However, you can still translate it here!"}), 400
 
     if is_product:
         mutation = """
