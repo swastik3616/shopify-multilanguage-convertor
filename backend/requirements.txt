@@ -8,3 +8,4 @@ langdetect
 psycopg2-binary
 flask-sqlalchemy
 pymysql
+dbutils
