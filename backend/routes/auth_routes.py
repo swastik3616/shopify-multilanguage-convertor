@@ -125,6 +125,10 @@ def auth_callback():
         atok = atok[1:-1]
     if isinstance(atok, str) and atok.lower().startswith("bearer "):
         atok = atok.split(None, 1)[1]
+        
+    # SECURITY: Encrypt access token before storing in database
+    from utils.helpers import encrypt_token
+    encrypted_atok = encrypt_token(atok)
 
     shop_normalized = normalize_shopify_store_url(shop)
     existing = execute(
@@ -135,12 +139,12 @@ def auth_callback():
     if existing:
         execute(
             "UPDATE SHOPIFY_STORES SET ACCESS_TOKEN = %s WHERE SHOP = %s",
-            (atok, shop_normalized),
+            (encrypted_atok, shop_normalized),
         )
     else:
         execute(
             "INSERT INTO SHOPIFY_STORES (SHOP, ACCESS_TOKEN) VALUES (%s, %s)",
-            (shop_normalized, atok),
+            (shop_normalized, encrypted_atok),
         )
 
     return "Installation successful! You can now close this tab and return to the app."

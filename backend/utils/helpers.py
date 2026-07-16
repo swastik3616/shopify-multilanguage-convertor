@@ -183,7 +183,7 @@ def get_shopify_credentials(shop=None):
 
     store = get_current_store(shop)
     if store:
-        return normalize_shopify_store_url(store["SHOP"]), _clean_token(store["ACCESS_TOKEN"])
+        return normalize_shopify_store_url(store["SHOP"]), _clean_token(decrypt_token(store["ACCESS_TOKEN"]))
     store_setting = get_setting("store_setting", {})
     store_url = normalize_shopify_store_url(store_setting.get("store_url", ""))
     access_token = _clean_token(store_setting.get("access_token", ""))
@@ -227,3 +227,31 @@ def verify_webhook_hmac(raw_data: bytes, hmac_header: str, secret: str) -> bool:
     calculated_hmac_b64 = base64.b64encode(calculated_hmac).decode('utf-8')
     
     return hmac.compare_digest(calculated_hmac_b64, hmac_header)
+
+from cryptography.fernet import Fernet
+import os
+
+# Add ENCRYPTION_KEY to your .env (generate via: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+def get_cipher():
+    key = os.getenv("ENCRYPTION_KEY")
+    if not key:
+        # Fallback to a hardcoded key in development to prevent crashes if .env is missing it
+        key = os.getenv("FLASK_SECRET_KEY", "bQdD-lZ2mR6vY7nB1cV8wX3sK5jF9aH4pL0tU2xO_gI=") 
+        if len(key) < 43:
+            key = "bQdD-lZ2mR6vY7nB1cV8wX3sK5jF9aH4pL0tU2xO_gI="
+    try:
+        return Fernet(key.encode())
+    except:
+        return Fernet(b"bQdD-lZ2mR6vY7nB1cV8wX3sK5jF9aH4pL0tU2xO_gI=")
+
+def encrypt_token(plain_token: str) -> str:
+    if not plain_token: return ""
+    return get_cipher().encrypt(plain_token.encode()).decode()
+
+def decrypt_token(encrypted_token: str) -> str:
+    if not encrypted_token: return ""
+    try:
+        return get_cipher().decrypt(encrypted_token.encode()).decode()
+    except Exception:
+        # Fallback for older plaintext tokens
+        return encrypted_token
