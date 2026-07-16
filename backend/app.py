@@ -17,6 +17,8 @@ from routes.overlay_routes import overlay_bp
 print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 
 app = Flask(__name__)
+# Added secret key for secure Flask sessions (required for OAuth state verification)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
 
 CORS(
     app,

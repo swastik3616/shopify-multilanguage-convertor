@@ -192,3 +192,58 @@ def get_shopify_credentials(shop=None):
     store_url = normalize_shopify_store_url(store_setting.get("store_url", ""))
     access_token = _clean_token(store_setting.get("access_token", ""))
     return store_url, access_token
+
+
+# --- Security Helpers Added for Shopify OAuth & Webhooks ---
+
+import hmac
+import hashlib
+from urllib.parse import urlencode
+
+def validate_shopify_shop(shop: str) -> bool:
+    """Ensure the shop parameter is a valid .myshopify.com domain."""
+    if not shop:
+        return False
+    # Only accept valid alphanumeric strings (and hyphens) ending in .myshopify.com
+    pattern = r"^[a-zA-Z0-9-]+\.myshopify\.com$"
+    return bool(re.match(pattern, shop))
+
+def verify_shopify_hmac(query_params: dict, secret: str) -> bool:
+    """Verify the HMAC signature of incoming Shopify requests during OAuth."""
+    if 'hmac' not in query_params:
+        return False
+    
+    # Extract the given hmac
+    provided_hmac = query_params['hmac']
+    
+    # Remove hmac and signature parameters before generating the hash
+    sorted_params = {k: v for k, v in sorted(query_params.items()) if k not in ['hmac', 'signature']}
+    
+    # Create the query string message (key=value joined by &)
+    message = urlencode(sorted_params, safe='=')
+    
+    # Calculate HMAC SHA256
+    calculated_hmac = hmac.new(
+        secret.encode('utf-8'),
+        message.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+    
+    # Use compare_digest to prevent timing attacks
+    return hmac.compare_digest(calculated_hmac, provided_hmac)
+
+def verify_webhook_hmac(raw_data: bytes, hmac_header: str, secret: str) -> bool:
+    """Reusable helper for verifying Shopify Webhooks using X-Shopify-Hmac-Sha256 header."""
+    if not hmac_header or not raw_data:
+        return False
+        
+    import base64
+    calculated_hmac = hmac.new(
+        secret.encode('utf-8'),
+        raw_data,
+        hashlib.sha256
+    ).digest()
+    
+    calculated_hmac_b64 = base64.b64encode(calculated_hmac).decode('utf-8')
+    
+    return hmac.compare_digest(calculated_hmac_b64, hmac_header)

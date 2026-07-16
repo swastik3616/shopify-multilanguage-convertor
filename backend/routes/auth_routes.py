@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Blueprint, jsonify, request, redirect
+from flask import Blueprint, jsonify, request, redirect, session
 from database import execute
 from utils.helpers import (
     get_shop_from_request,
@@ -8,6 +8,8 @@ from utils.helpers import (
     normalize_shopify_store_url,
     get_shopify_credentials,
     _mask_token,
+    validate_shopify_shop,
+    verify_shopify_hmac,
 )
 
 auth_bp = Blueprint("auth_routes", __name__)
@@ -54,11 +56,21 @@ def shopify_test():
 @auth_bp.route("/install")
 def install():
     shop = request.args.get("shop")
+    
+    # SECURITY: Validate the shop parameter to prevent Open Redirect attacks
+    if not validate_shopify_shop(shop):
+        return jsonify({"error": "Invalid shop parameter. Must be a .myshopify.com domain."}), 400
+        
+    # SECURITY: Generate secure random state to prevent CSRF attacks
+    state = os.urandom(15).hex()
+    session["oauth_state"] = state
+    
     install_url = (
         f"https://{shop}/admin/oauth/authorize"
         f"?client_id={os.getenv('SHOPIFY_CLIENT_ID')}"
         f"&scope={os.getenv('SHOPIFY_SCOPES')}"
         f"&redirect_uri={os.getenv('SHOPIFY_REDIRECT_URI')}"
+        f"&state={state}" # Added state to authorization URL
     )
     return redirect(install_url)
 
@@ -67,18 +79,48 @@ def install():
 def auth_callback():
     shop = request.args.get("shop")
     code = request.args.get("code")
+    state = request.args.get("state")
+    
+    # SECURITY: Validate the shop parameter
+    if not validate_shopify_shop(shop):
+        return jsonify({"error": "Invalid shop parameter."}), 400
 
+    # SECURITY: Verify OAuth state to prevent CSRF
+    if not state or state != session.get("oauth_state"):
+        return jsonify({"error": "Invalid state parameter. Possible CSRF attack."}), 403
+        
+    # Clear state from session after successful validation
+    session.pop("oauth_state", None)
+
+    # SECURITY: Verify Shopify HMAC signature to ensure request came from Shopify
+    query_params = request.args.to_dict()
+    client_secret = os.getenv("SHOPIFY_CLIENT_SECRET")
+    if not verify_shopify_hmac(query_params, client_secret):
+        return jsonify({"error": "Invalid HMAC signature. Request not authorized."}), 401
+
+    # Exchange code for access token
     response = requests.post(
         f"https://{shop}/admin/oauth/access_token",
         json={
             "client_id": os.getenv("SHOPIFY_CLIENT_ID"),
-            "client_secret": os.getenv("SHOPIFY_CLIENT_SECRET"),
+            "client_secret": client_secret,
             "code": code,
         },
     )
 
+    # ERROR HANDLING: Ensure we only proceed if token exchange succeeded
+    if not response.ok:
+        return jsonify({
+            "error": "Failed to exchange access token", 
+            "details": response.text
+        }), response.status_code
+
     token_data = response.json()
     atok = token_data.get("access_token", "")
+    
+    if not atok:
+        return jsonify({"error": "No access token returned by Shopify."}), 500
+
     if isinstance(atok, str) and atok.startswith('"') and atok.endswith('"'):
         atok = atok[1:-1]
     if isinstance(atok, str) and atok.lower().startswith("bearer "):
