@@ -243,7 +243,8 @@ def get_shopify_page_urls():
     for p in pages:
         handle = p.get("handle")
         title = p.get("title")
-        if handle and title:
+        # Filter out custom pages named 'Home' or 'Home Page' to avoid duplicates
+        if handle and title and title.lower() not in ["home page", "home"]:
             urls.append({
                 "title": title,
                 "url": f"https://{store_url}/pages/{handle}"
