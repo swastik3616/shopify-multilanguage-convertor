@@ -1,47 +1,97 @@
 import os
-import pymysql
-from pymysql.cursors import DictCursor
-from dbutils.pooled_db import PooledDB
+import psycopg2
+from psycopg2 import pool
+from psycopg2.extras import RealDictCursor
 
-pool = PooledDB(
-    creator=pymysql,
-    maxconnections=20,
-    mincached=1,
-    maxcached=10,
-    blocking=True,
-    host=os.getenv("MYSQL_HOST"),
-    port=int(os.getenv("MYSQL_PORT", 3306)),
-    user=os.getenv("MYSQL_USER"),
-    password=os.getenv("MYSQL_PASSWORD"),
-    database=os.getenv("MYSQL_DATABASE"),
-    charset="utf8mb4",
-    cursorclass=DictCursor,
-    autocommit=False
-)
+# ------------------------------------------------------------------
+# Database Connection
+# ------------------------------------------------------------------
+
+db_url = os.getenv("DATABASE_URL")
+
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+pg_pool = None
+
+if db_url:
+    try:
+        pg_pool = psycopg2.pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=20,
+            dsn=db_url
+        )
+        print(" PostgreSQL connection pool initialized.")
+    except Exception as e:
+        print(f" Error creating PostgreSQL connection pool: {e}")
+
+
+# ------------------------------------------------------------------
+# Helper
+# ------------------------------------------------------------------
+
+def _uppercase_dict(d):
+    if d is None:
+        return None
+    return {k.upper(): v for k, v in d.items()}
+
+
+# ------------------------------------------------------------------
+# Execute Query
+# ------------------------------------------------------------------
 
 def execute(query, params=None, fetch=None):
-    conn = pool.connection()
+    if not pg_pool:
+        raise Exception("Database pool not initialized")
+
+    conn = pg_pool.getconn()
 
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+            # ----------------------------------------------------------
+            # Debug SQL
+            # ----------------------------------------------------------
+            try:
+                print("\n" + "=" * 80)
+                print("SQL QUERY:")
+                print(cur.mogrify(query, params).decode("utf-8"))
+                print("=" * 80 + "\n")
+            except Exception as debug_error:
+                print(f"Could not mogrify query: {debug_error}")
+
+            # Execute
             cur.execute(query, params)
 
             if fetch == "one":
                 result = cur.fetchone()
                 conn.commit()
-                return result
+                return _uppercase_dict(result) if result else None
 
             elif fetch == "all":
                 result = cur.fetchall()
                 conn.commit()
-                return result
+                return [_uppercase_dict(row) for row in result]
 
-            conn.commit()
-            return None
+            else:
+                conn.commit()
+                return None
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+
+        print("\n" + "=" * 80)
+        print("DATABASE ERROR")
+        print("=" * 80)
+        print("Query:")
+        print(query)
+        print("\nParameters:")
+        print(repr(params))
+        print("\nException:")
+        print(e)
+        print("=" * 80 + "\n")
+
         raise
 
     finally:
-        conn.close()
+        pg_pool.putconn(conn)
