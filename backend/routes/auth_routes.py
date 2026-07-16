@@ -70,7 +70,7 @@ def install():
         f"?client_id={os.getenv('SHOPIFY_CLIENT_ID')}"
         f"&scope={os.getenv('SHOPIFY_SCOPES')}"
         f"&redirect_uri={os.getenv('SHOPIFY_REDIRECT_URI')}"
-        f"&state={state}" # Added state to authorization URL
+        f"&state={state}" 
     )
     return redirect(install_url)
 

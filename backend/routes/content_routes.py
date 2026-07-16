@@ -270,9 +270,6 @@ def fetch_and_parse_url():
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
-    # ────────────────────────────────────────────────────────────────────────────
-    # URL SECURITY: Validate that URL belongs to configured Shopify store
-    # ────────────────────────────────────────────────────────────────────────────
     validation = validate_shopify_url(url)
     if not validation['valid']:
         logger.warning(f"[fetch_and_parse_url] URL validation failed: {validation['message']}")

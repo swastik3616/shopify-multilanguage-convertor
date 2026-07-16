@@ -31,27 +31,6 @@ def _candidate_urls(raw_url):
 
 @overlay_bp.route("/overlay/save", methods=["POST", "OPTIONS"])
 def save_overlay_edits():
-    """
-    Save overlay edits (translations or base text modifications) for a URL.
-    
-    Security: Only URLs from the configured Shopify store are allowed.
-    
-    Request body:
-        {
-            "url": "https://mystore.myshopify.com/products/example",
-            "edits": [
-                {
-                    "original_text": "Original text",
-                    "new_text": "New text",
-                    "is_translation": false,
-                    "target_language": null,
-                    "selector": "body > div.product",
-                    "element_tag": "h1",
-                    "field_name": null
-                }
-            ]
-        }
-    """
     if request.method == "OPTIONS":
         return "", 204
 
@@ -63,13 +42,9 @@ def save_overlay_edits():
         logger.warning("[save_overlay_edits] Missing URL in request")
         return jsonify({"success": False, "message": "URL is required"}), 400
 
-    # Add scheme if missing
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
-    # ────────────────────────────────────────────────────────────────────────────
-    # URL SECURITY: Validate that URL belongs to configured Shopify store
-    # ────────────────────────────────────────────────────────────────────────────
     validation = validate_shopify_url(url)
     if not validation['valid']:
         logger.warning(f"[save_overlay_edits] URL validation failed: {validation['message']}")
@@ -117,30 +92,7 @@ def save_overlay_edits():
 
 @overlay_bp.route("/overlay/replacements", methods=["GET", "OPTIONS"])
 def get_replacements():
-    """
-    Get overlay replacements (edits) for a URL.
-    
-    Security: Only URLs from the configured Shopify store are allowed.
-    
-    Query parameters:
-        - url: URL to fetch replacements for (required)
-        - target_language: Target language code (optional)
-    
-    Response:
-        {
-            "replacements": [
-                {
-                    "original_text": "Original text",
-                    "new_text": "New text",
-                    "selector": "body > div.product",
-                    "element_tag": "h1",
-                    "field_name": null,
-                    "is_translation": false,
-                    "target_language": null
-                }
-            ]
-        }
-    """
+
     if request.method == "OPTIONS":
         return "", 204
 
@@ -151,13 +103,10 @@ def get_replacements():
         logger.warning("[get_replacements] Missing URL in request")
         return jsonify({"replacements": {}})
 
-    # Add scheme if missing
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
-    # ────────────────────────────────────────────────────────────────────────────
-    # URL SECURITY: Validate that URL belongs to configured Shopify store
-    # ────────────────────────────────────────────────────────────────────────────
+
     validation = validate_shopify_url(url)
     if not validation['valid']:
         logger.warning(f"[get_replacements] URL validation failed: {validation['message']}")

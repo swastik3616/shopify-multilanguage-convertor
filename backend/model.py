@@ -19,8 +19,6 @@ def _row_to(cls, row):
     return obj
 
 
-# ── QueryProxy ────────────────────────────────────────────────────────────────
-
 class QueryProxy:
 
     def __init__(self, cls):
@@ -196,7 +194,6 @@ class Column:
 
 
 class _ColRef:
-    """Returned when accessing Model.column (class-level) for filter expressions."""
     def __init__(self, col_name):
         self.col_name = col_name
 
@@ -243,10 +240,6 @@ class Model(metaclass=_ModelMeta):
     pass
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Concrete Models
-# ═════════════════════════════════════════════════════════════════════════════
-
 class Translation(Model):
     __tablename__ = "translations"
 
@@ -269,8 +262,6 @@ class Translation(Model):
         self._target_language = target_language
         self._translated_text = translated_text
         self._created_at      = _now()
-
-    # Make instance attribute access work after __init__
     def __getattr__(self, name):
         priv = f"_{name}"
         if priv in self.__dict__:

@@ -16,7 +16,7 @@ async function bulkTranslateElements(elements, targetLang) {
   const translatables = elements
     .map((el, idx) => ({ idx, text: el.text }))
     .filter(({ text }) => text && text.trim());
-  
+
   if (!translatables.length) return elements;
 
   const inputDict = {};
@@ -608,7 +608,7 @@ export default function TranslationPage() {
   useEffect(() => {
     getLanguages().then(data => {
       let targets = [];
-      
+
       // Handle array response (admin=true format)
       if (Array.isArray(data)) {
         targets = data
@@ -618,7 +618,7 @@ export default function TranslationPage() {
         // Handle object response (legacy format)
         targets = data.targets || [];
       }
-      
+
       if (targets.length > 0) {
         setAvailableLangs(targets);
         setTargetLang(targets[0]);
@@ -629,11 +629,10 @@ export default function TranslationPage() {
     getStoreSettings().then(cfg => {
       const rawUrl = cfg?.store_url || "";
       if (rawUrl) {
-        // Strip scheme + trailing slashes to get a bare hostname
         const host = rawUrl.replace(/^https?:\/\//i, "").replace(/\/.*$/, "").toLowerCase();
         setStoreHost(host);
       }
-    }).catch(() => { /* ignore — guard is also on backend */ });
+    }).catch(() => { });
 
     fetchShopifyPages().then(res => {
       if (res.success && res.pages) {
@@ -876,7 +875,7 @@ export default function TranslationPage() {
                 {storePages.length > 0 && (
                   <select
                     value=""
-                    onChange={e => { if(e.target.value) setUrl(e.target.value); }}
+                    onChange={e => { if (e.target.value) setUrl(e.target.value); }}
                     className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white max-w-[200px] cursor-pointer"
                   >
                     <option value="">Choose a Page...</option>

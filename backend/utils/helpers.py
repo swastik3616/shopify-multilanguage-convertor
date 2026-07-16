@@ -3,6 +3,9 @@ from database import execute
 from model import ShopifyStore
 import re
 from flask import request
+import hmac
+import hashlib
+from urllib.parse import urlencode
 
 
 def _mask_token(token):
@@ -54,7 +57,6 @@ def get_default_provider_settings():
 
 
 def get_provider_settings():
-    """Read provider config from the dynamic AI_PROVIDERS table."""
     active_row = execute("SELECT PROVIDER_NAME, MODEL FROM AI_PROVIDERS WHERE IS_ACTIVE = TRUE LIMIT 1", fetch="one")
     
     provider = "openai"
@@ -78,7 +80,6 @@ def get_provider_settings():
 
 
 def set_provider_settings(provider, model, api_key):
-    """Update active provider and its API key in AI_PROVIDERS."""
     execute("UPDATE AI_PROVIDERS SET IS_ACTIVE = FALSE")
     
     existing = execute(
@@ -126,7 +127,6 @@ def set_provider_settings(provider, model, api_key):
 
 
 def normalize_shopify_store_url(store_url):
-    """Strip scheme and trailing slashes — store URL must be hostname only."""
     if not store_url:
         return ""
     store_url = store_url.strip()
@@ -135,7 +135,6 @@ def normalize_shopify_store_url(store_url):
 
 
 def get_shop_from_request():
-    """Extract shop domain from request headers, query or JSON body."""
     shop = None
     try:
         shop = request.headers.get("X-Shopify-Shop-Domain")
@@ -156,7 +155,6 @@ def get_shop_from_request():
 
 
 def get_current_store(shop=None):
-    """Return a row dict for the provided shop domain (normalized) or from request."""
     if not shop:
         shop = get_shop_from_request()
     if not shop:
@@ -186,40 +184,23 @@ def get_shopify_credentials(shop=None):
     store = get_current_store(shop)
     if store:
         return normalize_shopify_store_url(store["SHOP"]), _clean_token(store["ACCESS_TOKEN"])
-
-    # Fallback: legacy manual store settings
     store_setting = get_setting("store_setting", {})
     store_url = normalize_shopify_store_url(store_setting.get("store_url", ""))
     access_token = _clean_token(store_setting.get("access_token", ""))
     return store_url, access_token
 
 
-# --- Security Helpers Added for Shopify OAuth & Webhooks ---
-
-import hmac
-import hashlib
-from urllib.parse import urlencode
-
 def validate_shopify_shop(shop: str) -> bool:
-    """Ensure the shop parameter is a valid .myshopify.com domain."""
     if not shop:
         return False
-    # Only accept valid alphanumeric strings (and hyphens) ending in .myshopify.com
     pattern = r"^[a-zA-Z0-9-]+\.myshopify\.com$"
     return bool(re.match(pattern, shop))
 
 def verify_shopify_hmac(query_params: dict, secret: str) -> bool:
-    """Verify the HMAC signature of incoming Shopify requests during OAuth."""
     if 'hmac' not in query_params:
         return False
-    
-    # Extract the given hmac
     provided_hmac = query_params['hmac']
-    
-    # Remove hmac and signature parameters before generating the hash
     sorted_params = {k: v for k, v in sorted(query_params.items()) if k not in ['hmac', 'signature']}
-    
-    # Create the query string message (key=value joined by &)
     message = urlencode(sorted_params, safe='=')
     
     # Calculate HMAC SHA256
@@ -233,7 +214,6 @@ def verify_shopify_hmac(query_params: dict, secret: str) -> bool:
     return hmac.compare_digest(calculated_hmac, provided_hmac)
 
 def verify_webhook_hmac(raw_data: bytes, hmac_header: str, secret: str) -> bool:
-    """Reusable helper for verifying Shopify Webhooks using X-Shopify-Hmac-Sha256 header."""
     if not hmac_header or not raw_data:
         return False
         

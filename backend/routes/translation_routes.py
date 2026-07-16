@@ -181,29 +181,7 @@ def translate_text():
 @translation_bp.route("/fetch-url", methods=["POST", "OPTIONS"])
 @translation_bp.route("/api/fetch-url", methods=["POST", "OPTIONS"])
 def fetch_url_content():
-    """
-    Fetch and parse HTML content from a URL.
-    
-    Security: Only URLs from the configured Shopify store are allowed.
-    
-    Request body:
-        {
-            "url": "https://mystore.myshopify.com/products/example"
-        }
-    
-    Response:
-        {
-            "success": true,
-            "html": "<cleaned HTML content>",
-            "_cache_debug": { cache headers info }
-        }
-    
-    Errors:
-        - 400: URL is required
-        - 403: URL does not belong to configured store
-        - 401: Store is password-protected
-        - 500: Other errors
-    """
+
     if request.method == "OPTIONS":
         return "", 204
 
@@ -219,9 +197,6 @@ def fetch_url_content():
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
-    # ────────────────────────────────────────────────────────────────────────────
-    # URL SECURITY: Validate that URL belongs to configured Shopify store
-    # ────────────────────────────────────────────────────────────────────────────
     validation = validate_shopify_url(url)
     if not validation['valid']:
         logger.warning(f"[fetch_url_content] URL validation failed: {validation['message']}")

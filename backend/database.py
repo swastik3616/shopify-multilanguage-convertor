@@ -3,10 +3,6 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 
-# ------------------------------------------------------------------
-# Database Connection
-# ------------------------------------------------------------------
-
 db_url = os.getenv("DATABASE_URL")
 
 if db_url and db_url.startswith("postgres://"):
@@ -26,19 +22,10 @@ if db_url:
         print(f" Error creating PostgreSQL connection pool: {e}")
 
 
-# ------------------------------------------------------------------
-# Helper
-# ------------------------------------------------------------------
-
 def _uppercase_dict(d):
     if d is None:
         return None
     return {k.upper(): v for k, v in d.items()}
-
-
-# ------------------------------------------------------------------
-# Execute Query
-# ------------------------------------------------------------------
 
 def execute(query, params=None, fetch=None):
     if not pg_pool:
@@ -48,10 +35,6 @@ def execute(query, params=None, fetch=None):
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-
-            # ----------------------------------------------------------
-            # Debug SQL
-            # ----------------------------------------------------------
             try:
                 print("\n" + "=" * 80)
                 print("SQL QUERY:")
