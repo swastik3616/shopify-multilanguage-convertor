@@ -6,6 +6,7 @@ from utils.translation_filter import TranslationFilter
 from utils.url_validator import validate_shopify_url, get_store_domain
 import requests
 import logging
+import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -68,22 +69,33 @@ def bulk_translate():
     )
 
     if uncached_indices:
-        # Process in chunks of 25 to prevent OpenAI token limit truncation and slow fallbacks
         chunk_size = 25
+        chunks = []
         for i in range(0, len(uncached_indices), chunk_size):
             chunk_indices = uncached_indices[i:i + chunk_size]
             uncached_dict = {str(j): texts[orig_idx] for j, orig_idx in enumerate(chunk_indices)}
+            chunks.append((chunk_indices, uncached_dict))
 
+        def process_chunk(chunk):
+            c_indices, c_dict = chunk
             try:
-                translated_dict = get_bulk_provider_response(
-                    provider, model, api_key, uncached_dict, target_language
+                t_dict = get_bulk_provider_response(
+                    provider, model, api_key, c_dict, target_language
                 )
+                return (c_indices, t_dict, None)
             except Exception as e:
-                return jsonify({"success": False, "message": str(e)}), 500
+                return (c_indices, None, str(e))
 
-            for j, orig_idx in enumerate(chunk_indices):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(executor.map(process_chunk, chunks))
+
+        for c_indices, t_dict, error in results:
+            if error:
+                return jsonify({"success": False, "message": error}), 500
+            
+            for j, orig_idx in enumerate(c_indices):
                 source = texts[orig_idx]
-                translated = translated_dict.get(str(j), source)
+                translated = t_dict.get(str(j), source)
                 cached_map[orig_idx] = translated
                 execute(
                     "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "

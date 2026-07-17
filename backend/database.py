@@ -12,7 +12,7 @@ pg_pool = None
 
 if db_url:
     try:
-        pg_pool = psycopg2.pool.SimpleConnectionPool(
+        pg_pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=1,
             maxconn=20,
             dsn=db_url
