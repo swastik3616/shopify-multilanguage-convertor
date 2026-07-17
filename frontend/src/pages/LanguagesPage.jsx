@@ -10,7 +10,15 @@ function LanguagesPage() {
   const [sourceLangId, setSourceLangId] = useState("");
   const [targetLangIds, setTargetLangIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const max_target_language=10;
+  const MAX_TARGET_LANGUAGES=10;
+
+  const showToast = (type, message) => {
+  setToast({ type, message });
+
+  setTimeout(() => {
+    setToast(null);
+  }, 3500);
+};
 
   useEffect(() => {
     const fetchLanguages = async () => {
@@ -47,7 +55,7 @@ function LanguagesPage() {
   }, []);
 
 const handleTargetToggle = (idStr) => {
-  setTargetLangIds(prev => {
+  setTargetLangIds((prev) => {
     const next = new Set(prev);
 
     if (next.has(idStr)) {
@@ -195,21 +203,29 @@ const handleTargetToggle = (idStr) => {
                 const idStr = lang.id.toString();
                 const isSelected = targetLangIds.has(idStr);
                 const isSource = idStr === sourceLangId;
+                const limitReached =
+                targetLangIds.size >= MAX_TARGET_LANGUAGES && !isSelected;
                 
                 return (
-                  <label 
-                    key={lang.id} 
-                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                      isSelected ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'
-                    } ${isSource ? 'opacity-50 grayscale' : ''}`}
-                  >
+                  <label
+                      key={lang.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                        isSelected
+                          ? "bg-blue-50 border-blue-200 shadow-sm"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      } ${
+                        isSource ? "opacity-50 grayscale" : ""
+                      } ${
+                        limitReached ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                      }`}
+                    >
                     <div className="flex items-center h-5">
                       <input 
                         type="checkbox" 
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
                         checked={isSelected}
                         onChange={() => handleTargetToggle(idStr)}
-                        disabled={isSource}
+                        disabled={isSource || limitReached}
                       />
                     </div>
                     <div className="flex flex-col min-w-0">
@@ -227,7 +243,7 @@ const handleTargetToggle = (idStr) => {
           )}
         </div>
         <div className="mt-4 flex justify-between items-center text-xs text-slate-500">
-          <span>{targetLangIds.size} target language{targetLangIds.size !== 1 ? 's' : ''} selected.</span>
+          <span>{targetLangIds.size} / {MAX_TARGET_LANGUAGES} target languages selected.</span>
           <button 
             className="text-blue-600 hover:text-blue-800 font-medium"
             onClick={() => setTargetLangIds(new Set())}
