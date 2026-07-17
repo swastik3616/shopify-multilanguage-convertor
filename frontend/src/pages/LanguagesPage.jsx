@@ -10,6 +10,7 @@ function LanguagesPage() {
   const [sourceLangId, setSourceLangId] = useState("");
   const [targetLangIds, setTargetLangIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const max_target_language=10;
 
   useEffect(() => {
     const fetchLanguages = async () => {
@@ -45,19 +46,27 @@ function LanguagesPage() {
     fetchLanguages();
   }, []);
 
-  const showToast = (type, message) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3500);
-  };
+const handleTargetToggle = (idStr) => {
+  setTargetLangIds(prev => {
+    const next = new Set(prev);
 
-  const handleTargetToggle = (idStr) => {
-    setTargetLangIds(prev => {
-      const next = new Set(prev);
-      if (next.has(idStr)) next.delete(idStr);
-      else next.add(idStr);
+    if (next.has(idStr)) {
+      next.delete(idStr);
       return next;
-    });
-  };
+    }
+
+    if (next.size >= MAX_TARGET_LANGUAGES) {
+      showToast(
+        "error",
+        `You can select a maximum of ${MAX_TARGET_LANGUAGES} target languages.`
+      );
+      return prev;
+    }
+
+    next.add(idStr);
+    return next;
+  });
+};
 
   const handleSave = async () => {
     setSaving(true);
