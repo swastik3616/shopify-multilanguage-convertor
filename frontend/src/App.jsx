@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, useSearchParams } from "react-router-dom";
-import { Provider as AppBridgeProvider } from "@shopify/app-bridge-react";
 
 import DashboardLayout from "./layouts/DashboardLayout";
 
@@ -32,28 +31,9 @@ function AppContent() {
 }
 
 function App() {
-  // Extract shop environment passed by Shopify Admin iframe
-  const urlParams = new URLSearchParams(window.location.search);
-  const host = urlParams.get("host") || "";
-  const shop = urlParams.get("shop") || "";
-
-  const appBridgeConfig = {
-    apiKey: import.meta.env.VITE_SHOPIFY_CLIENT_ID || process.env.REACT_APP_SHOPIFY_CLIENT_ID, // Use appropriate env var based on Vite/CRA
-    host: host,
-    shop: shop,
-    forceRedirect: true,
-  };
-
   return (
     <BrowserRouter>
-      {/* Wrap your app in AppBridgeProvider if loaded inside Shopify Admin */}
-      {host ? (
-        <AppBridgeProvider config={appBridgeConfig}>
-          <AppContent />
-        </AppBridgeProvider>
-      ) : (
-        <AppContent />
-      )}
+      <AppContent />
     </BrowserRouter>
   );
 }
