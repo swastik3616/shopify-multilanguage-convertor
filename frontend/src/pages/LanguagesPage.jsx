@@ -108,7 +108,7 @@ const handleTargetToggle = (idStr) => {
       }));
     } catch (error) {
       console.error(error);
-      showToast("error", "Failed to save settings. Please try again.");
+      showToast("error", error.message || "Failed to save settings. Please try again.");
     } finally {
       setSaving(false);
     }

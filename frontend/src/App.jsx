@@ -35,10 +35,12 @@ function App() {
   // Extract shop environment passed by Shopify Admin iframe
   const urlParams = new URLSearchParams(window.location.search);
   const host = urlParams.get("host") || "";
+  const shop = urlParams.get("shop") || "";
 
   const appBridgeConfig = {
     apiKey: import.meta.env.VITE_SHOPIFY_CLIENT_ID || process.env.REACT_APP_SHOPIFY_CLIENT_ID, // Use appropriate env var based on Vite/CRA
     host: host,
+    shop: shop,
     forceRedirect: true,
   };
 
