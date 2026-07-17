@@ -68,24 +68,28 @@ def bulk_translate():
     )
 
     if uncached_indices:
-        uncached_dict = {str(j): texts[orig_idx] for j, orig_idx in enumerate(uncached_indices)}
+        # Process in chunks of 25 to prevent OpenAI token limit truncation and slow fallbacks
+        chunk_size = 25
+        for i in range(0, len(uncached_indices), chunk_size):
+            chunk_indices = uncached_indices[i:i + chunk_size]
+            uncached_dict = {str(j): texts[orig_idx] for j, orig_idx in enumerate(chunk_indices)}
 
-        try:
-            translated_dict = get_bulk_provider_response(
-                provider, model, api_key, uncached_dict, target_language
-            )
-        except Exception as e:
-            return jsonify({"success": False, "message": str(e)}), 500
+            try:
+                translated_dict = get_bulk_provider_response(
+                    provider, model, api_key, uncached_dict, target_language
+                )
+            except Exception as e:
+                return jsonify({"success": False, "message": str(e)}), 500
 
-        for j, orig_idx in enumerate(uncached_indices):
-            source = texts[orig_idx]
-            translated = translated_dict.get(str(j), source)
-            cached_map[orig_idx] = translated
-            execute(
-                "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
-                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
-                (source, target_language, translated),
-            )
+            for j, orig_idx in enumerate(chunk_indices):
+                source = texts[orig_idx]
+                translated = translated_dict.get(str(j), source)
+                cached_map[orig_idx] = translated
+                execute(
+                    "INSERT INTO TRANSLATIONS (SOURCE_TEXT, TARGET_LANGUAGE, TRANSLATED_TEXT, CREATED_AT) "
+                    "VALUES (%s, %s, %s, CURRENT_TIMESTAMP)",
+                    (source, target_language, translated),
+                )
 
     translated_texts = [cached_map.get(i, texts[i]) for i in range(len(texts))]
 

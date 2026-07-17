@@ -154,8 +154,8 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
             for attempt in range(max_retries):
                 try:
                     fallback[key] = get_provider_response(provider, model, api_key, text, target_language)
-                    # Sleep to stay within Groq's free-tier RPM limit (~30 RPM = 1 req/2s)
-                    time.sleep(3.5)
+                    if provider.lower() == 'groq':
+                        time.sleep(2)
                     break
                 except Exception as single_e:
                     err_msg = str(single_e)

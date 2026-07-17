@@ -235,9 +235,22 @@
     console.log('[LSW] Done!');
   }
 
-  // Always start in the source language on fresh page load
-  localStorage.removeItem(STORAGE_KEY);
-  setActive(sourceLanguage);
+  const savedLang = localStorage.getItem(STORAGE_KEY);
+  
+  if (savedLang && savedLang !== sourceLanguage) {
+    setActive(savedLang);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        runTranslation(savedLang);
+      });
+    } else {
+      runTranslation(savedLang);
+    }
+  } else {
+    // 4. Otherwise, stick to the original source language
+    setActive(sourceLanguage);
+  }
+
 
   // Apply saved overlay replacements so edited translations appear on the storefront
   if (!window.__multilingualOverlayLoaded) {
