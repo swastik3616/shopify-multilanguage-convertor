@@ -19,6 +19,17 @@ def save_languages():
     updates = data.get("languages", [])
     
     try:
+        langs = Language.query.all()
+        lang_dict = {str(l.id): l.status for l in langs}
+        
+        for item in updates:
+            lang_dict[str(item["id"])] = item["status"]
+            
+        target_count = sum(1 for status in lang_dict.values() if status in ["Target", "Both"])
+        
+        if target_count > 10:
+            return jsonify({"success": False, "message": "Maximum of 10 target languages allowed."}), 400
+
         for item in updates:
             lang = Language.query.get(item["id"])
             if lang:
