@@ -209,14 +209,12 @@ const handleTargetToggle = (idStr) => {
                 return (
                   <label
                       key={lang.id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                      className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
                         isSelected
                           ? "bg-blue-50 border-blue-200 shadow-sm"
                           : "bg-white border-slate-200 hover:border-slate-300"
                       } ${
-                        isSource ? "opacity-50 grayscale" : ""
-                      } ${
-                        limitReached ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                        isSource ? "opacity-50 grayscale cursor-not-allowed" : ""
                       }`}
                     >
                     <div className="flex items-center h-5">
@@ -225,7 +223,7 @@ const handleTargetToggle = (idStr) => {
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
                         checked={isSelected}
                         onChange={() => handleTargetToggle(idStr)}
-                        disabled={isSource || limitReached}
+                        disabled={isSource}
                       />
                     </div>
                     <div className="flex flex-col min-w-0">
