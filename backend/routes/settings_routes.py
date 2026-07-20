@@ -158,11 +158,8 @@ def get_store_settings():
     return jsonify(get_setting("store_setting", {}))
 
 
-@settings_bp.route("/save-feature-flags", methods=["POST", "OPTIONS"])
+@settings_bp.route("/save-feature-flags", methods=["POST"])
 def save_feature_flags():
-    if request.method == "OPTIONS":
-        return "", 204
-
     data = request.json
     flags = get_setting("feature_flags", {})
     
@@ -180,8 +177,6 @@ def save_feature_flags():
     return jsonify({"success": True, "message": "Feature flags saved successfully"})
 
 
-@settings_bp.route("/get-feature-flags", methods=["GET", "OPTIONS"])
+@settings_bp.route("/get-feature-flags", methods=["GET"])
 def get_feature_flags():
-    if request.method == "OPTIONS":
-        return "", 204
     return jsonify(get_setting("feature_flags", {"currency_enabled": False}))
