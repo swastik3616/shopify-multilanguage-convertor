@@ -14,6 +14,7 @@ from routes.dashboard_routes import dashboard_bp
 from routes.seo_routes import seo_bp
 from routes.overlay_routes import overlay_bp
 from routes.webhook_routes import webhook_bp
+from routes.search_routes import search_bp
 
 print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 
@@ -38,6 +39,7 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(seo_bp)
 app.register_blueprint(overlay_bp)
 app.register_blueprint(webhook_bp)
+app.register_blueprint(search_bp)
 
 # ── Ensure AI_PROVIDERS table exists (idempotent) ────────────────────────
 try:
