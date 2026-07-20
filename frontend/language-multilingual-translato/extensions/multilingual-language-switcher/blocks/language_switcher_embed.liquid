@@ -186,10 +186,56 @@
       console.log('[LSW] Currency conversion is ENABLED. Running currency logic...');
       if (currencyApiKey) {
         console.log('[LSW] Currency API Key loaded successfully. Ready to convert.');
+        
+        // Simple language to currency mapping
+        const currencyMap = {
+          'Hindi': 'INR', 'Spanish': 'EUR', 'French': 'EUR', 'German': 'EUR', 
+          'Japanese': 'JPY', 'Italian': 'EUR', 'Portuguese': 'BRL', 'Chinese': 'CNY',
+          'Korean': 'KRW', 'Arabic': 'AED', 'English': 'USD'
+        };
+        const targetCurrency = currencyMap[lang] || 'USD';
+        
+        try {
+          // Detect Shopify's base currency, fallback to USD
+          const baseCurrency = (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) || 'USD';
+          
+          const res = await fetch(`https://v6.exchangerate-api.com/v6/${currencyApiKey}/latest/${baseCurrency}`);
+          if (res.ok) {
+            const data = await res.json();
+            const rate = data.conversion_rates[targetCurrency];
+            
+            if (rate && targetCurrency !== baseCurrency) {
+              console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
+              
+              // Generic price selector for Shopify stores
+              const priceElements = document.querySelectorAll('.money, .price-item, .price, span[class*="price"]');
+              const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'BRL': 'R$', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$' };
+              const newSymbol = symbols[targetCurrency] || targetCurrency + ' ';
+              
+              priceElements.forEach(el => {
+                if (el.dataset.converted) return;
+                
+                const text = el.textContent;
+                // Smart regex to extract number and surrounding symbols/currency codes
+                const match = text.match(/([^0-9\s]*)\s*([\d,]+(?:\.\d+)?)\s*([^0-9\s]*)/);
+                
+                if (match && match[2]) {
+                  const numValue = parseFloat(match[2].replace(/,/g, ''));
+                  const convertedValue = (numValue * rate).toFixed(2);
+                  
+                  // Replace the original match with the new symbol and converted value
+                  el.textContent = text.replace(match[0], `${newSymbol}${convertedValue}`);
+                  el.dataset.converted = "true";
+                }
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[LSW] Currency API failed:', err);
+        }
       } else {
         console.log('[LSW] Warning: Currency conversion is enabled but no API key was found in settings.');
       }
-      // Place your currency conversion logic here
     }
   }
 
