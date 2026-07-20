@@ -367,6 +367,58 @@
     setActive(sourceLanguage);
   }
 
+  // ── Intercept store search bar for multilingual search ───────────────────
+  function setupSearchIntercept() {
+    var searchForms = document.querySelectorAll('form[action*="search"], form[action*="/search"]');
+    if (!searchForms.length) {
+      setTimeout(setupSearchIntercept, 1000);
+      return;
+    }
+
+    searchForms.forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        var selectedLang = localStorage.getItem(STORAGE_KEY);
+        if (!selectedLang || selectedLang === sourceLanguage) return;
+
+        var input = form.querySelector('input[name="q"]');
+        if (!input) return;
+        var query = input.value.trim();
+        if (!query) return;
+
+        e.preventDefault();
+
+        fetch(BACKEND + '/api/multilingual-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query, target_language: selectedLang, limit: 3 })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var results = data.results || [];
+          var sourceQuery = query;
+
+          for (var i = 0; i < results.length; i++) {
+            if (results[i].is_fallback === false) {
+              sourceQuery = results[i].source_text;
+              break;
+            }
+          }
+
+          var searchUrl = '/search?q=' + encodeURIComponent(sourceQuery) + '&lang=' + encodeURIComponent(selectedLang);
+          window.location.href = searchUrl;
+        })
+        .catch(function() {
+          window.location.href = '/search?q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(selectedLang);
+        });
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupSearchIntercept);
+  } else {
+    setupSearchIntercept();
+  }
 
   // Apply saved overlay replacements so edited translations appear on the storefront
   if (!window.__multilingualOverlayLoaded) {
