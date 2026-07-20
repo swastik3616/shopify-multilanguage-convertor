@@ -9,7 +9,7 @@ function SettingsPage() {
   const [savingCurrency, setSavingCurrency] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/get-feature-flags")
+    apiFetch("/get-feature-flags")
       .then(res => res.json())
       .then(data => {
         setCurrencyEnabled(data.currency_enabled || false);
@@ -20,7 +20,7 @@ function SettingsPage() {
 
   const handleSaveApiKey = async () => {
     try {
-      await apiFetch("/api/save-feature-flags", {
+      await apiFetch("/save-feature-flags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currency_api_key: currencyApiKey }),
@@ -35,7 +35,7 @@ function SettingsPage() {
     setCurrencyEnabled(enabled);
     setSavingCurrency(true);
     try {
-      await apiFetch("/api/save-feature-flags", {
+      await apiFetch("/save-feature-flags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currency_enabled: enabled }),
