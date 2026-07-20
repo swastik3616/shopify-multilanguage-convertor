@@ -224,47 +224,49 @@
                 'span[class*="price"]', 'span[class*="money"]', 'span[class*="amount"]'
               ].join(', ');
 
-              // Store original prices on first run so re-application is accurate
-              document.querySelectorAll(PRICE_SELECTORS).forEach(el => {
-                if (!el.dataset.originalPrice) {
-                  el.dataset.originalPrice = el.textContent.trim();
-                }
-              });
-
               function applyConversion() {
-                const priceEls = document.querySelectorAll(PRICE_SELECTORS);
-                const priceElsArray = Array.from(priceEls);
-                const dedupedEls = priceElsArray.filter(el =>
-                  !priceElsArray.some(other => other !== el && other.contains(el))
-                );
-                console.log(`[LSW] Applying currency to ${dedupedEls.length} unique price elements`);
+                // Guard: prevent re-entrant calls from MutationObserver triggered by our own DOM changes
+                if (window.__lswCurrencyApplying) return;
+                window.__lswCurrencyApplying = true;
 
-                dedupedEls.forEach(el => {
-                  // Always re-read original price to avoid compounding conversion
-                  const originalText = el.dataset.originalPrice || el.textContent.trim();
-                  if (!el.dataset.originalPrice) el.dataset.originalPrice = originalText;
-                  
-                  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-                  let node;
-                  while ((node = walker.nextNode())) {
-                    const match = originalText.match(/([\d,]+(?:\.\d+)?)/);
-                    if (match && match[1]) {
-                      const numValue = parseFloat(match[1].replace(/,/g, ''));
-                      if (!isNaN(numValue) && numValue > 0) {
-                        const convertedValue = (numValue * rate).toFixed(2);
-                        let newText = originalText.replace(match[1], convertedValue);
-                        newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
-                        node.nodeValue = `${newSymbol}${newText}`;
+                try {
+                  const priceEls = document.querySelectorAll(PRICE_SELECTORS);
+                  const priceElsArray = Array.from(priceEls);
+                  const dedupedEls = priceElsArray.filter(el =>
+                    !priceElsArray.some(other => other !== el && other.contains(el))
+                  );
+                  console.log(`[LSW] Applying currency to ${dedupedEls.length} unique price elements`);
+
+                  dedupedEls.forEach(el => {
+                    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+                    let node;
+                    while ((node = walker.nextNode())) {
+                      // Store original on the TEXT NODE itself (not the element) to avoid stale parent textContent
+                      if (node._lswOriginal === undefined) {
+                        node._lswOriginal = node.nodeValue;
+                      }
+                      const originalNodeText = node._lswOriginal;
+
+                      // Only process text nodes that actually contain a number
+                      const match = originalNodeText.match(/([\d,]+(?:\.\d+)?)/);
+                      if (match && match[1]) {
+                        const numValue = parseFloat(match[1].replace(/,/g, ''));
+                        if (!isNaN(numValue) && numValue > 0) {
+                          const convertedValue = (numValue * rate).toFixed(2);
+                          let newText = originalNodeText.replace(match[1], convertedValue);
+                          newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
+                          node.nodeValue = `${newSymbol}${newText}`;
+                        }
                       }
                     }
-                  }
-                  el.dataset.converted = "true";
-                });
+                  });
+                } finally {
+                  window.__lswCurrencyApplying = false;
+                }
               }
 
-              // Run now
+              // Run now and register for re-apply after overlay sync
               applyConversion();
-              // Register for re-apply after overlay sync
               window.__lswCurrencyReapply = applyConversion;
             } else if (targetCurrency === baseCurrency) {
               console.log(`[LSW] Target currency is the same as base currency (${baseCurrency}). No conversion needed.`);
