@@ -86,6 +86,7 @@
 
   let currencyEnabled = false;
   let currencyApiKey = "";
+  let currencyMap = {};
 
   try {
     // Fetch feature flags to check if currency is active
@@ -94,6 +95,7 @@
       const flags = await flagRes.json();
       currencyEnabled = flags.currency_enabled || false;
       currencyApiKey = flags.currency_api_key || "";
+      currencyMap = flags.currency_map || {};
     }
   } catch (e) {
     console.error('[LSW] Failed to fetch feature flags:', e);
@@ -193,12 +195,6 @@
       if (currencyApiKey) {
         console.log('[LSW] Currency API Key loaded successfully. Ready to convert.');
         
-        // Simple language to currency mapping
-        const currencyMap = {
-          'Hindi': 'INR', 'Spanish': 'EUR', 'French': 'EUR', 'German': 'EUR', 
-          'Japanese': 'JPY', 'Italian': 'EUR', 'Portuguese': 'BRL', 'Chinese': 'CNY',
-          'Korean': 'KRW', 'Arabic': 'AED', 'English': 'USD'
-        };
         const targetCurrency = currencyMap[lang] || 'USD';
         
         try {
@@ -213,7 +209,7 @@
           if (rate && targetCurrency !== baseCurrency) {
               console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
               
-              const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'BRL': 'R$', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$' };
+              const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$', 'AUD': 'A$', 'SGD': 'S$', 'CZK': 'Kč', 'PLN': 'zł', 'DKK': 'kr', 'SEK': 'kr', 'NOK': 'kr', 'HUF': 'Ft', 'TRY': '₺', 'ILS': '₪', 'THB': '฿', 'VND': '₫', 'IDR': 'Rp', 'MYR': 'RM', 'PHP': '₱', 'RUB': '₽' };
               const newSymbol = symbols[targetCurrency] || targetCurrency + ' ';
               
               const PRICE_SELECTORS = [
@@ -255,7 +251,7 @@
                         if (!isNaN(numValue) && numValue > 0) {
                           const convertedValue = (numValue * rate).toFixed(2);
                           let newText = originalNodeText.replace(match[1], convertedValue);
-                          newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
+                          newText = newText.replace(/[\$€£¥₹₩₺₪฿₫Rp₱₽KčzłFt]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD|AUD|SGD|CZK|PLN|DKK|SEK|NOK|HUF|TRY|ILS|THB|VND|IDR|MYR|PHP|RUB)/ig, '').trim();
                           node.nodeValue = `${newSymbol}${newText}`;
                         }
                       }
@@ -351,6 +347,13 @@
     console.log('[LSW] Done!');
   }
 
+  // Check URL lang parameter first (set by search redirect), then localStorage
+  var urlParams = new URLSearchParams(window.location.search);
+  var urlLang = urlParams.get('lang');
+  if (urlLang && urlLang !== sourceLanguage) {
+    localStorage.setItem(STORAGE_KEY, urlLang);
+  }
+
   const savedLang = localStorage.getItem(STORAGE_KEY);
   
   if (savedLang && savedLang !== sourceLanguage) {
@@ -358,9 +361,12 @@
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
         runTranslation(savedLang);
+        // Re-translate after delay for dynamically loaded content (e.g. search results)
+        setTimeout(function() { runTranslation(savedLang); }, 1500);
       });
     } else {
       runTranslation(savedLang);
+      setTimeout(function() { runTranslation(savedLang); }, 1500);
     }
   } else {
     // 4. Otherwise, stick to the original source language

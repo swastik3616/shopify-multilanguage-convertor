@@ -158,6 +158,22 @@ def get_store_settings():
     return jsonify(get_setting("store_setting", {}))
 
 
+DEFAULT_CURRENCY_MAP = {
+    "Hindi": "INR", "Marathi": "INR", "Gujarati": "INR", "Tamil": "INR",
+    "Telugu": "INR", "Kannada": "INR", "Malayalam": "INR", "Bengali": "INR",
+    "Punjabi": "INR", "Urdu": "INR", "Odia": "INR", "Assamese": "INR",
+    "Spanish": "EUR", "French": "EUR", "German": "EUR", "Italian": "EUR",
+    "Portuguese": "EUR", "Dutch": "EUR", "Greek": "EUR", "Romanian": "EUR",
+    "Czech": "CZK", "Polish": "PLN", "Danish": "DKK", "Swedish": "SEK",
+    "Norwegian": "NOK", "Finnish": "EUR", "Hungarian": "HUF",
+    "Japanese": "JPY", "Chinese": "CNY", "Korean": "KRW",
+    "Arabic": "AED", "Turkish": "TRY", "Hebrew": "ILS",
+    "Thai": "THB", "Vietnamese": "VND", "Indonesian": "IDR",
+    "Malay": "MYR", "Filipino": "PHP", "Russian": "RUB",
+    "English": "USD",
+}
+
+
 @settings_bp.route("/save-feature-flags", methods=["POST"])
 def save_feature_flags():
     data = request.json
@@ -167,6 +183,8 @@ def save_feature_flags():
         flags["currency_enabled"] = data["currency_enabled"]
     if "currency_api_key" in data:
         flags["currency_api_key"] = data["currency_api_key"]
+    if "currency_map" in data:
+        flags["currency_map"] = data["currency_map"]
         
     set_setting("feature_flags", flags)
 
@@ -179,4 +197,7 @@ def save_feature_flags():
 
 @settings_bp.route("/get-feature-flags", methods=["GET"])
 def get_feature_flags():
-    return jsonify(get_setting("feature_flags", {"currency_enabled": False}))
+    flags = get_setting("feature_flags", {"currency_enabled": False})
+    if "currency_map" not in flags or not flags["currency_map"]:
+        flags["currency_map"] = DEFAULT_CURRENCY_MAP
+    return jsonify(flags)
