@@ -207,28 +207,54 @@
             if (rate && targetCurrency !== baseCurrency) {
               console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
               
-              // Generic price selector for Shopify stores
-              const priceElements = document.querySelectorAll('.money, .price-item, .price, span[class*="price"]');
               const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'BRL': 'R$', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$' };
               const newSymbol = symbols[targetCurrency] || targetCurrency + ' ';
               
-              priceElements.forEach(el => {
-                if (el.dataset.converted) return;
-                
-                const text = el.textContent;
-                // Smart regex to extract number and surrounding symbols/currency codes
-                const match = text.match(/([^0-9\s]*)\s*([\d,]+(?:\.\d+)?)\s*([^0-9\s]*)/);
-                
-                if (match && match[2]) {
-                  const numValue = parseFloat(match[2].replace(/,/g, ''));
-                  const convertedValue = (numValue * rate).toFixed(2);
+              const priceWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                  const parentClass = (node.parentElement && node.parentElement.className) || '';
+                  const isPriceClass = typeof parentClass === 'string' && (parentClass.toLowerCase().includes('price') || parentClass.toLowerCase().includes('money'));
+                  const text = node.nodeValue.trim();
                   
-                  // Replace the original match with the new symbol and converted value
-                  el.textContent = text.replace(match[0], `${newSymbol}${convertedValue}`);
-                  el.dataset.converted = "true";
+                  // Accept if inside a price class OR contains known currency symbols/abbreviations near numbers
+                  if (isPriceClass || /[\$€£¥₹₩]/.test(text) || /(?:Rs\.?|USD|EUR|GBP|INR|AED|rs)\s*\d/i.test(text) || /\d\s*(?:Rs\.?|USD|EUR|GBP|INR|AED|rs)/i.test(text)) {
+                    // Don't accept if empty or just letters
+                    if (/\d/.test(text)) return NodeFilter.FILTER_ACCEPT;
+                  }
+                  return NodeFilter.FILTER_SKIP;
                 }
               });
+
+              let node;
+              while ((node = priceWalker.nextNode())) {
+                if (node.parentElement && node.parentElement.dataset.converted) continue;
+                
+                const text = node.nodeValue;
+                const match = text.match(/([\d,]+(?:\.\d+)?)/); // Match the number
+                
+                if (match && match[1]) {
+                  const numValue = parseFloat(match[1].replace(/,/g, ''));
+                  if (!isNaN(numValue)) {
+                    const convertedValue = (numValue * rate).toFixed(2);
+                    
+                    // Replace the number with the new value
+                    let newText = text.replace(match[1], convertedValue);
+                    // Strip common old currency symbols/text from this text node
+                    newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?|rs|USD|EUR|GBP|INR|AED)/ig, '').trim();
+                    
+                    // Add the new currency symbol
+                    node.nodeValue = `${newSymbol}${newText}`;
+                    if (node.parentElement) {
+                      node.parentElement.dataset.converted = "true";
+                    }
+                  }
+                }
+              }
+            } else if (targetCurrency === baseCurrency) {
+              console.log(`[LSW] Target currency is the same as base currency (${baseCurrency}). No conversion needed.`);
             }
+          } else {
+            console.error('[LSW] ExchangeRate API returned an error:', await res.text());
           }
         } catch (err) {
           console.error('[LSW] Currency API failed:', err);
