@@ -93,6 +93,11 @@ function Sidebar() {
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 px-3">SEO Management</div>
           {seoLinks.map((link) => <NavLink key={link.path} item={link} />)}
         </div>
+
+        <div className="flex flex-col gap-1 mt-auto pt-4 border-t border-slate-100">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 px-3">System</div>
+          {systemLinks.map((link) => <NavLink key={link.path} item={link} />)}
+        </div>
       </div>
     </div>
   );
