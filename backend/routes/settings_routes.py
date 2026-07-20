@@ -165,7 +165,12 @@ def save_feature_flags():
 
     data = request.json
     flags = get_setting("feature_flags", {})
-    flags["currency_enabled"] = data.get("currency_enabled", False)
+    
+    if "currency_enabled" in data:
+        flags["currency_enabled"] = data["currency_enabled"]
+    if "currency_api_key" in data:
+        flags["currency_api_key"] = data["currency_api_key"]
+        
     set_setting("feature_flags", flags)
 
     execute(

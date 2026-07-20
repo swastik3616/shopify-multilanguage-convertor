@@ -84,6 +84,7 @@
   let activeLanguages = [];
 
   let currencyEnabled = false;
+  let currencyApiKey = "";
 
   try {
     // Fetch feature flags to check if currency is active
@@ -91,6 +92,7 @@
     if (flagRes.ok) {
       const flags = await flagRes.json();
       currencyEnabled = flags.currency_enabled || false;
+      currencyApiKey = flags.currency_api_key || "";
     }
   } catch (e) {
     console.error('[LSW] Failed to fetch feature flags:', e);
@@ -182,6 +184,11 @@
 
     if (currencyEnabled) {
       console.log('[LSW] Currency conversion is ENABLED. Running currency logic...');
+      if (currencyApiKey) {
+        console.log('[LSW] Currency API Key loaded successfully. Ready to convert.');
+      } else {
+        console.log('[LSW] Warning: Currency conversion is enabled but no API key was found in settings.');
+      }
       // Place your currency conversion logic here
     }
   }

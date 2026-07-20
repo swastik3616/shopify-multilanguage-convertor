@@ -1,25 +1,37 @@
-import { Monitor, Moon, Sun, AlertCircle, Check } from "lucide-react";
-import { useTheme } from "../contexts/ThemeContext";
-import { useState } from "react";
 import { Monitor, Moon, Sun, AlertCircle, Check, DollarSign } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useState, useEffect } from "react";
 import { apiFetch } from "../services/apiClient";
-
-
 function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [expandExclusions, setExpandExclusions] = useState(false);
 
   const [currencyEnabled, setCurrencyEnabled] = useState(false);
+  const [currencyApiKey, setCurrencyApiKey] = useState("");
   const [savingCurrency, setSavingCurrency] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/get-feature-flags")
       .then(res => res.json())
-      .then(data => setCurrencyEnabled(data.currency_enabled))
+      .then(data => {
+        setCurrencyEnabled(data.currency_enabled || false);
+        setCurrencyApiKey(data.currency_api_key || "");
+      })
       .catch(err => console.error("Failed to load feature flags", err));
   }, []);
+
+  const handleSaveApiKey = async () => {
+    try {
+      await apiFetch("/api/save-feature-flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency_api_key: currencyApiKey }),
+      });
+      alert("API Key Saved Successfully");
+    } catch (err) {
+      console.error("Failed to save API key", err);
+    }
+  };
 
   const handleCurrencyToggle = async (enabled) => {
     setCurrencyEnabled(enabled);
@@ -77,6 +89,25 @@ function SettingsPage() {
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#008060]"></div>
             </label>
           </div>
+          {currencyEnabled && (
+            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Currency API Key
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  placeholder="Enter your Exchange API key"
+                  className="input-field flex-1"
+                  value={currencyApiKey}
+                  onChange={(e) => setCurrencyApiKey(e.target.value)}
+                />
+                <button onClick={handleSaveApiKey} className="btn btn-primary px-4">
+                  Save Key
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
         <div className="space-y-4">
