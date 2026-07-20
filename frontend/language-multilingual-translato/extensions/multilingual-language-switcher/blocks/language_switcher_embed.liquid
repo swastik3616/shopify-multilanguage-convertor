@@ -199,10 +199,13 @@
           // Detect Shopify's base currency, fallback to USD
           const baseCurrency = (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) || 'USD';
           
-          const res = await fetch(`https://v6.exchangerate-api.com/v6/${currencyApiKey}/latest/${baseCurrency}`);
+          // Using a completely free, no-API-key required CDN for exchange rates
+          const res = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseCurrency.toLowerCase()}.json`);
           if (res.ok) {
             const data = await res.json();
-            const rate = data.conversion_rates[targetCurrency];
+            // The API returns rates under the lowercase base currency key
+            const rates = data[baseCurrency.toLowerCase()];
+            const rate = rates[targetCurrency.toLowerCase()];
             
             if (rate && targetCurrency !== baseCurrency) {
               console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
