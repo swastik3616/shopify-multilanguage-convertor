@@ -1,10 +1,42 @@
 import { Monitor, Moon, Sun, AlertCircle, Check } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useState } from "react";
+import { Monitor, Moon, Sun, AlertCircle, Check, DollarSign } from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../services/apiClient";
+
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [expandExclusions, setExpandExclusions] = useState(false);
+
+  const [currencyEnabled, setCurrencyEnabled] = useState(false);
+  const [savingCurrency, setSavingCurrency] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/api/get-feature-flags")
+      .then(res => res.json())
+      .then(data => setCurrencyEnabled(data.currency_enabled))
+      .catch(err => console.error("Failed to load feature flags", err));
+  }, []);
+
+  const handleCurrencyToggle = async (enabled) => {
+    setCurrencyEnabled(enabled);
+    setSavingCurrency(true);
+    try {
+      await apiFetch("/api/save-feature-flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency_enabled: enabled }),
+      });
+    } catch (err) {
+      console.error("Failed to save currency flag", err);
+    } finally {
+      setSavingCurrency(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -17,7 +49,36 @@ function SettingsPage() {
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
           Appearance
         </h2>
+      <div className="card-container p-6 w-full max-w-3xl">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
+          Experimental Features
+        </h2>
         
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${currencyEnabled ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Currency Converter</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Enable multi-currency functionality on the storefront.</p>
+              </div>
+            </div>
+            
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={currencyEnabled}
+                disabled={savingCurrency}
+                onChange={(e) => handleCurrencyToggle(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#008060]"></div>
+            </label>
+          </div>
+        </div>
+      </div>
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-900 dark:text-slate-50 block mb-3">

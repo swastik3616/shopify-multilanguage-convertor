@@ -83,6 +83,19 @@
   let sourceLanguage = 'English';
   let activeLanguages = [];
 
+  let currencyEnabled = false;
+
+  try {
+    // Fetch feature flags to check if currency is active
+    const flagRes = await fetch(`${BACKEND}/get-feature-flags`);
+    if (flagRes.ok) {
+      const flags = await flagRes.json();
+      currencyEnabled = flags.currency_enabled || false;
+    }
+  } catch (e) {
+    console.error('[LSW] Failed to fetch feature flags:', e);
+  }
+
   try {
     // Fetch directly from the database using the admin parameter
     const res = await fetch(`${BACKEND}/get-languages?admin=true`);
@@ -166,6 +179,11 @@
     await runTranslation(lang);
     // Apply any manually saved/edited translations for this language on top
     await syncOverlayReplacements();
+
+    if (currencyEnabled) {
+      console.log('[LSW] Currency conversion is ENABLED. Running currency logic...');
+      // Place your currency conversion logic here
+    }
   }
 
   // Reference to the language-switcher root element

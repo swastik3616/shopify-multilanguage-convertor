@@ -156,3 +156,27 @@ def get_store_settings():
     if request.method == "OPTIONS":
         return "", 204
     return jsonify(get_setting("store_setting", {}))
+
+
+@settings_bp.route("/save-feature-flags", methods=["POST", "OPTIONS"])
+def save_feature_flags():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    data = request.json
+    flags = get_setting("feature_flags", {})
+    flags["currency_enabled"] = data.get("currency_enabled", False)
+    set_setting("feature_flags", flags)
+
+    execute(
+        "INSERT INTO AUDIT_LOGS (ACTION, CREATED_AT) VALUES (%s, CURRENT_TIMESTAMP)",
+        (f"Feature Flags Updated: Currency {'Enabled' if flags['currency_enabled'] else 'Disabled'}",),
+    )
+    return jsonify({"success": True, "message": "Feature flags saved successfully"})
+
+
+@settings_bp.route("/get-feature-flags", methods=["GET", "OPTIONS"])
+def get_feature_flags():
+    if request.method == "OPTIONS":
+        return "", 204
+    return jsonify(get_setting("feature_flags", {"currency_enabled": False}))
