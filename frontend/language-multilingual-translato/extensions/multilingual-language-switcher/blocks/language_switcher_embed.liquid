@@ -223,12 +223,20 @@
               const priceEls = document.querySelectorAll(PRICE_SELECTORS);
               console.log(`[LSW] Found ${priceEls.length} price elements on page`);
 
-              priceEls.forEach(el => {
+              // Deduplicate: skip elements that are descendants of another matched element
+              // This prevents double-conversion when e.g. .price contains .price-item
+              const priceElsArray = Array.from(priceEls);
+              const dedupedEls = priceElsArray.filter(el =>
+                !priceElsArray.some(other => other !== el && other.contains(el))
+              );
+              console.log(`[LSW] Deduplicated to ${dedupedEls.length} unique price elements`);
+
+              dedupedEls.forEach(el => {
+                if (el.dataset.converted) return;
                 // Walk text nodes inside this element to avoid wiping child elements
                 const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
                 let node;
                 while ((node = walker.nextNode())) {
-                  if (el.dataset.converted) continue;
                   const text = node.nodeValue;
                   // Match a number (with optional commas/decimals)
                   const match = text.match(/([\d,]+(?:\.\d+)?)/);
