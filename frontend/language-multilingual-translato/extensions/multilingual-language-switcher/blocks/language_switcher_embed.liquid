@@ -182,6 +182,11 @@
     // Apply any manually saved/edited translations for this language on top
     await syncOverlayReplacements();
 
+    // Re-apply currency after overlay sync (overlay sync may reset prices)
+    if (window.__lswCurrencyReapply) {
+      window.__lswCurrencyReapply();
+    }
+
     if (currencyEnabled) {
       console.log('[LSW] Currency conversion is ENABLED. Running currency logic...');
       if (currencyApiKey) {
@@ -204,13 +209,12 @@
             const data = await res.json();
             const rate = data.conversion_rates[targetCurrency];
             
-            if (rate && targetCurrency !== baseCurrency) {
+          if (rate && targetCurrency !== baseCurrency) {
               console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
               
               const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'BRL': 'R$', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$' };
               const newSymbol = symbols[targetCurrency] || targetCurrency + ' ';
               
-              // Broad selector covering all common Shopify theme price patterns
               const PRICE_SELECTORS = [
                 '.money', '.price', '.price-item', '.product__price',
                 '.product-price', '[data-product-price]', '[data-regular-price]',
@@ -220,39 +224,48 @@
                 'span[class*="price"]', 'span[class*="money"]', 'span[class*="amount"]'
               ].join(', ');
 
-              const priceEls = document.querySelectorAll(PRICE_SELECTORS);
-              console.log(`[LSW] Found ${priceEls.length} price elements on page`);
+              // Store original prices on first run so re-application is accurate
+              document.querySelectorAll(PRICE_SELECTORS).forEach(el => {
+                if (!el.dataset.originalPrice) {
+                  el.dataset.originalPrice = el.textContent.trim();
+                }
+              });
 
-              // Deduplicate: skip elements that are descendants of another matched element
-              // This prevents double-conversion when e.g. .price contains .price-item
-              const priceElsArray = Array.from(priceEls);
-              const dedupedEls = priceElsArray.filter(el =>
-                !priceElsArray.some(other => other !== el && other.contains(el))
-              );
-              console.log(`[LSW] Deduplicated to ${dedupedEls.length} unique price elements`);
+              function applyConversion() {
+                const priceEls = document.querySelectorAll(PRICE_SELECTORS);
+                const priceElsArray = Array.from(priceEls);
+                const dedupedEls = priceElsArray.filter(el =>
+                  !priceElsArray.some(other => other !== el && other.contains(el))
+                );
+                console.log(`[LSW] Applying currency to ${dedupedEls.length} unique price elements`);
 
-              dedupedEls.forEach(el => {
-                if (el.dataset.converted) return;
-                // Walk text nodes inside this element to avoid wiping child elements
-                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-                let node;
-                while ((node = walker.nextNode())) {
-                  const text = node.nodeValue;
-                  // Match a number (with optional commas/decimals)
-                  const match = text.match(/([\d,]+(?:\.\d+)?)/);
-                  if (match && match[1]) {
-                    const numValue = parseFloat(match[1].replace(/,/g, ''));
-                    if (!isNaN(numValue) && numValue > 0) {
-                      const convertedValue = (numValue * rate).toFixed(2);
-                      // Strip old symbol chars and replace number with converted value
-                      let newText = text.replace(match[1], convertedValue);
-                      newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
-                      node.nodeValue = `${newSymbol}${newText}`;
+                dedupedEls.forEach(el => {
+                  // Always re-read original price to avoid compounding conversion
+                  const originalText = el.dataset.originalPrice || el.textContent.trim();
+                  if (!el.dataset.originalPrice) el.dataset.originalPrice = originalText;
+                  
+                  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+                  let node;
+                  while ((node = walker.nextNode())) {
+                    const match = originalText.match(/([\d,]+(?:\.\d+)?)/);
+                    if (match && match[1]) {
+                      const numValue = parseFloat(match[1].replace(/,/g, ''));
+                      if (!isNaN(numValue) && numValue > 0) {
+                        const convertedValue = (numValue * rate).toFixed(2);
+                        let newText = originalText.replace(match[1], convertedValue);
+                        newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
+                        node.nodeValue = `${newSymbol}${newText}`;
+                      }
                     }
                   }
-                }
-                el.dataset.converted = "true";
-              });
+                  el.dataset.converted = "true";
+                });
+              }
+
+              // Run now
+              applyConversion();
+              // Register for re-apply after overlay sync
+              window.__lswCurrencyReapply = applyConversion;
             } else if (targetCurrency === baseCurrency) {
               console.log(`[LSW] Target currency is the same as base currency (${baseCurrency}). No conversion needed.`);
             }
@@ -474,6 +487,10 @@
         if (replacements.length) {
           console.log('[LSW] Applying overlay replacements:', replacements.length, 'lang:', selectedLang || 'base');
           applyReplacements(replacements);
+          // Re-apply currency conversion after overlay resets prices
+          if (window.__lswCurrencyReapply) {
+            window.__lswCurrencyReapply();
+          }
         }
       } catch (e) {
         console.error('[LSW] Failed to apply overlay replacements:', e);
