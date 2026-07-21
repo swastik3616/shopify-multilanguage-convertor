@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from flask import Flask, jsonify
+import flask
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 # Blueprints
@@ -30,18 +31,38 @@ CORS(
     supports_credentials=False,
 )
 
-# Hard CORS safety-net: Render.com can strip flask-cors headers in some
-# deployment configurations. This hook guarantees the headers are always
-# present on every response so the Shopify storefront can reach the backend.
+# ── Global CORS preflight handler ──────────────────────────────────────
+# Catches every OPTIONS request at the app level BEFORE blueprint routes
+# handle them, guaranteeing a rapid 204 with the right CORS headers.
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        resp = flask.make_response("", 204)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        resp.headers["Access-Control-Max-Age"] = "86400"
+        return resp
+
+# ── CORS safety-net after_request ──────────────────────────────────────
+# Render.com can strip flask-cors headers in some deployment
+# configurations. This hook guarantees the headers are always present on
+# every response so the Shopify storefront can reach the backend.
+_ALWAYS_ORIGIN = "*"
+_ALWAYS_HEADERS = "Content-Type, X-Shopify-Shop-Domain, Authorization"
+_ALWAYS_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
+
+def _set_cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = _ALWAYS_ORIGIN
+    resp.headers["Access-Control-Allow-Headers"] = _ALWAYS_HEADERS
+    resp.headers["Access-Control-Allow-Methods"] = _ALWAYS_METHODS
+
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    _set_cors(response)
     return response
 
-# Catch all unhandled exceptions (like DB connection drops) so they return
-# JSON with CORS headers instead of an HTML 500 page that strips CORS.
+# ── Global exception handler with CORS ──────────────────────────────────
 from werkzeug.exceptions import HTTPException
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -50,10 +71,7 @@ def handle_exception(e):
     else:
         response = jsonify({"success": False, "message": "Internal Server Error", "error": str(e)})
         response.status_code = 500
-    
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    _set_cors(response)
     return response
 
 # Register blueprints

@@ -15,6 +15,7 @@ Functions:
 import re
 from urllib.parse import urlparse
 from utils.helpers import get_current_store, get_shopify_credentials, normalize_shopify_store_url, get_setting
+from database import execute as _db_execute
 import logging
 
 # Configure logging
@@ -234,6 +235,21 @@ def validate_shopify_url(url, store_domain=None):
         if not store_domain:
             store_domain = get_store_domain()
         
+        if not store_domain:
+            # Fallback: look up the store by the URL's own domain (handles
+            # requests from the storefront script which doesn't carry shop
+            # headers/params).
+            try:
+                row = _db_execute(
+                    "SELECT SHOP FROM SHOPIFY_STORES WHERE SHOP = %s LIMIT 1",
+                    (url_domain,),
+                    fetch="one",
+                )
+                if row:
+                    store_domain = normalize_shopify_store_url(row["SHOP"])
+            except Exception:
+                pass
+
         if not store_domain:
             logger.error("[validate_shopify_url] No store domain configured")
             return {
