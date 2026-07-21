@@ -476,6 +476,101 @@
     setupSearchIntercept();
   }
 
+  // ── Predictive / autocomplete search dropdown translation ────────────────
+  // Shopify themes inject product names into a live search dropdown via AJAX
+  // as the user types. The main runTranslation() call won't catch these because
+  // they are injected AFTER page load. This block watches for those nodes and
+  // translates only the newly injected dropdown content.
+
+  function lswDebounce(fn, delay) {
+    var t;
+    return function() { clearTimeout(t); t = setTimeout(fn, delay); };
+  }
+
+  async function translateContainer(container, lang) {
+    if (!lang || lang === sourceLanguage) return;
+
+    const walker = document.createTreeWalker(
+      container, NodeFilter.SHOW_TEXT,
+      { acceptNode: function(n) {
+        const tag = n.parentElement && n.parentElement.tagName;
+        if (!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE'].includes(tag)) return NodeFilter.FILTER_REJECT;
+        if (lswRoot && lswRoot.contains(n.parentElement)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }}
+    );
+
+    const nodes = [], texts = [];
+    let nd;
+    while ((nd = walker.nextNode())) {
+      nodes.push(nd);
+      if (nd.__lsw_orig_node_text === undefined) nd.__lsw_orig_node_text = nd.nodeValue;
+      texts.push(nd.__lsw_orig_node_text.trim());
+    }
+    if (!texts.length) return;
+
+    try {
+      const res = await fetch(`${BACKEND}/bulk-translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts: texts, target_language: lang })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const translations = data.translations || [];
+      for (let i = 0; i < nodes.length; i++) {
+        if (translations[i]) {
+          const orig = nodes[i].__lsw_orig_node_text;
+          nodes[i].nodeValue = orig.replace(orig.trim(), translations[i]);
+        }
+      }
+    } catch(e) {
+      console.error('[LSW] Dropdown translation failed:', e);
+    }
+  }
+
+  function setupPredictiveSearchTranslation() {
+    var lang = localStorage.getItem(STORAGE_KEY);
+    if (!lang || lang === sourceLanguage) return;
+
+    // Common selectors used by Dawn, Debut, Impulse, Prestige, and other popular themes
+    var DROPDOWN_SELECTOR = [
+      '[data-predictive-search]',
+      '.predictive-search',
+      '.predictive-search__results',
+      '#predictive-search-results',
+      '.search-modal__results',
+      '.search__results',
+      '[data-search-results]',
+      '.live-search-results',
+      '.search-autocomplete'
+    ].join(', ');
+
+    var debouncedTranslate = lswDebounce(function() {
+      var containers = document.querySelectorAll(DROPDOWN_SELECTOR);
+      containers.forEach(function(c) {
+        // Only translate if the container actually has visible content
+        if (c.children.length > 0 && c.textContent.trim().length > 0) {
+          translateContainer(c, lang);
+        }
+      });
+    }, 400); // 400 ms after the last DOM change — enough for AJAX to finish
+
+    var dropdownObserver = new MutationObserver(function(mutations) {
+      var hasNewElements = mutations.some(function(m) {
+        return Array.from(m.addedNodes).some(function(node) {
+          return node.nodeType === 1; // only element nodes, not text/comment
+        });
+      });
+      if (hasNewElements) debouncedTranslate();
+    });
+
+    dropdownObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  setupPredictiveSearchTranslation();
+
   // Apply saved overlay replacements so edited translations appear on the storefront
   if (!window.__multilingualOverlayLoaded) {
     window.__multilingualOverlayLoaded = true;
