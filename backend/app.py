@@ -40,6 +40,22 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     return response
 
+# Catch all unhandled exceptions (like DB connection drops) so they return
+# JSON with CORS headers instead of an HTML 500 page that strips CORS.
+from werkzeug.exceptions import HTTPException
+@app.errorhandler(Exception)
+def handle_exception(e):
+    if isinstance(e, HTTPException):
+        response = e.get_response()
+    else:
+        response = jsonify({"success": False, "message": "Internal Server Error", "error": str(e)})
+        response.status_code = 500
+    
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
+
 # Register blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(translation_bp)
