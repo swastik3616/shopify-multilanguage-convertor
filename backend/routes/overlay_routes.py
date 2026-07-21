@@ -1,11 +1,30 @@
 from flask import Blueprint, jsonify, request
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode, parse_qsl
 from database import execute
 from utils.url_validator import validate_shopify_url
 import logging
 
 logger = logging.getLogger(__name__)
 overlay_bp = Blueprint("overlay_routes", __name__)
+
+# Shopify appends these internal params to URLs in development/preview mode.
+# Strip them before validation and DB lookup so ?pb=0 URLs match stored URLs.
+_SHOPIFY_INTERNAL_PARAMS = {'pb', '_nocache', 'preview_theme_id', 'fts', 'ls'}
+
+def _strip_shopify_params(url):
+    """Remove known Shopify-internal query params that vary per-session."""
+    if not url:
+        return url
+    try:
+        parsed = urlparse(url)
+        filtered = [(k, v) for k, v in parse_qsl(parsed.query)
+                    if k not in _SHOPIFY_INTERNAL_PARAMS]
+        new_query = urlencode(filtered)
+        cleaned = parsed._replace(query=new_query).geturl()
+        # Remove trailing ? if no params remain
+        return cleaned.rstrip('?')
+    except Exception:
+        return url
 
 
 def _candidate_urls(raw_url):
@@ -106,6 +125,8 @@ def get_replacements():
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
+    # Strip Shopify internal params (e.g. ?pb=0) before validation
+    url = _strip_shopify_params(url)
 
     validation = validate_shopify_url(url)
     if not validation['valid']:

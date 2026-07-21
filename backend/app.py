@@ -30,6 +30,16 @@ CORS(
     supports_credentials=False,
 )
 
+# Hard CORS safety-net: Render.com can strip flask-cors headers in some
+# deployment configurations. This hook guarantees the headers are always
+# present on every response so the Shopify storefront can reach the backend.
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
+
 # Register blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(translation_bp)
