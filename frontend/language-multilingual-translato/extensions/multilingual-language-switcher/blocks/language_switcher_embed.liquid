@@ -63,6 +63,23 @@
   const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
 
+  // Guard: if this script is running inside a sandboxed iframe (e.g. the
+  // Shopify admin preview), localStorage is blocked with a SecurityError.
+  // Exit immediately — the widget only makes sense on the live storefront.
+  try { localStorage; } catch(e) { return; }
+
+  // Safe localStorage helpers — silently swallow any SecurityError so a
+  // sandboxed context never causes uncaught exceptions from our code.
+  function lswGetStorage(key) {
+    try { return localStorage.getItem(key); } catch(e) { return null; }
+  }
+  function lswSetStorage(key, val) {
+    try { localStorage.setItem(key, val); } catch(e) {}
+  }
+  function lswRemoveStorage(key) {
+    try { localStorage.removeItem(key); } catch(e) {}
+  }
+
   // Helper to get a flag emoji for common languages, or fallback to the code
   function getBadge(code) {
     const map = {
@@ -173,14 +190,14 @@
 
     // If the user selects the source language, reset page to original
     if (lang === sourceLanguage) {
-      localStorage.removeItem(STORAGE_KEY);
+      lswRemoveStorage(STORAGE_KEY);
       setActive(sourceLanguage);
       location.reload();
       return;
     }
 
     setActive(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
+    lswSetStorage(STORAGE_KEY, lang);
     await runTranslation(lang);
     // Apply any manually saved/edited translations for this language on top
     await syncOverlayReplacements();
@@ -351,10 +368,10 @@
   var urlParams = new URLSearchParams(window.location.search);
   var urlLang = urlParams.get('lang');
   if (urlLang && urlLang !== sourceLanguage) {
-    localStorage.setItem(STORAGE_KEY, urlLang);
+    lswSetStorage(STORAGE_KEY, urlLang);
   }
 
-  const savedLang = localStorage.getItem(STORAGE_KEY);
+  const savedLang = lswGetStorage(STORAGE_KEY);
 
   function runTranslationAndWatch(lang) {
     runTranslation(lang);
@@ -411,7 +428,7 @@
       form.__lswSearchBound = true;
 
       form.addEventListener('submit', function(e) {
-        var selectedLang = localStorage.getItem(STORAGE_KEY);
+        var selectedLang = lswGetStorage(STORAGE_KEY);
         if (!selectedLang || selectedLang === sourceLanguage) return;
 
         var input = form.querySelector('input[name="q"]');
@@ -531,7 +548,7 @@
   }
 
   function setupPredictiveSearchTranslation() {
-    var lang = localStorage.getItem(STORAGE_KEY);
+    var lang = lswGetStorage(STORAGE_KEY);
     if (!lang || lang === sourceLanguage) return;
 
     // Common selectors used by Dawn, Debut, Impulse, Prestige, and other popular themes
@@ -681,7 +698,7 @@
         requestUrl.searchParams.set('url', currentUrl);
 
         // KEY FIX: pass the selected language so translated edits are fetched and applied
-        const selectedLang = localStorage.getItem(STORAGE_KEY);
+        const selectedLang = lswGetStorage(STORAGE_KEY);
         if (selectedLang && selectedLang !== sourceLanguage) {
           requestUrl.searchParams.set('target_language', selectedLang);
         }
