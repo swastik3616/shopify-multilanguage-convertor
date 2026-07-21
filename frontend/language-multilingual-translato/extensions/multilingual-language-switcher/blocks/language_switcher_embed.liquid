@@ -355,21 +355,46 @@
   }
 
   const savedLang = localStorage.getItem(STORAGE_KEY);
-  
+
+  function runTranslationAndWatch(lang) {
+    runTranslation(lang);
+
+    // On search result pages, Shopify loads product cards asynchronously.
+    // Use a MutationObserver to detect when new content is injected and
+    // re-translate it, instead of relying on an unreliable fixed timeout.
+    var isSearchPage = window.location.pathname.indexOf('/search') !== -1;
+    if (isSearchPage) {
+      var translated = false;
+      var resultsObserver = new MutationObserver(function(mutations) {
+        var hasNewNodes = mutations.some(function(m) { return m.addedNodes.length > 0; });
+        if (hasNewNodes && !translated) {
+          translated = true;
+          resultsObserver.disconnect();
+          // Small debounce so the full batch of injected nodes is ready
+          setTimeout(function() { runTranslation(lang); }, 300);
+        }
+      });
+      var resultsContainer = document.querySelector(
+        '#product-grid, .search-results, [data-search-results], main'
+      ) || document.body;
+      resultsObserver.observe(resultsContainer, { childList: true, subtree: true });
+
+      // Safety net: disconnect observer after 10s regardless
+      setTimeout(function() { resultsObserver.disconnect(); }, 10000);
+    }
+  }
+
   if (savedLang && savedLang !== sourceLanguage) {
     setActive(savedLang);
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        runTranslation(savedLang);
-        // Re-translate after delay for dynamically loaded content (e.g. search results)
-        setTimeout(function() { runTranslation(savedLang); }, 1500);
+      document.addEventListener('DOMContentLoaded', function() {
+        runTranslationAndWatch(savedLang);
       });
     } else {
-      runTranslation(savedLang);
-      setTimeout(function() { runTranslation(savedLang); }, 1500);
+      runTranslationAndWatch(savedLang);
     }
   } else {
-    // 4. Otherwise, stick to the original source language
+    // Otherwise, stick to the original source language
     setActive(sourceLanguage);
   }
 
@@ -382,6 +407,9 @@
     }
 
     searchForms.forEach(function(form) {
+      if (form.__lswSearchBound) return;
+      form.__lswSearchBound = true;
+
       form.addEventListener('submit', function(e) {
         var selectedLang = localStorage.getItem(STORAGE_KEY);
         if (!selectedLang || selectedLang === sourceLanguage) return;
@@ -396,24 +424,46 @@
         fetch(BACKEND + '/api/multilingual-search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: query, target_language: selectedLang, limit: 3 })
+          body: JSON.stringify({ query: query, target_language: selectedLang, limit: 5 })
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
           var results = data.results || [];
-          var sourceQuery = query;
 
-          for (var i = 0; i < results.length; i++) {
-            if (results[i].is_fallback === false) {
-              sourceQuery = results[i].source_text;
-              break;
+          // Priority 1: backend already reverse-translated the query for us
+          var sourceQuery = data.translated_query || null;
+
+          // Priority 2: find a non-fallback result and use its source_text
+          if (!sourceQuery) {
+            for (var i = 0; i < results.length; i++) {
+              if (results[i].is_fallback === false && results[i].source_text) {
+                sourceQuery = results[i].source_text;
+                break;
+              }
             }
           }
 
-          var searchUrl = '/search?q=' + encodeURIComponent(sourceQuery) + '&lang=' + encodeURIComponent(selectedLang);
-          window.location.href = searchUrl;
+          // Priority 3: call /translate to reverse-translate the raw query
+          if (!sourceQuery) {
+            return fetch(BACKEND + '/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ source_text: query, target_language: sourceLanguage })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(td) {
+              var sq = (td.translated_text || query).trim();
+              window.location.href = '/search?q=' + encodeURIComponent(sq) + '&lang=' + encodeURIComponent(selectedLang);
+            })
+            .catch(function() {
+              window.location.href = '/search?q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(selectedLang);
+            });
+          }
+
+          window.location.href = '/search?q=' + encodeURIComponent(sourceQuery) + '&lang=' + encodeURIComponent(selectedLang);
         })
         .catch(function() {
+          // Hard fallback: redirect with original query and let results page handle it
           window.location.href = '/search?q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(selectedLang);
         });
       });
