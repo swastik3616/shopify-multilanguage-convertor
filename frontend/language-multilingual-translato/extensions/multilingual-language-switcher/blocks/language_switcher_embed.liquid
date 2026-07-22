@@ -23,6 +23,18 @@
       <span id="lsw-embed-currency-notice" style="display:none;font-weight:400;text-transform:none;letter-spacing:0;color:#008060;font-size:10px;margin-top:4px;white-space:nowrap;">✓ Prices convert to local currency</span>
     </div>
     <div id="lsw-embed-options"></div>
+    <div id="lsw-embed-currency-toggle" style="display:none;border-top:1px solid #eee;padding:8px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#222;">Currency Conversion</div>
+          <div id="lsw-embed-currency-info" style="font-size:11px;color:#666;margin-top:2px;"></div>
+        </div>
+        <label class="lsw-toggle">
+          <input type="checkbox" id="lsw-currency-switch">
+          <span class="lsw-toggle-slider"></span>
+        </label>
+      </div>
+    </div>
   </div>
 
   <!-- Status bar -->
@@ -60,6 +72,12 @@
   .lsw-embed-opt-check { color: #0057b8; font-size: 16px; display: none; }
   .lsw-embed-opt.active .lsw-embed-opt-check { display: block; }
   .lsw-embed-opt-currency { display: block; font-size: 11px; color: #008060; font-weight: 500; margin-top: 2px; }
+  .lsw-toggle { position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0; }
+  .lsw-toggle input { opacity:0; width:0; height:0; }
+  .lsw-toggle-slider { position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:20px; transition:0.2s; }
+  .lsw-toggle-slider::before { content:''; position:absolute; height:16px; width:16px; left:2px; bottom:2px; background:#fff; border-radius:50%; transition:0.2s; }
+  .lsw-toggle input:checked + .lsw-toggle-slider { background:#008060; }
+  .lsw-toggle input:checked + .lsw-toggle-slider::before { transform:translateX(16px); }
 </style>
 
 <script>
@@ -197,7 +215,42 @@
     if (notice) notice.style.display = 'block';
   }
 
+  // ── Currency toggle inside dropdown ──────────────────────────────────
+  let latestRate = null;
+  let latestTargetCurrency = null;
+  const toggleRow = document.getElementById('lsw-embed-currency-toggle');
+  const currencySwitch = document.getElementById('lsw-currency-switch');
+  const currencyInfo = document.getElementById('lsw-embed-currency-info');
+
+  // Restore saved toggle state
+  var savedCurrencyToggle = lswGetStorage('currency_conversion');
+  if (savedCurrencyToggle === 'on') currencySwitch.checked = true;
+  if (savedCurrencyToggle === 'off') currencySwitch.checked = false;
+
+  function updateCurrencyToggleInfo(lang) {
+    if (!currencyEnabled || !toggleRow) return;
+    var code = currencyMap[lang];
+    if (!code || code === storeCurrencyCode) {
+      toggleRow.style.display = 'none';
+      return;
+    }
+    toggleRow.style.display = 'flex';
+    var sym = CURRENCY_SYMBOLS[code] || code;
+    currencyInfo.textContent = storeCurrencyCode + ' → ' + sym + code;
+  }
+
+  currencySwitch.addEventListener('change', function() {
+    var isOn = currencySwitch.checked;
+    lswSetStorage('currency_conversion', isOn ? 'on' : 'off');
+    if (isOn && latestRate && latestTargetCurrency) {
+      applyPriceConversion(latestRate, latestTargetCurrency);
+    } else if (!isOn) {
+      restoreOriginalPrices();
+    }
+  });
+
   // Toggle dropdown
+  // (existing code continues below)
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
     const open = !dropdown.hidden;
@@ -222,6 +275,64 @@
   // Forward-reference — real implementation is assigned inside the overlay block below
   let syncOverlayReplacements = async function() {};
 
+  // ── Currency price conversion helpers ──────────────────────────────────
+  const CURRENCY_SELECTORS = [
+    '.money', '.price', '.price-item', '.product__price',
+    '.product-price', '[data-product-price]', '[data-regular-price]',
+    '[data-sale-price]', '.amount', '.price__regular',
+    '.price__sale', '.price__compare', '.price--on-sale',
+    '.cart-item__price', '.cart__price', '.order-summary__price',
+    'span[class*="price"]', 'span[class*="money"]', 'span[class*="amount"]'
+  ].join(', ');
+
+  function getCurrencySymbol(code) {
+    return CURRENCY_SYMBOLS[code] || code + ' ';
+  }
+
+  function applyPriceConversion(rate, targetCurrency) {
+    if (window.__lswCurrencyApplying) return;
+    window.__lswCurrencyApplying = true;
+    try {
+      var newSymbol = getCurrencySymbol(targetCurrency);
+      var els = Array.from(document.querySelectorAll(CURRENCY_SELECTORS));
+      var deduped = els.filter(function(el) {
+        return !els.some(function(other) { return other !== el && other.contains(el); });
+      });
+      deduped.forEach(function(el) {
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+        var node;
+        while ((node = walker.nextNode())) {
+          if (node._lswOriginal === undefined) {
+            node._lswOriginal = node.nodeValue;
+          }
+          var originalText = node._lswOriginal;
+          var match = originalText.match(/([\d,]+(?:\.\d+)?)/);
+          if (match && match[1]) {
+            var num = parseFloat(match[1].replace(/,/g, ''));
+            if (!isNaN(num) && num > 0) {
+              var converted = (num * rate).toFixed(2);
+              var newText = originalText.replace(match[1], converted);
+              newText = newText.replace(/[\$€£¥₹₩₺₪฿₫Rp₱₽KčzłFt]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD|AUD|SGD|CZK|PLN|DKK|SEK|NOK|HUF|TRY|ILS|THB|VND|IDR|MYR|PHP|RUB)/ig, '').trim();
+              node.nodeValue = newSymbol + newText;
+            }
+          }
+        }
+      });
+    } finally {
+      window.__lswCurrencyApplying = false;
+    }
+  }
+
+  function restoreOriginalPrices() {
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    var node;
+    while ((node = walker.nextNode())) {
+      if (node._lswOriginal !== undefined) {
+        node.nodeValue = node._lswOriginal;
+      }
+    }
+  }
+
   async function handleSelect(lang) {
     dropdown.hidden = true;
     chevron.style.transform = '';
@@ -236,106 +347,50 @@
 
     setActive(lang);
     lswSetStorage(STORAGE_KEY, lang);
+
+    // Update currency toggle info for this language
+    updateCurrencyToggleInfo(lang);
+
     await runTranslation(lang);
     // Apply any manually saved/edited translations for this language on top
     await syncOverlayReplacements();
+
+    // Initialize currency conversion for this language
+    await initCurrencyForLang(lang);
 
     // Re-apply currency after overlay sync (overlay sync may reset prices)
     if (window.__lswCurrencyReapply) {
       window.__lswCurrencyReapply();
     }
-
-    if (currencyEnabled) {
-      console.log('[LSW] Currency conversion is ENABLED. Running currency logic...');
-      if (currencyApiKey) {
-        console.log('[LSW] Currency API Key loaded successfully. Ready to convert.');
-        
-        const targetCurrency = currencyMap[lang] || 'USD';
-        
-        try {
-          const baseCurrency = storeCurrencyCode;
-          
-          const res = await fetch(`https://v6.exchangerate-api.com/v6/${currencyApiKey}/latest/${baseCurrency}`);
-          if (res.ok) {
-            const data = await res.json();
-            const rate = data.conversion_rates[targetCurrency];
-            
-          if (rate && targetCurrency !== baseCurrency) {
-              console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
-              
-              const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$', 'AUD': 'A$', 'SGD': 'S$', 'CZK': 'Kč', 'PLN': 'zł', 'DKK': 'kr', 'SEK': 'kr', 'NOK': 'kr', 'HUF': 'Ft', 'TRY': '₺', 'ILS': '₪', 'THB': '฿', 'VND': '₫', 'IDR': 'Rp', 'MYR': 'RM', 'PHP': '₱', 'RUB': '₽' };
-              const newSymbol = symbols[targetCurrency] || targetCurrency + ' ';
-              
-              const PRICE_SELECTORS = [
-                '.money', '.price', '.price-item', '.product__price',
-                '.product-price', '[data-product-price]', '[data-regular-price]',
-                '[data-sale-price]', '.amount', '.price__regular',
-                '.price__sale', '.price__compare', '.price--on-sale',
-                '.cart-item__price', '.cart__price', '.order-summary__price',
-                'span[class*="price"]', 'span[class*="money"]', 'span[class*="amount"]'
-              ].join(', ');
-
-              function applyConversion() {
-                // Guard: prevent re-entrant calls from MutationObserver triggered by our own DOM changes
-                if (window.__lswCurrencyApplying) return;
-                window.__lswCurrencyApplying = true;
-
-                try {
-                  const priceEls = document.querySelectorAll(PRICE_SELECTORS);
-                  const priceElsArray = Array.from(priceEls);
-                  const dedupedEls = priceElsArray.filter(el =>
-                    !priceElsArray.some(other => other !== el && other.contains(el))
-                  );
-                  console.log(`[LSW] Applying currency to ${dedupedEls.length} unique price elements`);
-
-                  dedupedEls.forEach(el => {
-                    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-                    let node;
-                    while ((node = walker.nextNode())) {
-                      // Store original on the TEXT NODE itself (not the element) to avoid stale parent textContent
-                      if (node._lswOriginal === undefined) {
-                        node._lswOriginal = node.nodeValue;
-                      }
-                      const originalNodeText = node._lswOriginal;
-
-                      // Only process text nodes that actually contain a number
-                      const match = originalNodeText.match(/([\d,]+(?:\.\d+)?)/);
-                      if (match && match[1]) {
-                        const numValue = parseFloat(match[1].replace(/,/g, ''));
-                        if (!isNaN(numValue) && numValue > 0) {
-                          const convertedValue = (numValue * rate).toFixed(2);
-                          let newText = originalNodeText.replace(match[1], convertedValue);
-                          newText = newText.replace(/[\$€£¥₹₩₺₪฿₫Rp₱₽KčzłFt]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD|AUD|SGD|CZK|PLN|DKK|SEK|NOK|HUF|TRY|ILS|THB|VND|IDR|MYR|PHP|RUB)/ig, '').trim();
-                          node.nodeValue = `${newSymbol}${newText}`;
-                        }
-                      }
-                    }
-                  });
-                } finally {
-                  window.__lswCurrencyApplying = false;
-                }
-              }
-
-              // Run now and register for re-apply after overlay sync
-              applyConversion();
-              window.__lswCurrencyReapply = applyConversion;
-            } else if (targetCurrency === baseCurrency) {
-              console.log(`[LSW] Target currency is the same as base currency (${baseCurrency}). No conversion needed.`);
-            }
-          } else {
-            console.error('[LSW] ExchangeRate API returned an error:', await res.text());
-          }
-        } catch (err) {
-          console.error('[LSW] Currency API failed:', err);
-        }
-      } else {
-        console.log('[LSW] Warning: Currency conversion is enabled but no API key was found in settings.');
-      }
-    }
   }
 
   // Reference to the language-switcher root element
   const lswRoot = document.getElementById('lsw-embed');
+
+  async function initCurrencyForLang(lang) {
+    if (!currencyEnabled || !currencyApiKey) return;
+    var targetCurrency = currencyMap[lang];
+    if (!targetCurrency || targetCurrency === storeCurrencyCode) return;
+    try {
+      var res = await fetch('https://v6.exchangerate-api.com/v6/' + currencyApiKey + '/latest/' + storeCurrencyCode);
+      if (!res.ok) return;
+      var data = await res.json();
+      var rate = data.conversion_rates[targetCurrency];
+      if (!rate) return;
+      latestRate = rate;
+      latestTargetCurrency = targetCurrency;
+      window.__lswCurrencyReapply = function() {
+        if (currencySwitch && currencySwitch.checked) {
+          applyPriceConversion(latestRate, latestTargetCurrency);
+        }
+      };
+      if (currencySwitch && currencySwitch.checked) {
+        applyPriceConversion(rate, targetCurrency);
+      }
+    } catch(e) {
+      console.error('[LSW] Currency init failed:', e);
+    }
+  }
 
   async function runTranslation(lang) {
     const walker = document.createTreeWalker(
@@ -412,6 +467,12 @@
 
   function runTranslationAndWatch(lang) {
     runTranslation(lang);
+    updateCurrencyToggleInfo(lang);
+    if (document.readyState !== 'loading') {
+      initCurrencyForLang(lang);
+    } else {
+      document.addEventListener('DOMContentLoaded', function() { initCurrencyForLang(lang); });
+    }
 
     // On search result pages, Shopify loads product cards asynchronously.
     // Use a MutationObserver to detect when new content is injected and
