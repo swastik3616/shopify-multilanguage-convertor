@@ -18,7 +18,10 @@
   box-shadow:0 8px 40px rgba(0,0,0,0.15);overflow:hidden;min-width:200px;
   border:1px solid rgba(0,0,0,0.06);">
     <div style="padding:12px 16px;background:#f8f9fa;border-bottom:1px solid #eee;
-    font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;">Select Language</div>
+    font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;">
+      Select Language
+      <span id="lsw-embed-currency-notice" style="display:none;font-weight:400;text-transform:none;letter-spacing:0;color:#008060;font-size:10px;margin-top:4px;white-space:nowrap;">✓ Prices convert to local currency</span>
+    </div>
     <div id="lsw-embed-options"></div>
   </div>
 
@@ -56,6 +59,7 @@
   .lsw-embed-opt-name { flex: 1; }
   .lsw-embed-opt-check { color: #0057b8; font-size: 16px; display: none; }
   .lsw-embed-opt.active .lsw-embed-opt-check { display: block; }
+  .lsw-embed-opt-currency { display: block; font-size: 11px; color: #008060; font-weight: 500; margin-top: 2px; }
 </style>
 
 <script>
@@ -90,6 +94,15 @@
     return map[code.toLowerCase()] || code.toUpperCase();
   }
 
+  const CURRENCY_SYMBOLS = {
+    'USD': '$', 'EUR': '€', 'GBP': '£', 'INR': '₹', 'JPY': '¥',
+    'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'CAD': 'C$', 'AUD': 'A$',
+    'SGD': 'S$', 'CZK': 'Kč', 'PLN': 'zł', 'DKK': 'kr', 'SEK': 'kr',
+    'NOK': 'kr', 'HUF': 'Ft', 'TRY': '₺', 'ILS': '₪', 'THB': '฿',
+    'VND': '₫', 'IDR': 'Rp', 'MYR': 'RM', 'PHP': '₱', 'RUB': '₽',
+    'MXN': 'MX$', 'BRL': 'R$', 'ZAR': 'R', 'NGN': '₦', 'EGP': 'E£'
+  };
+
   const btn      = document.getElementById('lsw-embed-btn');
   const dropdown = document.getElementById('lsw-embed-dropdown');
   const label    = document.getElementById('lsw-embed-label');
@@ -100,6 +113,17 @@
 
   let sourceLanguage = 'English';
   let activeLanguages = [];
+  let storeCurrencyCode = 'USD';
+
+  // Detect store's base currency from Shopify global or meta tags
+  try {
+    if (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) {
+      storeCurrencyCode = window.Shopify.currency.active;
+    } else {
+      const metaCurr = document.querySelector('meta[property="product:price:currency"], meta[itemprop="priceCurrency"]');
+      if (metaCurr) storeCurrencyCode = metaCurr.getAttribute('content') || storeCurrencyCode;
+    }
+  } catch(e) {}
 
   let currencyEnabled = false;
   let currencyApiKey = "";
@@ -132,10 +156,18 @@
       // Filter out non-selected languages
       const active = data.filter(l => ['Source', 'Target', 'Both'].includes(l.status));
       if (active.length > 0) {
-        activeLanguages = active.map(item => ({
-          lang: item.name,
-          flag: getBadge(item.code)
-        }));
+        activeLanguages = active.map(item => {
+          const currencyCode = currencyMap[item.name];
+          const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || currencyCode;
+          const showCurrency = currencyEnabled && currencyCode && currencyCode !== storeCurrencyCode;
+          return {
+            lang: item.name,
+            flag: getBadge(item.code),
+            currencyCode: currencyCode,
+            currencySymbol: currencySymbol,
+            showCurrency: showCurrency
+          };
+        });
       }
     }
   } catch (e) {
@@ -149,7 +181,7 @@
     el.dataset.lang = item.lang;
     el.innerHTML = `
       <span class="lsw-embed-opt-flag">${item.flag}</span>
-      <span class="lsw-embed-opt-name">${item.lang}</span>
+      <span class="lsw-embed-opt-name">${item.lang}${item.showCurrency ? `<span class="lsw-embed-opt-currency">${storeCurrencyCode} → ${item.currencySymbol}${item.currencyCode}</span>` : ''}</span>
       <span class="lsw-embed-opt-check">✓</span>
     `;
     el.addEventListener('click', function(e) {
@@ -158,6 +190,12 @@
     });
     optCont.appendChild(el);
   });
+
+  // Show currency notice if enabled
+  if (currencyEnabled) {
+    const notice = document.getElementById('lsw-embed-currency-notice');
+    if (notice) notice.style.display = 'block';
+  }
 
   // Toggle dropdown
   btn.addEventListener('click', function(e) {
@@ -215,8 +253,7 @@
         const targetCurrency = currencyMap[lang] || 'USD';
         
         try {
-          // Detect Shopify's base currency, fallback to USD
-          const baseCurrency = (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) || 'USD';
+          const baseCurrency = storeCurrencyCode;
           
           const res = await fetch(`https://v6.exchangerate-api.com/v6/${currencyApiKey}/latest/${baseCurrency}`);
           if (res.ok) {
