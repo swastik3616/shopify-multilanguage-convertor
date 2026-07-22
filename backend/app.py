@@ -16,6 +16,7 @@ from routes.seo_routes import seo_bp
 from routes.overlay_routes import overlay_bp
 from routes.webhook_routes import webhook_bp
 from routes.search_routes import search_bp
+from routes.currency_routes import currency_bp
 
 print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 
@@ -84,6 +85,7 @@ app.register_blueprint(seo_bp)
 app.register_blueprint(overlay_bp)
 app.register_blueprint(webhook_bp)
 app.register_blueprint(search_bp)
+app.register_blueprint(currency_bp)
 
 # ── Ensure AI_PROVIDERS table exists (idempotent) ────────────────────────
 try:
@@ -151,6 +153,24 @@ except Exception as _e:
 @app.route("/")
 def home():
     return jsonify({"message": "Shopify Translator Backend Running"})
+
+
+# ── Serve storefront widget scripts ──────────────────────────────────
+import os as _os
+
+_STATICS = {
+    "/storefront.js": _os.path.join(_os.path.dirname(__file__), "..", "frontend", "public", "storefront.js"),
+    "/currency.js": _os.path.join(_os.path.dirname(__file__), "..", "frontend", "public", "currency.js"),
+}
+
+@app.route("/storefront.js")
+@app.route("/currency.js")
+def serve_storefront_script():
+    path = _STATICS.get(request.path)
+    if not path or not _os.path.isfile(path):
+        return "Not Found", 404
+    with open(path, "r", encoding="utf-8") as f:
+        return flask.Response(f.read(), mimetype="application/javascript")
 
 
 @app.route("/wake", methods=["GET", "OPTIONS"])

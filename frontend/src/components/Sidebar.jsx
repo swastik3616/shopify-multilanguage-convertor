@@ -9,7 +9,8 @@ import {
   Settings,
   History,
   Store,
-  Search
+  Search,
+  DollarSign
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -26,6 +27,7 @@ function Sidebar() {
   const configLinks = [
     { name: "Languages", path: "/languages", icon: Languages },
     { name: "Providers", path: "/providers", icon: Plug },
+    { name: "Currency", path: "/currency", icon: DollarSign },
   ];
 
   const contentLinks = [
