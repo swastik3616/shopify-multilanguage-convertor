@@ -1,6 +1,8 @@
-import { DollarSign, Save, RefreshCw, Check, AlertCircle, ExternalLink } from "lucide-react";
-import { useState, useEffect } from "react";
+import { DollarSign, Save, RefreshCw, Check, AlertCircle, ExternalLink, X } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { apiFetch } from "../services/apiClient";
+
+const MAX_CURRENCIES = 5;
 
 function CurrencyPage() {
   const [enabled, setEnabled] = useState(false);
@@ -25,6 +27,12 @@ function CurrencyPage() {
       .then((data) => setStoreUrl(data.store_url || ""))
       .catch(() => {});
   }, []);
+
+  const configuredCount = useMemo(
+    () => Object.values(currencyMap).filter((c) => c && c.trim().length === 3).length,
+    [currencyMap]
+  );
+  const atLimit = configuredCount >= MAX_CURRENCIES;
 
   const handleToggle = async (val) => {
     setEnabled(val);
@@ -64,7 +72,18 @@ function CurrencyPage() {
   };
 
   const updateCurrency = (lang, code) => {
-    setCurrencyMap((prev) => ({ ...prev, [lang]: code.toUpperCase() }));
+    code = code.toUpperCase();
+    var prev = currencyMap[lang] || "";
+    if (!prev && code.length === 3 && atLimit) return;
+    setCurrencyMap((prev) => ({ ...prev, [lang]: code }));
+  };
+
+  const clearCurrency = (lang) => {
+    setCurrencyMap((prev) => {
+      var next = { ...prev };
+      delete next[lang];
+      return next;
+    });
   };
 
   const storefrontLink = storeUrl
@@ -125,34 +144,60 @@ function CurrencyPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Language-to-Currency Mapping
-              </label>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  Language-to-Currency Mapping
+                </label>
+                <span className={`text-xs font-semibold ${atLimit ? "text-amber-600" : "text-slate-500"}`}>
+                  {configuredCount}/{MAX_CURRENCIES} currencies configured
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mb-3">
-                Each language will automatically convert prices to the assigned currency code.
+                Assign a currency code to each language. Maximum {MAX_CURRENCIES} languages can have currency conversion.
               </p>
+
+              {atLimit && (
+                <div className="flex items-center gap-2 p-3 mb-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-800">Maximum {MAX_CURRENCIES} currencies reached. Remove one before adding another.</p>
+                </div>
+              )}
+
               <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 sticky top-0">
                     <tr>
                       <th className="text-left px-4 py-2 font-medium text-slate-600 border-b border-slate-200">Language</th>
                       <th className="text-left px-4 py-2 font-medium text-slate-600 border-b border-slate-200">Currency Code</th>
+                      <th className="w-10 border-b border-slate-200"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(currencyMap).map(([lang, code]) => (
-                      <tr key={lang} className="border-b border-slate-100 last:border-0">
-                        <td className="px-4 py-2 text-slate-700">{lang}</td>
-                        <td className="px-4 py-2">
-                          <input
-                            className="input-field w-24 uppercase"
-                            value={code}
-                            onChange={(e) => updateCurrency(lang, e.target.value)}
-                            maxLength={3}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {Object.entries(currencyMap).map(([lang, code]) => {
+                      var hasCode = code && code.trim().length === 3;
+                      return (
+                        <tr key={lang} className={`border-b border-slate-100 last:border-0 ${!hasCode && atLimit ? "opacity-40" : ""}`}>
+                          <td className="px-4 py-2 text-slate-700">{lang}</td>
+                          <td className="px-4 py-2">
+                            <input
+                              className="input-field w-24 uppercase"
+                              value={code}
+                              onChange={(e) => updateCurrency(lang, e.target.value)}
+                              maxLength={3}
+                              placeholder={!hasCode && atLimit ? "Limit reached" : "e.g. INR"}
+                              disabled={!hasCode && atLimit}
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            {hasCode && (
+                              <button onClick={() => clearCurrency(lang)} className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer" title="Remove">
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -179,12 +224,8 @@ function CurrencyPage() {
                 <div>
                   <p className="text-sm font-medium text-blue-900">Storefront Setup</p>
                   <p className="text-xs text-blue-700 mt-1">
-                    To show the currency selector on your storefront, add the following script to your Shopify theme's{" "}
-                    <code className="bg-blue-100 px-1 rounded">theme.liquid</code> just before <code className="bg-blue-100 px-1 rounded">&lt;/body&gt;</code>:
+                    No additional setup needed. The language switcher on your storefront will show a currency toggle and convert prices automatically.
                   </p>
-                  <pre className="mt-2 p-3 bg-blue-900/10 rounded text-xs text-blue-800 overflow-x-auto">
-{`<script src="${window.location.origin}/currency.js?shop=${storeUrl}"></script>`}
-                  </pre>
                 </div>
               </div>
             )}

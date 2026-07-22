@@ -8,6 +8,7 @@
     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" 
     cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 
     10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    <span id="lsw-embed-currency-badge" title="Currency conversion" style="display:none;font-size:12px;font-weight:700;background:#008060;color:#fff;border-radius:6px;padding:2px 6px;line-height:1.2;cursor:pointer;">$</span>
     <span id="lsw-embed-label">Loading...</span>
     <svg id="lsw-embed-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s ease;"><polyline points="6 9 12 15 18 9"/></svg>
   </button>
@@ -78,6 +79,7 @@
   .lsw-toggle-slider::before { content:''; position:absolute; height:16px; width:16px; left:2px; bottom:2px; background:#fff; border-radius:50%; transition:0.2s; }
   .lsw-toggle input:checked + .lsw-toggle-slider { background:#008060; }
   .lsw-toggle input:checked + .lsw-toggle-slider::before { transform:translateX(16px); }
+  #lsw-embed-currency-badge.off { background:#555; opacity:0.5; }
 </style>
 
 <script>
@@ -215,33 +217,62 @@
     if (notice) notice.style.display = 'block';
   }
 
-  // ── Currency toggle inside dropdown ──────────────────────────────────
+  // ── Currency toggle inside dropdown + badge on button ──────────────────
   let latestRate = null;
   let latestTargetCurrency = null;
   const toggleRow = document.getElementById('lsw-embed-currency-toggle');
   const currencySwitch = document.getElementById('lsw-currency-switch');
   const currencyInfo = document.getElementById('lsw-embed-currency-info');
+  const currencyBadge = document.getElementById('lsw-embed-currency-badge');
 
   // Restore saved toggle state
   var savedCurrencyToggle = lswGetStorage('currency_conversion');
   if (savedCurrencyToggle === 'on') currencySwitch.checked = true;
   if (savedCurrencyToggle === 'off') currencySwitch.checked = false;
 
+  function syncBadgeWithToggle() {
+    if (!currencyBadge) return;
+    var isOn = currencySwitch && currencySwitch.checked;
+    currencyBadge.classList.toggle('off', !isOn);
+    if (latestTargetCurrency) {
+      var sym = CURRENCY_SYMBOLS[latestTargetCurrency] || latestTargetCurrency;
+      currencyBadge.textContent = isOn ? sym : '$';
+    }
+  }
+
   function updateCurrencyToggleInfo(lang) {
     if (!currencyEnabled || !toggleRow) return;
     var code = currencyMap[lang];
     if (!code || code === storeCurrencyCode) {
       toggleRow.style.display = 'none';
+      if (currencyBadge) currencyBadge.style.display = 'none';
       return;
     }
     toggleRow.style.display = 'flex';
     var sym = CURRENCY_SYMBOLS[code] || code;
     currencyInfo.textContent = storeCurrencyCode + ' → ' + sym + code;
+    if (currencyBadge) {
+      currencyBadge.style.display = 'inline';
+      currencyBadge.textContent = sym;
+      syncBadgeWithToggle();
+    }
+  }
+
+  // Clicking the badge toggles currency (same as the dropdown switch)
+  if (currencyBadge) {
+    currencyBadge.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (currencySwitch) {
+        currencySwitch.checked = !currencySwitch.checked;
+        currencySwitch.dispatchEvent(new Event('change'));
+      }
+    });
   }
 
   currencySwitch.addEventListener('change', function() {
     var isOn = currencySwitch.checked;
     lswSetStorage('currency_conversion', isOn ? 'on' : 'off');
+    syncBadgeWithToggle();
     if (isOn && latestRate && latestTargetCurrency) {
       applyPriceConversion(latestRate, latestTargetCurrency);
     } else if (!isOn) {
