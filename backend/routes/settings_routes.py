@@ -203,5 +203,5 @@ def get_feature_flags():
     if "currency_map" not in flags or not flags["currency_map"]:
         flags["currency_map"] = DEFAULT_CURRENCY_MAP
     if "active_currencies" not in flags:
-        flags["active_currencies"] = ["USD", "EUR", "GBP", "INR", "CAD"]
+        flags["active_currencies"] = []
     return jsonify(flags)
