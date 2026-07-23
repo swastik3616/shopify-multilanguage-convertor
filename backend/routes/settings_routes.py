@@ -185,6 +185,8 @@ def save_feature_flags():
         flags["currency_api_key"] = data["currency_api_key"]
     if "currency_map" in data:
         flags["currency_map"] = data["currency_map"]
+    if "active_currencies" in data:
+        flags["active_currencies"] = data["active_currencies"]
         
     set_setting("feature_flags", flags)
 
@@ -200,4 +202,6 @@ def get_feature_flags():
     flags = get_setting("feature_flags", {"currency_enabled": False})
     if "currency_map" not in flags or not flags["currency_map"]:
         flags["currency_map"] = DEFAULT_CURRENCY_MAP
+    if "active_currencies" not in flags:
+        flags["active_currencies"] = ["USD", "EUR", "GBP", "INR", "CAD"]
     return jsonify(flags)

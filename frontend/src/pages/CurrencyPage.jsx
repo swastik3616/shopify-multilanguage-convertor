@@ -1,13 +1,27 @@
 import { DollarSign, Save, RefreshCw, Check, AlertCircle, ExternalLink, X } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { apiFetch } from "../services/apiClient";
 
 const MAX_CURRENCIES = 5;
 
+const AVAILABLE_CURRENCIES = [
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: '$' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: '$' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'AED', name: 'UAE Dirham', symbol: 'د.إ' },
+  { code: 'KRW', name: 'South Korean Won', symbol: '₩' },
+  { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' }
+];
+
 function CurrencyPage() {
   const [enabled, setEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
-  const [currencyMap, setCurrencyMap] = useState({});
+  const [activeCurrencies, setActiveCurrencies] = useState(["USD"]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
@@ -18,7 +32,7 @@ function CurrencyPage() {
       .then((data) => {
         setEnabled(data.currency_enabled || false);
         setApiKey(data.currency_api_key || "");
-        setCurrencyMap(data.currency_map || {});
+        setActiveCurrencies(data.active_currencies || ["USD"]);
       })
       .catch((err) => console.error("Failed to load currency settings", err));
 
@@ -28,11 +42,7 @@ function CurrencyPage() {
       .catch(() => {});
   }, []);
 
-  const configuredCount = useMemo(
-    () => Object.values(currencyMap).filter((c) => c && c.trim().length === 3).length,
-    [currencyMap]
-  );
-  const atLimit = configuredCount >= MAX_CURRENCIES;
+  const atLimit = activeCurrencies.length >= MAX_CURRENCIES;
 
   const handleToggle = async (val) => {
     setEnabled(val);
@@ -53,19 +63,13 @@ function CurrencyPage() {
   const handleSaveAll = async () => {
     setSaving(true);
     try {
-      // Only save non-empty 3-letter currency codes
-      var cleanMap = {};
-      Object.keys(currencyMap).forEach(function(lang) {
-        var code = (currencyMap[lang] || "").trim().toUpperCase();
-        if (code.length === 3) cleanMap[lang] = code;
-      });
       await apiFetch("/save-feature-flags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currency_enabled: enabled,
           currency_api_key: apiKey,
-          currency_map: cleanMap,
+          active_currencies: activeCurrencies,
         }),
       });
       setSaved(true);
@@ -77,19 +81,13 @@ function CurrencyPage() {
     }
   };
 
-  const updateCurrency = (lang, code) => {
-    code = code.toUpperCase();
-    var prev = currencyMap[lang] || "";
-    if (!prev && code.length === 3 && atLimit) return;
-    setCurrencyMap((prev) => ({ ...prev, [lang]: code }));
-  };
-
-  const clearCurrency = (lang) => {
-    setCurrencyMap((prev) => {
-      var next = { ...prev };
-      delete next[lang];
-      return next;
-    });
+  const toggleCurrency = (code) => {
+    if (activeCurrencies.includes(code)) {
+      setActiveCurrencies(prev => prev.filter(c => c !== code));
+    } else {
+      if (atLimit) return;
+      setActiveCurrencies(prev => [...prev, code]);
+    }
   };
 
   const storefrontLink = storeUrl
@@ -101,7 +99,7 @@ function CurrencyPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Currency Exchange</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Enable automatic currency conversion on your storefront based on the selected language.
+          Enable automatic currency conversion on your storefront.
         </p>
       </div>
 
@@ -113,7 +111,7 @@ function CurrencyPage() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Currency Converter</h2>
-              <p className="text-xs text-slate-500">Convert prices to the local currency of each language.</p>
+              <p className="text-xs text-slate-500">Convert prices to selected currencies.</p>
             </div>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -152,60 +150,47 @@ function CurrencyPage() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-sm font-medium text-slate-700">
-                  Language-to-Currency Mapping
+                  Supported Currencies
                 </label>
                 <span className={`text-xs font-semibold ${atLimit ? "text-amber-600" : "text-slate-500"}`}>
-                  {configuredCount}/{MAX_CURRENCIES} currencies configured
+                  {activeCurrencies.length}/{MAX_CURRENCIES} selected
                 </span>
               </div>
               <p className="text-xs text-slate-500 mb-3">
-                Assign a currency code to each language. Maximum {MAX_CURRENCIES} languages can have currency conversion.
+                Select up to {MAX_CURRENCIES} currencies to display in the storefront widget.
               </p>
 
               {atLimit && (
-                <div className="flex items-center gap-2 p-3 mb-3 rounded-lg bg-amber-50 border border-amber-200">
+                <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-amber-50 border border-amber-200">
                   <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  <p className="text-xs text-amber-800">Maximum {MAX_CURRENCIES} currencies reached. Remove one before adding another.</p>
+                  <p className="text-xs text-amber-800">Maximum {MAX_CURRENCIES} currencies reached. Uncheck one before adding another.</p>
                 </div>
               )}
 
-              <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 sticky top-0">
-                    <tr>
-                      <th className="text-left px-4 py-2 font-medium text-slate-600 border-b border-slate-200">Language</th>
-                      <th className="text-left px-4 py-2 font-medium text-slate-600 border-b border-slate-200">Currency Code</th>
-                      <th className="w-10 border-b border-slate-200"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(currencyMap).map(([lang, code]) => {
-                      var hasCode = code && code.trim().length === 3;
-                      return (
-                        <tr key={lang} className={`border-b border-slate-100 last:border-0 ${!hasCode && atLimit ? "opacity-40" : ""}`}>
-                          <td className="px-4 py-2 text-slate-700">{lang}</td>
-                          <td className="px-4 py-2">
-                            <input
-                              className="input-field w-24 uppercase"
-                              value={code}
-                              onChange={(e) => updateCurrency(lang, e.target.value)}
-                              maxLength={3}
-                              placeholder={!hasCode && atLimit ? "Limit reached" : "e.g. INR"}
-                              disabled={!hasCode && atLimit}
-                            />
-                          </td>
-                          <td className="px-2 py-2">
-                            {hasCode && (
-                              <button onClick={() => clearCurrency(lang)} className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer" title="Remove">
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {AVAILABLE_CURRENCIES.map((currency) => {
+                  const isChecked = activeCurrencies.includes(currency.code);
+                  const isDisabled = !isChecked && atLimit;
+                  
+                  return (
+                    <label 
+                      key={currency.code} 
+                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-300'}`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 text-[#008060] rounded border-slate-300 focus:ring-[#008060]"
+                        checked={isChecked}
+                        disabled={isDisabled}
+                        onChange={() => toggleCurrency(currency.code)}
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-slate-700">{currency.code}</span>
+                        <span className="text-xs text-slate-500">{currency.name} ({currency.symbol})</span>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 
