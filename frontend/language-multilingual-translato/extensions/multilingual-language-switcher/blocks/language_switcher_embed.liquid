@@ -8,7 +8,6 @@
     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" 
     cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 
     10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-    <span id="lsw-embed-currency-badge" title="Currency conversion" style="display:none;font-size:12px;font-weight:700;background:#008060;color:#fff;border-radius:6px;padding:2px 6px;line-height:1.2;cursor:pointer;">$</span>
     <span id="lsw-embed-label">Loading...</span>
     <svg id="lsw-embed-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s ease;"><polyline points="6 9 12 15 18 9"/></svg>
   </button>
@@ -19,15 +18,8 @@
   box-shadow:0 8px 40px rgba(0,0,0,0.15);overflow:hidden;min-width:200px;
   border:1px solid rgba(0,0,0,0.06);">
     <div style="padding:12px 16px;background:#f8f9fa;border-bottom:1px solid #eee;
-    font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;">
-      Select Language
-      <span id="lsw-embed-currency-notice" style="display:none;font-weight:400;text-transform:none;letter-spacing:0;color:#008060;font-size:10px;margin-top:4px;white-space:nowrap;">✓ Currency picker available</span>
-    </div>
+    font-size:11px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;">Select Language</div>
     <div id="lsw-embed-options"></div>
-    <div id="lsw-embed-currency-section" style="display:none;border-top:1px solid #eee;">
-      <div style="padding:10px 16px 6px;font-size:11px;font-weight:700;color:#888;letter-spacing:0.06em;text-transform:uppercase;">Select Currency</div>
-      <div id="lsw-embed-currency-options" style="padding:0 8px 8px;"></div>
-    </div>
   </div>
 
   <!-- Status bar -->
@@ -64,31 +56,12 @@
   .lsw-embed-opt-name { flex: 1; }
   .lsw-embed-opt-check { color: #0057b8; font-size: 16px; display: none; }
   .lsw-embed-opt.active .lsw-embed-opt-check { display: block; }
-  .lsw-embed-opt-currency { display: block; font-size: 11px; color: #008060; font-weight: 500; margin-top: 2px; }
-  #lsw-embed-currency-badge.off { background:#555; opacity:0.5; }
 </style>
 
 <script>
 (async function() {
   const BACKEND = 'https://shopify-multilanguage-convertor.onrender.com';
   const STORAGE_KEY = 'shopify_selected_language';
-
-  // Guard: if this script is running inside a sandboxed iframe (e.g. the
-  // Shopify admin preview), localStorage is blocked with a SecurityError.
-  // Exit immediately — the widget only makes sense on the live storefront.
-  try { localStorage; } catch(e) { return; }
-
-  // Safe localStorage helpers — silently swallow any SecurityError so a
-  // sandboxed context never causes uncaught exceptions from our code.
-  function lswGetStorage(key) {
-    try { return localStorage.getItem(key); } catch(e) { return null; }
-  }
-  function lswSetStorage(key, val) {
-    try { localStorage.setItem(key, val); } catch(e) {}
-  }
-  function lswRemoveStorage(key) {
-    try { localStorage.removeItem(key); } catch(e) {}
-  }
 
   // Helper to get a flag emoji for common languages, or fallback to the code
   function getBadge(code) {
@@ -100,15 +73,6 @@
     return map[code.toLowerCase()] || code.toUpperCase();
   }
 
-  const CURRENCY_SYMBOLS = {
-    'USD': '$', 'EUR': '€', 'GBP': '£', 'INR': '₹', 'JPY': '¥',
-    'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'CAD': 'C$', 'AUD': 'A$',
-    'SGD': 'S$', 'CZK': 'Kč', 'PLN': 'zł', 'DKK': 'kr', 'SEK': 'kr',
-    'NOK': 'kr', 'HUF': 'Ft', 'TRY': '₺', 'ILS': '₪', 'THB': '฿',
-    'VND': '₫', 'IDR': 'Rp', 'MYR': 'RM', 'PHP': '₱', 'RUB': '₽',
-    'MXN': 'MX$', 'BRL': 'R$', 'ZAR': 'R', 'NGN': '₦', 'EGP': 'E£'
-  };
-
   const btn      = document.getElementById('lsw-embed-btn');
   const dropdown = document.getElementById('lsw-embed-dropdown');
   const label    = document.getElementById('lsw-embed-label');
@@ -119,21 +83,9 @@
 
   let sourceLanguage = 'English';
   let activeLanguages = [];
-  let storeCurrencyCode = 'USD';
-
-  // Detect store's base currency from Shopify global or meta tags
-  try {
-    if (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) {
-      storeCurrencyCode = window.Shopify.currency.active;
-    } else {
-      const metaCurr = document.querySelector('meta[property="product:price:currency"], meta[itemprop="priceCurrency"]');
-      if (metaCurr) storeCurrencyCode = metaCurr.getAttribute('content') || storeCurrencyCode;
-    }
-  } catch(e) {}
 
   let currencyEnabled = false;
   let currencyApiKey = "";
-  let currencyMap = {};
 
   try {
     // Fetch feature flags to check if currency is active
@@ -142,7 +94,6 @@
       const flags = await flagRes.json();
       currencyEnabled = flags.currency_enabled || false;
       currencyApiKey = flags.currency_api_key || "";
-      currencyMap = flags.currency_map || {};
     }
   } catch (e) {
     console.error('[LSW] Failed to fetch feature flags:', e);
@@ -162,18 +113,10 @@
       // Filter out non-selected languages
       const active = data.filter(l => ['Source', 'Target', 'Both'].includes(l.status));
       if (active.length > 0) {
-        activeLanguages = active.map(item => {
-          const currencyCode = currencyMap[item.name];
-          const currencySymbol = CURRENCY_SYMBOLS[currencyCode] || currencyCode;
-          const showCurrency = currencyEnabled && currencyCode && currencyCode !== storeCurrencyCode;
-          return {
-            lang: item.name,
-            flag: getBadge(item.code),
-            currencyCode: currencyCode,
-            currencySymbol: currencySymbol,
-            showCurrency: showCurrency
-          };
-        });
+        activeLanguages = active.map(item => ({
+          lang: item.name,
+          flag: getBadge(item.code)
+        }));
       }
     }
   } catch (e) {
@@ -187,7 +130,7 @@
     el.dataset.lang = item.lang;
     el.innerHTML = `
       <span class="lsw-embed-opt-flag">${item.flag}</span>
-      <span class="lsw-embed-opt-name">${item.lang}${item.showCurrency ? `<span class="lsw-embed-opt-currency">${storeCurrencyCode} → ${item.currencySymbol}${item.currencyCode}</span>` : ''}</span>
+      <span class="lsw-embed-opt-name">${item.lang}</span>
       <span class="lsw-embed-opt-check">✓</span>
     `;
     el.addEventListener('click', function(e) {
@@ -197,152 +140,7 @@
     optCont.appendChild(el);
   });
 
-  // ── Currency picker (inside dropdown) + badge on button ─────────────────
-  let latestRates = {};
-  let selectedCurrency = null;
-  const currencySection = document.getElementById('lsw-embed-currency-section');
-  const currencyOptions = document.getElementById('lsw-embed-currency-options');
-  const currencyBadge = document.getElementById('lsw-embed-currency-badge');
-
-  // Restore saved currency selection
-  var savedCurrency = lswGetStorage('store_currency');
-  if (savedCurrency && savedCurrency !== storeCurrencyCode) {
-    selectedCurrency = savedCurrency;
-  }
-
-  function getAvailableCurrencies() {
-    if (!currencyEnabled) return [];
-    var seen = {}, list = [];
-    Object.keys(currencyMap).forEach(function(lang) {
-      var code = currencyMap[lang];
-      if (code && code !== storeCurrencyCode && !seen[code]) {
-        seen[code] = true;
-        list.push(code);
-      }
-    });
-    return list;
-  }
-
-  function buildCurrencyOptions() {
-    if (!currencySection || !currencyOptions) return;
-    var codes = getAvailableCurrencies();
-    if (codes.length === 0) {
-      currencySection.style.display = 'none';
-      if (currencyBadge) currencyBadge.style.display = 'none';
-      return;
-    }
-    currencySection.style.display = 'block';
-
-    // Show currency notice in header
-    var notice = document.getElementById('lsw-embed-currency-notice');
-    if (notice) notice.style.display = 'block';
-
-    // Show badge
-    if (currencyBadge) {
-      currencyBadge.style.display = 'inline';
-      if (selectedCurrency) {
-        var sym = CURRENCY_SYMBOLS[selectedCurrency] || selectedCurrency;
-        currencyBadge.textContent = sym;
-        currencyBadge.classList.toggle('off', false);
-      } else {
-        currencyBadge.textContent = '$';
-        currencyBadge.classList.toggle('off', true);
-      }
-    }
-
-    currencyOptions.innerHTML = '';
-    codes.forEach(function(code) {
-      var el = document.createElement('div');
-      var sym = CURRENCY_SYMBOLS[code] || code;
-      var isActive = selectedCurrency === code;
-      el.className = 'lsw-embed-opt' + (isActive ? ' active' : '');
-      el.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#222;border-radius:8px;transition:background 0.15s;';
-      el.innerHTML = '<span style="font-size:16px;width:24px;text-align:center;">' + sym + '</span>' +
-        '<span style="flex:1;font-weight:' + (isActive ? '600' : '400') + ';">' + code + '</span>' +
-        '<span style="color:#008060;font-size:14px;display:' + (isActive ? 'inline' : 'none') + ';">✓</span>';
-      el.addEventListener('mouseenter', function() { if (!isActive) el.style.background = '#f3f4f6'; });
-      el.addEventListener('mouseleave', function() { if (!isActive) el.style.background = ''; });
-      el.addEventListener('click', function(e) {
-        e.stopPropagation();
-        selectCurrency(code);
-      });
-      currencyOptions.appendChild(el);
-    });
-  }
-
-  async function selectCurrency(code) {
-    if (code === storeCurrencyCode || code === selectedCurrency) return;
-
-    // Fetch rates first
-    if (!latestRates[code] && currencyApiKey) {
-      try {
-        var res = await fetch('https://v6.exchangerate-api.com/v6/' + currencyApiKey + '/latest/' + storeCurrencyCode);
-        if (res.ok) {
-          var data = await res.json();
-          latestRates = data.conversion_rates || {};
-        }
-      } catch(e) {
-        console.error('[LSW] Failed to fetch rates:', e);
-        return;
-      }
-    }
-
-    var rate = latestRates[code];
-    if (!rate) return;
-
-    selectedCurrency = code;
-    lswSetStorage('store_currency', code);
-
-    // Update badge
-    if (currencyBadge) {
-      var sym = CURRENCY_SYMBOLS[code] || code;
-      currencyBadge.textContent = sym;
-      currencyBadge.classList.toggle('off', false);
-    }
-
-    // Apply conversion
-    applyPriceConversion(rate, code);
-
-    // Update active state in options
-    buildCurrencyOptions();
-
-    // Register for re-apply
-    window.__lswCurrencyReapply = function() {
-      if (selectedCurrency && latestRates[selectedCurrency]) {
-        applyPriceConversion(latestRates[selectedCurrency], selectedCurrency);
-      }
-    };
-  }
-
-  function clearCurrencySelection() {
-    selectedCurrency = null;
-    lswRemoveStorage('store_currency');
-    restoreOriginalPrices();
-    if (currencyBadge) {
-      currencyBadge.textContent = '$';
-      currencyBadge.classList.toggle('off', true);
-    }
-    buildCurrencyOptions();
-    window.__lswCurrencyReapply = null;
-  }
-
-  // Clicking the badge resets to store currency
-  if (currencyBadge) {
-    currencyBadge.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (selectedCurrency) {
-        clearCurrencySelection();
-      } else {
-        // Open dropdown and scroll to currency section
-        if (dropdown && dropdown.hidden !== false) {
-          btn.click();
-        }
-      }
-    });
-  }
-
   // Toggle dropdown
-  // (existing code continues below)
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
     const open = !dropdown.hidden;
@@ -367,114 +165,127 @@
   // Forward-reference — real implementation is assigned inside the overlay block below
   let syncOverlayReplacements = async function() {};
 
-  // ── Currency price conversion helpers ──────────────────────────────────
-  const CURRENCY_SELECTORS = [
-    '.money', '.price', '.price-item', '.product__price',
-    '.product-price', '[data-product-price]', '[data-regular-price]',
-    '[data-sale-price]', '.amount', '.price__regular',
-    '.price__sale', '.price__compare', '.price--on-sale',
-    '.cart-item__price', '.cart__price', '.order-summary__price',
-    'span[class*="price"]', 'span[class*="money"]', 'span[class*="amount"]'
-  ].join(', ');
-
-  function getCurrencySymbol(code) {
-    return CURRENCY_SYMBOLS[code] || code + ' ';
-  }
-
-  function applyPriceConversion(rate, targetCurrency) {
-    if (window.__lswCurrencyApplying) return;
-    window.__lswCurrencyApplying = true;
-    try {
-      var newSymbol = getCurrencySymbol(targetCurrency);
-      var els = Array.from(document.querySelectorAll(CURRENCY_SELECTORS));
-      var deduped = els.filter(function(el) {
-        return !els.some(function(other) { return other !== el && other.contains(el); });
-      });
-      deduped.forEach(function(el) {
-        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-        var node;
-        while ((node = walker.nextNode())) {
-          if (node._lswOriginal === undefined) {
-            node._lswOriginal = node.nodeValue;
-          }
-          var originalText = node._lswOriginal;
-          var match = originalText.match(/([\d,]+(?:\.\d+)?)/);
-          if (match && match[1]) {
-            var num = parseFloat(match[1].replace(/,/g, ''));
-            if (!isNaN(num) && num > 0) {
-              var converted = (num * rate).toFixed(2);
-              var newText = originalText.replace(match[1], converted);
-              newText = newText.replace(/[\$€£¥₹₩₺₪฿₫Rp₱₽KčzłFt]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD|AUD|SGD|CZK|PLN|DKK|SEK|NOK|HUF|TRY|ILS|THB|VND|IDR|MYR|PHP|RUB)/ig, '').trim();
-              node.nodeValue = newSymbol + newText;
-            }
-          }
-        }
-      });
-    } finally {
-      window.__lswCurrencyApplying = false;
-    }
-  }
-
-  function restoreOriginalPrices() {
-    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-    var node;
-    while ((node = walker.nextNode())) {
-      if (node._lswOriginal !== undefined) {
-        node.nodeValue = node._lswOriginal;
-      }
-    }
-  }
-
   async function handleSelect(lang) {
     dropdown.hidden = true;
     chevron.style.transform = '';
 
+    // If the user selects the source language, reset page to original
     if (lang === sourceLanguage) {
-      lswRemoveStorage(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
       setActive(sourceLanguage);
       location.reload();
       return;
     }
 
     setActive(lang);
-    lswSetStorage(STORAGE_KEY, lang);
-
+    localStorage.setItem(STORAGE_KEY, lang);
     await runTranslation(lang);
+    // Apply any manually saved/edited translations for this language on top
     await syncOverlayReplacements();
 
     // Re-apply currency after overlay sync (overlay sync may reset prices)
-    if (window.__lswCurrencyReapply && selectedCurrency) {
+    if (window.__lswCurrencyReapply) {
       window.__lswCurrencyReapply();
+    }
+
+    if (currencyEnabled) {
+      console.log('[LSW] Currency conversion is ENABLED. Running currency logic...');
+      if (currencyApiKey) {
+        console.log('[LSW] Currency API Key loaded successfully. Ready to convert.');
+        
+        // Simple language to currency mapping
+        const currencyMap = {
+          'Hindi': 'INR', 'Spanish': 'EUR', 'French': 'EUR', 'German': 'EUR', 
+          'Japanese': 'JPY', 'Italian': 'EUR', 'Portuguese': 'BRL', 'Chinese': 'CNY',
+          'Korean': 'KRW', 'Arabic': 'AED', 'English': 'USD'
+        };
+        const targetCurrency = currencyMap[lang] || 'USD';
+        
+        try {
+          // Detect Shopify's base currency, fallback to USD
+          const baseCurrency = (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) || 'USD';
+          
+          const res = await fetch(`https://v6.exchangerate-api.com/v6/${currencyApiKey}/latest/${baseCurrency}`);
+          if (res.ok) {
+            const data = await res.json();
+            const rate = data.conversion_rates[targetCurrency];
+            
+          if (rate && targetCurrency !== baseCurrency) {
+              console.log(`[LSW] Converting prices from ${baseCurrency} to ${targetCurrency} at rate ${rate}`);
+              
+              const symbols = { 'INR': '₹', 'EUR': '€', 'JPY': '¥', 'BRL': 'R$', 'CNY': '¥', 'KRW': '₩', 'AED': 'د.إ', 'USD': '$', 'GBP': '£', 'CAD': '$' };
+              const newSymbol = symbols[targetCurrency] || targetCurrency + ' ';
+              
+              const PRICE_SELECTORS = [
+                '.money', '.price', '.price-item', '.product__price',
+                '.product-price', '[data-product-price]', '[data-regular-price]',
+                '[data-sale-price]', '.amount', '.price__regular',
+                '.price__sale', '.price__compare', '.price--on-sale',
+                '.cart-item__price', '.cart__price', '.order-summary__price',
+                'span[class*="price"]', 'span[class*="money"]', 'span[class*="amount"]'
+              ].join(', ');
+
+              function applyConversion() {
+                // Guard: prevent re-entrant calls from MutationObserver triggered by our own DOM changes
+                if (window.__lswCurrencyApplying) return;
+                window.__lswCurrencyApplying = true;
+
+                try {
+                  const priceEls = document.querySelectorAll(PRICE_SELECTORS);
+                  const priceElsArray = Array.from(priceEls);
+                  const dedupedEls = priceElsArray.filter(el =>
+                    !priceElsArray.some(other => other !== el && other.contains(el))
+                  );
+                  console.log(`[LSW] Applying currency to ${dedupedEls.length} unique price elements`);
+
+                  dedupedEls.forEach(el => {
+                    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+                    let node;
+                    while ((node = walker.nextNode())) {
+                      // Store original on the TEXT NODE itself (not the element) to avoid stale parent textContent
+                      if (node._lswOriginal === undefined) {
+                        node._lswOriginal = node.nodeValue;
+                      }
+                      const originalNodeText = node._lswOriginal;
+
+                      // Only process text nodes that actually contain a number
+                      const match = originalNodeText.match(/([\d,]+(?:\.\d+)?)/);
+                      if (match && match[1]) {
+                        const numValue = parseFloat(match[1].replace(/,/g, ''));
+                        if (!isNaN(numValue) && numValue > 0) {
+                          const convertedValue = (numValue * rate).toFixed(2);
+                          let newText = originalNodeText.replace(match[1], convertedValue);
+                          newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
+                          node.nodeValue = `${newSymbol}${newText}`;
+                        }
+                      }
+                    }
+                  });
+                } finally {
+                  window.__lswCurrencyApplying = false;
+                }
+              }
+
+              // Run now and register for re-apply after overlay sync
+              applyConversion();
+              window.__lswCurrencyReapply = applyConversion;
+            } else if (targetCurrency === baseCurrency) {
+              console.log(`[LSW] Target currency is the same as base currency (${baseCurrency}). No conversion needed.`);
+            }
+          } else {
+            console.error('[LSW] ExchangeRate API returned an error:', await res.text());
+          }
+        } catch (err) {
+          console.error('[LSW] Currency API failed:', err);
+        }
+      } else {
+        console.log('[LSW] Warning: Currency conversion is enabled but no API key was found in settings.');
+      }
     }
   }
 
   // Reference to the language-switcher root element
   const lswRoot = document.getElementById('lsw-embed');
-
-  async function initSavedCurrency() {
-    if (!currencyEnabled || !currencyApiKey || !selectedCurrency) return;
-    if (selectedCurrency === storeCurrencyCode) return;
-    try {
-      var res = await fetch('https://v6.exchangerate-api.com/v6/' + currencyApiKey + '/latest/' + storeCurrencyCode);
-      if (!res.ok) return;
-      var data = await res.json();
-      latestRates = data.conversion_rates || {};
-      var rate = latestRates[selectedCurrency];
-      if (!rate) {
-        selectedCurrency = null;
-        lswRemoveStorage('store_currency');
-        return;
-      }
-      applyPriceConversion(rate, selectedCurrency);
-      window.__lswCurrencyReapply = function() {
-        if (selectedCurrency && latestRates[selectedCurrency]) {
-          applyPriceConversion(latestRates[selectedCurrency], selectedCurrency);
-        }
-      };
-    } catch(e) {
-      console.error('[LSW] Currency init failed:', e);
-    }
-  }
 
   async function runTranslation(lang) {
     const walker = document.createTreeWalker(
@@ -540,238 +351,22 @@
     console.log('[LSW] Done!');
   }
 
-  // Check URL lang parameter first (set by search redirect), then localStorage
-  var urlParams = new URLSearchParams(window.location.search);
-  var urlLang = urlParams.get('lang');
-  if (urlLang && urlLang !== sourceLanguage) {
-    lswSetStorage(STORAGE_KEY, urlLang);
-  }
-
-  const savedLang = lswGetStorage(STORAGE_KEY);
-
-  function runTranslationAndWatch(lang) {
-    runTranslation(lang);
-
-    // On search result pages, Shopify loads product cards asynchronously.
-    // Use a MutationObserver to detect when new content is injected and
-    // re-translate it, instead of relying on an unreliable fixed timeout.
-    var isSearchPage = window.location.pathname.indexOf('/search') !== -1;
-    if (isSearchPage) {
-      var translated = false;
-      var resultsObserver = new MutationObserver(function(mutations) {
-        var hasNewNodes = mutations.some(function(m) { return m.addedNodes.length > 0; });
-        if (hasNewNodes && !translated) {
-          translated = true;
-          resultsObserver.disconnect();
-          // Small debounce so the full batch of injected nodes is ready
-          setTimeout(function() { runTranslation(lang); }, 300);
-        }
-      });
-      var resultsContainer = document.querySelector(
-        '#product-grid, .search-results, [data-search-results], main'
-      ) || document.body;
-      resultsObserver.observe(resultsContainer, { childList: true, subtree: true });
-
-      // Safety net: disconnect observer after 10s regardless
-      setTimeout(function() { resultsObserver.disconnect(); }, 10000);
-    }
-  }
-
+  const savedLang = localStorage.getItem(STORAGE_KEY);
+  
   if (savedLang && savedLang !== sourceLanguage) {
     setActive(savedLang);
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() {
-        runTranslationAndWatch(savedLang);
-        buildCurrencyOptions();
-        initSavedCurrency();
+      document.addEventListener('DOMContentLoaded', () => {
+        runTranslation(savedLang);
       });
     } else {
-      runTranslationAndWatch(savedLang);
-      buildCurrencyOptions();
-      initSavedCurrency();
+      runTranslation(savedLang);
     }
   } else {
+    // 4. Otherwise, stick to the original source language
     setActive(sourceLanguage);
-    buildCurrencyOptions();
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() { initSavedCurrency(); });
-    } else {
-      initSavedCurrency();
-    }
   }
 
-  // ── Intercept store search bar for multilingual search ───────────────────
-  function setupSearchIntercept() {
-    var searchForms = document.querySelectorAll('form[action*="search"], form[action*="/search"]');
-    if (!searchForms.length) {
-      setTimeout(setupSearchIntercept, 1000);
-      return;
-    }
-
-    searchForms.forEach(function(form) {
-      if (form.__lswSearchBound) return;
-      form.__lswSearchBound = true;
-
-      form.addEventListener('submit', function(e) {
-        var selectedLang = lswGetStorage(STORAGE_KEY);
-        if (!selectedLang || selectedLang === sourceLanguage) return;
-
-        var input = form.querySelector('input[name="q"]');
-        if (!input) return;
-        var query = input.value.trim();
-        if (!query) return;
-
-        e.preventDefault();
-
-        fetch(BACKEND + '/api/multilingual-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: query, target_language: selectedLang, limit: 5 })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var results = data.results || [];
-
-          // Priority 1: backend already reverse-translated the query for us
-          var sourceQuery = data.translated_query || null;
-
-          // Priority 2: find a non-fallback result and use its source_text
-          if (!sourceQuery) {
-            for (var i = 0; i < results.length; i++) {
-              if (results[i].is_fallback === false && results[i].source_text) {
-                sourceQuery = results[i].source_text;
-                break;
-              }
-            }
-          }
-
-          // Priority 3: call /translate to reverse-translate the raw query
-          if (!sourceQuery) {
-            return fetch(BACKEND + '/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ source_text: query, target_language: sourceLanguage })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(td) {
-              var sq = (td.translated_text || query).trim();
-              window.location.href = '/search?q=' + encodeURIComponent(sq) + '&lang=' + encodeURIComponent(selectedLang);
-            })
-            .catch(function() {
-              window.location.href = '/search?q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(selectedLang);
-            });
-          }
-
-          window.location.href = '/search?q=' + encodeURIComponent(sourceQuery) + '&lang=' + encodeURIComponent(selectedLang);
-        })
-        .catch(function() {
-          // Hard fallback: redirect with original query and let results page handle it
-          window.location.href = '/search?q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(selectedLang);
-        });
-      });
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupSearchIntercept);
-  } else {
-    setupSearchIntercept();
-  }
-
-  // ── Predictive / autocomplete search dropdown translation ────────────────
-  // Shopify themes inject product names into a live search dropdown via AJAX
-  // as the user types. The main runTranslation() call won't catch these because
-  // they are injected AFTER page load. This block watches for those nodes and
-  // translates only the newly injected dropdown content.
-
-  function lswDebounce(fn, delay) {
-    var t;
-    return function() { clearTimeout(t); t = setTimeout(fn, delay); };
-  }
-
-  async function translateContainer(container, lang) {
-    if (!lang || lang === sourceLanguage) return;
-
-    const walker = document.createTreeWalker(
-      container, NodeFilter.SHOW_TEXT,
-      { acceptNode: function(n) {
-        const tag = n.parentElement && n.parentElement.tagName;
-        if (!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-        if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE'].includes(tag)) return NodeFilter.FILTER_REJECT;
-        if (lswRoot && lswRoot.contains(n.parentElement)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      }}
-    );
-
-    const nodes = [], texts = [];
-    let nd;
-    while ((nd = walker.nextNode())) {
-      nodes.push(nd);
-      if (nd.__lsw_orig_node_text === undefined) nd.__lsw_orig_node_text = nd.nodeValue;
-      texts.push(nd.__lsw_orig_node_text.trim());
-    }
-    if (!texts.length) return;
-
-    try {
-      const res = await fetch(`${BACKEND}/bulk-translate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts: texts, target_language: lang })
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const translations = data.translations || [];
-      for (let i = 0; i < nodes.length; i++) {
-        if (translations[i]) {
-          const orig = nodes[i].__lsw_orig_node_text;
-          nodes[i].nodeValue = orig.replace(orig.trim(), translations[i]);
-        }
-      }
-    } catch(e) {
-      console.error('[LSW] Dropdown translation failed:', e);
-    }
-  }
-
-  function setupPredictiveSearchTranslation() {
-    var lang = lswGetStorage(STORAGE_KEY);
-    if (!lang || lang === sourceLanguage) return;
-
-    // Common selectors used by Dawn, Debut, Impulse, Prestige, and other popular themes
-    var DROPDOWN_SELECTOR = [
-      '[data-predictive-search]',
-      '.predictive-search',
-      '.predictive-search__results',
-      '#predictive-search-results',
-      '.search-modal__results',
-      '.search__results',
-      '[data-search-results]',
-      '.live-search-results',
-      '.search-autocomplete'
-    ].join(', ');
-
-    var debouncedTranslate = lswDebounce(function() {
-      var containers = document.querySelectorAll(DROPDOWN_SELECTOR);
-      containers.forEach(function(c) {
-        // Only translate if the container actually has visible content
-        if (c.children.length > 0 && c.textContent.trim().length > 0) {
-          translateContainer(c, lang);
-        }
-      });
-    }, 400); // 400 ms after the last DOM change — enough for AJAX to finish
-
-    var dropdownObserver = new MutationObserver(function(mutations) {
-      var hasNewElements = mutations.some(function(m) {
-        return Array.from(m.addedNodes).some(function(node) {
-          return node.nodeType === 1; // only element nodes, not text/comment
-        });
-      });
-      if (hasNewElements) debouncedTranslate();
-    });
-
-    dropdownObserver.observe(document.body, { childList: true, subtree: true });
-  }
-
-  setupPredictiveSearchTranslation();
 
   // Apply saved overlay replacements so edited translations appear on the storefront
   if (!window.__multilingualOverlayLoaded) {
@@ -883,7 +478,7 @@
         requestUrl.searchParams.set('url', currentUrl);
 
         // KEY FIX: pass the selected language so translated edits are fetched and applied
-        const selectedLang = lswGetStorage(STORAGE_KEY);
+        const selectedLang = localStorage.getItem(STORAGE_KEY);
         if (selectedLang && selectedLang !== sourceLanguage) {
           requestUrl.searchParams.set('target_language', selectedLang);
         }
