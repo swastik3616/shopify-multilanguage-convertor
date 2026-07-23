@@ -171,14 +171,22 @@
 
     // If the user selects the source language, reset page to original
     if (lang === sourceLanguage) {
-      localStorage.removeItem(STORAGE_KEY);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.warn('[LSW] localStorage not available', e);
+      }
       setActive(sourceLanguage);
       location.reload();
       return;
     }
 
     setActive(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch (e) {
+      console.warn('[LSW] localStorage not available', e);
+    }
     await runTranslation(lang);
     // Apply any manually saved/edited translations for this language on top
     await syncOverlayReplacements();
@@ -351,7 +359,12 @@
     console.log('[LSW] Done!');
   }
 
-  const savedLang = localStorage.getItem(STORAGE_KEY);
+  let savedLang = null;
+  try {
+    savedLang = localStorage.getItem(STORAGE_KEY);
+  } catch (e) {
+    console.warn('[LSW] localStorage not available', e);
+  }
   
   if (savedLang && savedLang !== sourceLanguage) {
     setActive(savedLang);
@@ -478,7 +491,10 @@
         requestUrl.searchParams.set('url', currentUrl);
 
         // KEY FIX: pass the selected language so translated edits are fetched and applied
-        const selectedLang = localStorage.getItem(STORAGE_KEY);
+        let selectedLang = null;
+        try {
+          selectedLang = localStorage.getItem(STORAGE_KEY);
+        } catch (e) {}
         if (selectedLang && selectedLang !== sourceLanguage) {
           requestUrl.searchParams.set('target_language', selectedLang);
         }
