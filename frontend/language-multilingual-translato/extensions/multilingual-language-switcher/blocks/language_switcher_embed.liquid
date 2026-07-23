@@ -463,25 +463,6 @@
               const dedupedEls = priceElsArray.filter(el =>
                 !priceElsArray.some(other => other !== el && other.contains(el))
               );
-
-              dedupedEls.forEach(el => {
-                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-                let node;
-                while ((node = walker.nextNode())) {
-                  if (node._lswOriginal === undefined) node._lswOriginal = node.nodeValue;
-                  const originalNodeText = node._lswOriginal;
-                  const match = originalNodeText.match(/([\d,]+(?:\.\d+)?)/);
-                  if (match && match[1]) {
-                    const numValue = parseFloat(match[1].replace(/,/g, ''));
-                    if (!isNaN(numValue) && numValue > 0) {
-                      const convertedValue = (numValue * rate).toFixed(2);
-                      let newText = originalNodeText.replace(match[1], convertedValue);
-                      newText = newText.replace(/[\$€£¥₹₩]|(?:Rs\.?\s*|rs\s*|USD|EUR|GBP|INR|AED|CAD)/ig, '').trim();
-                      node.nodeValue = `${newSymbol}${newText}`;
-                    }
-                  }
-                }
-              });
             } finally {
               window.__lswCurrencyApplying = false;
             }
