@@ -53,13 +53,19 @@ function CurrencyPage() {
   const handleSaveAll = async () => {
     setSaving(true);
     try {
+      // Only save non-empty 3-letter currency codes
+      var cleanMap = {};
+      Object.keys(currencyMap).forEach(function(lang) {
+        var code = (currencyMap[lang] || "").trim().toUpperCase();
+        if (code.length === 3) cleanMap[lang] = code;
+      });
       await apiFetch("/save-feature-flags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currency_enabled: enabled,
           currency_api_key: apiKey,
-          currency_map: currencyMap,
+          currency_map: cleanMap,
         }),
       });
       setSaved(true);
