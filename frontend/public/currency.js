@@ -266,10 +266,10 @@
           }
         });
 
-        if (currencyList.length === 0) return;
-
         // Also add store currency as an option (to revert)
         currencyList.unshift(storeCurrency);
+
+        if (currencyList.length === 0) return;
 
         return fetch(BACKEND + '/currency/rates?base=' + storeCurrency);
       })
