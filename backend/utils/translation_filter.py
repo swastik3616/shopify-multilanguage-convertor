@@ -10,6 +10,8 @@ class TranslationFilter:
         'id': r'#\d+|ID:\s*\d+|id=\d+',
         'html_tag': r'<[^>]+>',  # HTML tags
         'special_char_only': r'^[^\w\s]+$',  # Only special characters
+        'currency_code': r'^\s*(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)\s*$',
+        'currency_symbol': r'^\s*[\$€£¥₹₩₺₪฿₫]\s*$',
     }
     
     @staticmethod

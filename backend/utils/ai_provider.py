@@ -127,13 +127,14 @@ def call_provider(provider_id_or_name, prompt):
     return val.strip()
 
 def get_provider_response(provider, model, api_key, source_text, target_language):
-    prompt = f"Translate the following text to {target_language}. Only return the translated text without any quotes or explanations.\n\nText: {source_text}"
+    prompt = f"Translate the following text to {target_language}. IMPORTANT: Do NOT translate currency codes, names, or symbols (such as USD, EUR, INR, GBP, AED, CAD, $, €, £, ₹). Keep currency codes and symbols exactly as they are in the original text. Only return the translated text without quotes or explanations.\n\nText: {source_text}"
     return call_provider(provider, prompt)
 
 def get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language):
     import time
     prompt = (
         f"You are a professional translator. Translate the following JSON object's values to {target_language}. "
+        "CRITICAL RULE: Do NOT translate currency codes, currency names, or currency symbols (such as USD, EUR, INR, GBP, AED, CAD, $, €, £, ₹, etc.). Keep currency codes and symbols exactly as they are in the original text.\n"
         "Return ONLY a valid JSON object with the exact same keys and the translated values. "
         "Do not include any markdown formatting, explanations, or backticks.\n\n"
         f"Input: {json.dumps(source_texts_dict)}"
