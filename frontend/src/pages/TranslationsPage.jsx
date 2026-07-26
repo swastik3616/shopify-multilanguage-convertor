@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Globe, Loader2, RefreshCw, Languages,
   ChevronDown, ChevronRight, PanelLeft,
-  Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap,
+  Image as ImageIcon, AlertCircle, Edit2, Check, X, Grid3x3, Rows, Zap, Lock,
 } from "lucide-react";
 import { fetchUrlContent, saveOverlayEdits, fetchOverlayEdits, fetchShopifyPages } from "../services/translationPageService";
 import { translateText } from "../services/translationService";
@@ -12,10 +12,11 @@ import { getStoreSettings } from "../services/storeSettingsService";
 import { API_URL, apiFetch } from "../services/apiClient";
 
 async function bulkTranslateElements(elements, targetLang) {
-  // Build a numbered dict of translatable items
+  // Build a numbered dict of translatable items (skip price items)
   const translatables = elements
     .map((el, idx) => ({ idx, text: el.text }))
-    .filter(({ text }) => text && text.trim());
+    .filter(({ text }) => text && text.trim())
+    .filter(({ text }) => !isPriceText(text));
 
   if (!translatables.length) return elements;
 
@@ -45,6 +46,18 @@ const KIND_LABELS = {
   article: "Article", content: "Content",
 };
 const DELIMITER = "\n\n";
+
+function isPriceText(text) {
+  if (!text) return false;
+  const t = text.trim();
+  if (/^[\$€£¥₹₩]\s*[\d,]+\.?\d*/.test(t)) return true;
+  if (/[\d,]+\.?\d*\s*[\$€£¥₹₩]$/.test(t)) return true;
+  if (/^[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|MXN|TRY|NOK|SEK|DKK|PLN|CZK|HUF|ILS|VND|THB|MYR|PHP|ZAR|NGN|EGP)$/i.test(t)) return true;
+  if (/^(from|starting\s+at)\s+[\$€£¥₹₩]?\s*[\d,]+\.?\d*/i.test(t)) return true;
+  if (/^[\$€£¥₹₩]?[\d,]+\.?\d*\s*-\s*[\$€£¥₹₩]?[\d,]+\.?\d*$/.test(t)) return true;
+  if (/^-?[\$€£¥₹₩]?[\d,]+\.?\d*$/.test(t)) return true;
+  return false;
+}
 
 /* ─── Styling helpers ────────────────────────────────────────── */
 function tagBadge(tag) {
@@ -428,12 +441,14 @@ function ElementContent({ tag, text, translated = false }) {
 
 /* ─── ElementRow ─────────────────────────────────────────────── */
 function ElementRow({ element, isTranslating, onEdit }) {
+  const isPrice = isPriceText(element.text);
   const [isEditingT, setIsEditingT] = useState(false);
   const [editedTextT, setEditedTextT] = useState(element.translatedText || "");
 
   const hasT = !!element.translatedText;
 
   const handleSaveT = () => {
+    if (isPrice) return;
     if (onEdit) onEdit(editedTextT);
     setIsEditingT(false);
   };
@@ -441,21 +456,28 @@ function ElementRow({ element, isTranslating, onEdit }) {
   return (
     <div className="grid grid-cols-1 border-b border-slate-50 last:border-b-0 lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
       {/* Original — read-only */}
-      <div className="flex items-start gap-3 px-5 py-4 bg-white">
+      <div className={`flex items-start gap-3 px-5 py-4 ${isPrice ? "bg-amber-50/40" : "bg-white"}`}>
         <div className="min-w-0 flex-1">
-          <ElementContent tag={element.tag} text={element.text} />
+          <div className="flex items-center gap-2">
+            <ElementContent tag={element.tag} text={element.text} />
+            {isPrice && (
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+                <Lock className="h-2.5 w-2.5" /> Price
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Translated */}
-      <div className={`group flex items-start gap-3 px-5 py-4 ${hasT ? "bg-emerald-50/30" : "bg-slate-50/40"}`}>
+      <div className={`group flex items-start gap-3 px-5 py-4 ${isPrice ? "bg-amber-50/30" : hasT ? "bg-emerald-50/30" : "bg-slate-50/40"}`}>
         <div className="min-w-0 flex-1 relative">
           {isTranslating ? (
             <div className="flex items-center gap-2 pt-1">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
               <span className="text-xs text-slate-400">translating…</span>
             </div>
-          ) : isEditingT ? (
+          ) : isEditingT && !isPrice ? (
             <div className="flex flex-col gap-2">
               <textarea
                 value={editedTextT}
@@ -478,16 +500,20 @@ function ElementRow({ element, isTranslating, onEdit }) {
                 {hasT ? (
                   <ElementContent tag={element.tag} text={element.translatedText} translated />
                 ) : (
-                  <span className="text-sm italic text-slate-300">—</span>
+                  <span className="text-sm italic text-slate-300">
+                    {isPrice ? "Price — auto handled" : "—"}
+                  </span>
                 )}
               </div>
-              <button
-                onClick={() => setIsEditingT(true)}
-                className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-100 transition"
-                title="Edit translation"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
+              {!isPrice && (
+                <button
+                  onClick={() => setIsEditingT(true)}
+                  className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-100 transition"
+                  title="Edit translation"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )}
         </div>

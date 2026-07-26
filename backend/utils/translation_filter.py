@@ -12,6 +12,11 @@ class TranslationFilter:
         'special_char_only': r'^[^\w\s]+$',  # Only special characters
         'currency_code': r'^\s*(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)\s*$',
         'currency_symbol': r'^\s*[\$€£¥₹₩₺₪฿₫]\s*$',
+        'price_amount': r'^[\$€£¥₹₩]?\s*[\d,]+\.?\d*\s*[-–]\s*[\$€£¥₹₩]?\s*[\d,]+\.?\d*$',  # Price ranges
+        'price_with_symbol': r'^[\$€£¥₹₩]\s*[\d,]+\.?\d*$',  # Symbol prefixed: $19.99
+        'price_with_suffix': r'^[\d,]+\.?\d*\s*[\$€£¥₹₩]$',  # Symbol suffixed: 19.99€
+        'price_with_code': r'^[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)$',
+        'from_price': r'^(From|from|Starting at|starting\s+at|As low as|as low as)\s+[\$€£¥₹₩]?\s*[\d,]+\.?\d*$',
     }
     
     @staticmethod

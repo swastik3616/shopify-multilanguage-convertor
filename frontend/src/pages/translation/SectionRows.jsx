@@ -1,14 +1,28 @@
 import { useState, useEffect } from "react";
-import { Edit3, X, Check, Save, Loader2, Zap, Trash2 } from "lucide-react";
+import { Edit3, X, Check, Save, Loader2, Zap, Trash2, Lock } from "lucide-react";
 import { translateContent, updateContent, updateTranslation, createManualTranslation } from "../../services/contentService";
 
 export const LANG_FLAGS = { Hindi: "🇮🇳", Marathi: "🇮🇳", French: "🇫🇷", German: "🇩🇪", Spanish: "🇪🇸", Italian: "🇮🇹" };
 
+function isPriceText(text) {
+  if (!text) return false;
+  const t = text.trim();
+  if (/^[\$€£¥₹₩]\s*[\d,]+\.?\d*/.test(t)) return true;
+  if (/[\d,]+\.?\d*\s*[\$€£¥₹₩]$/.test(t)) return true;
+  if (/^[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|MXN|TRY|NOK|SEK|DKK|PLN|CZK|HUF|ILS|VND|THB|MYR|PHP|ZAR|NGN|EGP)$/i.test(t)) return true;
+  if (/^(from|starting\s+at)\s+[\$€£¥₹₩]?\s*[\d,]+\.?\d*/i.test(t)) return true;
+  if (/^[\$€£¥₹₩]?[\d,]+\.?\d*\s*-\s*[\$€£¥₹₩]?[\d,]+\.?\d*$/.test(t)) return true;
+  if (/^-?[\$€£¥₹₩]?[\d,]+\.?\d*$/.test(t)) return true;
+  return false;
+}
+
 function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved, onTranslationSaved) {
-  const findEx = () => allTranslations.find(h => h.source_text === item.source_text && h.target_language === targetLanguage);
+  const sourceText = item.source_text || "";
+  const isPrice = isPriceText(sourceText);
+  const findEx = () => allTranslations.find(h => h.source_text === sourceText && h.target_language === targetLanguage);
   const [translated, setTranslated] = useState(findEx()?.translated_text || "");
   const [isTranslating, setIsTranslating] = useState(false);
-  const [editOrig, setEditOrig] = useState(item.source_text);
+  const [editOrig, setEditOrig] = useState(sourceText);
   const [editingOrig, setEditingOrig] = useState(false);
   const [savingOrig, setSavingOrig] = useState(false);
   const [editTrans, setEditTrans] = useState("");
@@ -19,9 +33,10 @@ function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved
     const found = findEx();
     setTranslated(found?.translated_text || "");
     setEditingTrans(false);
-  }, [targetLanguage, allTranslations, item.source_text]);
+  }, [targetLanguage, allTranslations, sourceText]);
 
   const translate = async () => {
+    if (isPrice) return;
     setIsTranslating(true);
     try {
       const r = await translateContent(item.id, targetLanguage);
@@ -33,6 +48,7 @@ function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved
   };
 
   const saveOrig = async () => {
+    if (isPrice) return;
     setSavingOrig(true);
     try {
       const r = await updateContent(item.id, { page: item.page, key: item.key, source_text: editOrig });
@@ -44,6 +60,7 @@ function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved
   };
 
   const saveTrans = async (text) => {
+    if (isPrice) return;
     const t = text ?? editTrans;
     if (!t.trim()) return;
     setSavingTrans(true);
@@ -168,31 +185,26 @@ export function ProductNameRow({ item, targetLanguage, allTranslations, onDelete
   );
 }
 
-// ── PRICE ROW: badge style ──────────────────────────────────────────
+// ── PRICE ROW: badge style (read-only — amounts cannot be modified) ──
 export function PriceRow({ item, targetLanguage, allTranslations, onDelete, onContentSaved, onTranslationSaved }) {
   const h = useTranslationRow(item, targetLanguage, allTranslations, onContentSaved, onTranslationSaved);
   return (
-    <div className="group grid grid-cols-2 divide-x divide-amber-100 border-b border-amber-50 last:border-b-0 hover:bg-amber-50/40 transition-colors">
+    <div className="group grid grid-cols-2 divide-x divide-amber-100 border-b border-amber-50 last:border-b-0 bg-amber-50/20">
       <div className="px-5 py-3 flex items-center gap-4">
         <span className="text-2xl font-black text-amber-700 bg-amber-100 px-4 py-2 rounded-xl">{item.source_text}</span>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500">{item.key}</p>
-          {h.editingOrig && <input type="text" className="input-field mt-1 text-sm" value={h.editOrig} onChange={e => h.setEditOrig(e.target.value)} autoFocus />}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <EditControls editing={h.editingOrig} saving={h.savingOrig} onEdit={() => { h.setEditingOrig(true); h.setEditOrig(item.source_text); }} onSave={h.saveOrig} onCancel={() => h.setEditingOrig(false)} />
-          <button onClick={() => onDelete(item.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"><Trash2 className="h-3 w-3" /></button>
+          <span className="inline-flex items-center gap-1 text-[11px] text-amber-500 font-semibold">
+            <Lock className="h-3 w-3" /> Protected
+          </span>
         </div>
       </div>
       <div className="px-5 py-3 flex items-center gap-4 bg-amber-50/30">
         {h.translated
           ? <span className="text-2xl font-black text-amber-800 bg-amber-200 px-4 py-2 rounded-xl">{h.translated}</span>
-          : <span className="text-sm text-amber-400 italic">not translated</span>}
-        <div className="ml-auto flex items-center gap-2">
-          {h.translated && <EditControls editing={h.editingTrans} saving={h.savingTrans} onEdit={() => { h.setEditingTrans(true); h.setEditTrans(h.translated); }} onSave={() => h.saveTrans(h.editTrans)} onCancel={() => h.setEditingTrans(false)} saveIcon={Save} />}
-          <TransBtn loading={h.isTranslating} hasTranslation={!!h.translated} onClick={h.translate} />
-        </div>
-        {h.editingTrans && <input type="text" className="input-field mt-1 text-sm" value={h.editTrans} onChange={e => h.setEditTrans(e.target.value)} autoFocus />}
+          : <span className="text-sm text-amber-400 italic">Price — auto</span>}
       </div>
     </div>
   );

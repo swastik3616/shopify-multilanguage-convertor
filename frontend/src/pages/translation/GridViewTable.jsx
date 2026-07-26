@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit3, X, Check, Save, Loader2, Zap, Trash2 } from "lucide-react";
+import { Edit3, X, Check, Save, Loader2, Zap, Trash2, Lock } from "lucide-react";
 import { translateContent, updateContent, updateTranslation, createManualTranslation } from "../../services/contentService";
 
 export const LANG_FLAGS = { 
@@ -7,6 +7,18 @@ export const LANG_FLAGS = {
   Spanish: "🇪🇸", Italian: "🇮🇹", Portuguese: "🇵🇹", Arabic: "🇸🇦",
   Japanese: "🇯🇵", Chinese: "🇨🇳"
 };
+
+function isPriceText(text) {
+  if (!text) return false;
+  const t = text.trim();
+  if (/^[\$€£¥₹₩]\s*[\d,]+\.?\d*/.test(t)) return true;
+  if (/[\d,]+\.?\d*\s*[\$€£¥₹₩]$/.test(t)) return true;
+  if (/^[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|MXN|TRY|NOK|SEK|DKK|PLN|CZK|HUF|ILS|VND|THB|MYR|PHP|ZAR|NGN|EGP)$/i.test(t)) return true;
+  if (/^(from|starting\s+at)\s+[\$€£¥₹₩]?\s*[\d,]+\.?\d*/i.test(t)) return true;
+  if (/^[\$€£¥₹₩]?[\d,]+\.?\d*\s*-\s*[\$€£¥₹₩]?[\d,]+\.?\d*$/.test(t)) return true;
+  if (/^-?[\$€£¥₹₩]?[\d,]+\.?\d*$/.test(t)) return true;
+  return false;
+}
 
 function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved, onTranslationSaved) {
   const sourceText = item.originalText || item.text || "";
@@ -22,6 +34,7 @@ function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved
   const [showTransInput, setShowTransInput] = useState(false);
 
   const translate = async () => {
+    if (isPriceText(sourceText)) return;
     setIsTranslating(true);
     try {
       const r = await translateContent(item.id, targetLanguage);
@@ -33,6 +46,7 @@ function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved
   };
 
   const saveOrig = async () => {
+    if (isPriceText(sourceText)) return;
     setSavingOrig(true);
     try {
       const r = await updateContent(item.id, { page: item.page, key: item.key, source_text: editOrig });
@@ -44,6 +58,7 @@ function useTranslationRow(item, targetLanguage, allTranslations, onContentSaved
   };
 
   const saveTrans = async (text) => {
+    if (isPriceText(sourceText)) return;
     const t = text ?? editTrans;
     if (!t.trim()) return;
     setSavingTrans(true);
@@ -107,6 +122,8 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
         <tbody className="divide-y divide-slate-200">
           {items.map((item, idx) => {
             const h = useTranslationRow(item, targetLanguage, allTranslations, onContentSaved, onTranslationSaved);
+            const sourceText = item.originalText || item.text || "";
+            const isPrice = isPriceText(sourceText);
             const isExpanded = expandedRow === item.id;
 
             return (
@@ -128,7 +145,7 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
 
                 {/* Source Text Column */}
                 <td className="px-4 py-3">
-                  {h.editingOrig ? (
+                  {h.editingOrig && !isPrice ? (
                     <input
                       type="text"
                       className="input-field w-full text-sm"
@@ -137,18 +154,25 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
                       autoFocus
                     />
                   ) : (
-                    <div 
-                      className="text-sm text-slate-700 cursor-pointer hover:text-slate-900 break-words"
-                      title={sourceText}
-                    >
-                      {getTruncated(sourceText, 80)}
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className={`text-sm break-words ${isPrice ? "text-amber-700 font-bold" : "text-slate-700"}`}
+                        title={sourceText}
+                      >
+                        {getTruncated(sourceText, 80)}
+                      </div>
+                      {isPrice && (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+                          <Lock className="h-2.5 w-2.5" /> Price
+                        </span>
+                      )}
                     </div>
                   )}
                 </td>
 
                 {/* Translation Column */}
                 <td className="px-4 py-3">
-                  {h.editingTrans ? (
+                  {h.editingTrans && !isPrice ? (
                     <input
                       type="text"
                       className="input-field w-full text-sm"
@@ -158,96 +182,106 @@ export function GridViewTable({ items, targetLanguage, allTranslations, onDelete
                     />
                   ) : h.translated ? (
                     <div 
-                      className="text-sm text-slate-800 font-medium break-words"
+                      className={`text-sm break-words ${isPrice ? "text-amber-800 font-bold" : "text-slate-800 font-medium"}`}
                       title={h.translated}
                     >
                       {getTruncated(h.translated, 80)}
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-400 italic">Not translated</div>
+                    <div className="text-xs text-slate-400 italic">
+                      {isPrice ? "Price — auto" : "Not translated"}
+                    </div>
                   )}
                 </td>
 
                 {/* Actions Column */}
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    {/* Edit Source */}
-                    {!h.editingOrig ? (
+                  {isPrice ? (
+                    <div className="flex items-center justify-center">
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-500 font-semibold">
+                        <Lock className="h-3 w-3" /> Protected
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      {/* Edit Source */}
+                      {!h.editingOrig ? (
+                        <button
+                          onClick={() => { h.setEditingOrig(true); h.setEditOrig(sourceText); }}
+                          className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Edit source"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={h.saveOrig}
+                            disabled={h.savingOrig}
+                            className="p-1.5 rounded bg-green-100 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                            title="Save source"
+                          >
+                            {h.savingOrig ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => h.setEditingOrig(false)}
+                            className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Translate Button */}
                       <button
-                        onClick={() => { h.setEditingOrig(true); h.setEditOrig(sourceText); }}
-                        className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Edit source"
+                        onClick={h.translate}
+                        disabled={h.isTranslating}
+                        className="p-1.5 rounded bg-[#008060] hover:bg-[#006e52] text-white transition-colors disabled:opacity-50 opacity-0 group-hover:opacity-100"
+                        title={h.translated ? "Re-translate" : "Translate"}
                       >
-                        <Edit3 className="h-3.5 w-3.5" />
+                        {h.isTranslating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                       </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={h.saveOrig}
-                          disabled={h.savingOrig}
-                          className="p-1.5 rounded bg-green-100 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                          title="Save source"
-                        >
-                          {h.savingOrig ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => h.setEditingOrig(false)}
-                          className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors"
-                          title="Cancel"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    )}
 
-                    {/* Translate Button */}
-                    <button
-                      onClick={h.translate}
-                      disabled={h.isTranslating}
-                      className="p-1.5 rounded bg-[#008060] hover:bg-[#006e52] text-white transition-colors disabled:opacity-50 opacity-0 group-hover:opacity-100"
-                      title={h.translated ? "Re-translate" : "Translate"}
-                    >
-                      {h.isTranslating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-                    </button>
+                      {/* Edit Translation */}
+                      {h.translated && !h.editingTrans ? (
+                        <button
+                          onClick={() => { h.setEditingTrans(true); h.setEditTrans(h.translated); }}
+                          className="p-1.5 rounded hover:bg-purple-100 text-purple-600 hover:text-purple-700 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Edit translation"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : h.editingTrans ? (
+                        <>
+                          <button
+                            onClick={() => h.saveTrans(h.editTrans)}
+                            disabled={h.savingTrans}
+                            className="p-1.5 rounded bg-green-100 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                            title="Save translation"
+                          >
+                            {h.savingTrans ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => h.setEditingTrans(false)}
+                            className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors"
+                            title="Cancel"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : null}
 
-                    {/* Edit Translation */}
-                    {h.translated && !h.editingTrans ? (
+                      {/* Delete Button */}
                       <button
-                        onClick={() => { h.setEditingTrans(true); h.setEditTrans(h.translated); }}
-                        className="p-1.5 rounded hover:bg-purple-100 text-purple-600 hover:text-purple-700 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Edit translation"
+                        onClick={() => onDelete(item.id)}
+                        className="p-1.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete"
                       >
-                        <Edit3 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                    ) : h.editingTrans ? (
-                      <>
-                        <button
-                          onClick={() => h.saveTrans(h.editTrans)}
-                          disabled={h.savingTrans}
-                          className="p-1.5 rounded bg-green-100 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
-                          title="Save translation"
-                        >
-                          {h.savingTrans ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => h.setEditingTrans(false)}
-                          className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors"
-                          title="Cancel"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    ) : null}
-
-                    {/* Delete Button */}
-                    <button
-                      onClick={() => onDelete(item.id)}
-                      className="p-1.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </td>
               </tr>
             );
