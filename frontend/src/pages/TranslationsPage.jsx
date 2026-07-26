@@ -139,6 +139,7 @@ function getTruncated(text, length = 100) {
 }
 
 function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTranslation }) {
+  const isPrice = isPriceText(item.text);
   const [editingTranslation, setEditingTranslation] = useState(false);
   const [translationValue, setTranslationValue] = useState(item.translatedText || "");
 
@@ -149,21 +150,30 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
   }, [item.translatedText, editingTranslation]);
 
   const openTranslationEditor = () => {
+    if (isPrice) return;
     setTranslationValue(item.translatedText || "");
     setEditingTranslation(true);
   };
 
   const handleSaveTranslation = () => {
+    if (isPrice) return;
     onEditTranslation(item.sectionId, item.id, translationValue, false);
     setEditingTranslation(false);
   };
 
   return (
-    <tr key={item.id} className="divide-x divide-slate-200 hover:bg-slate-50 transition-colors">
+    <tr key={item.id} className={`divide-x divide-slate-200 transition-colors ${isPrice ? "bg-amber-50/40" : "hover:bg-slate-50"}`}>
       {/* Column 1: Source Language Text */}
       <td className="px-4 py-3">
-        <div className="text-sm text-slate-700 break-words select-text" title={item.text}>
-          {getTruncated(item.text, 90)}
+        <div className="flex items-center gap-2">
+          <div className={`text-sm break-words select-text ${isPrice ? "text-amber-700 font-bold" : "text-slate-700"}`} title={item.text}>
+            {getTruncated(item.text, 90)}
+          </div>
+          {isPrice && (
+            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+              <Lock className="h-2.5 w-2.5" /> Price
+            </span>
+          )}
         </div>
       </td>
 
@@ -176,7 +186,7 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
 
       {/* Column 3: Translation / Not translated */}
       <td className="px-4 py-3 min-w-0">
-        {editingTranslation ? (
+        {editingTranslation && !isPrice ? (
           <div className="flex flex-col gap-2">
             <textarea
               className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
@@ -203,53 +213,65 @@ function TranslationGridRow({ item, translatingId, onTranslateItem, onEditTransl
             </div>
           </div>
         ) : item.translatedText ? (
-          <div className="flex items-start justify-between gap-3 group">
-            <div className="text-sm text-emerald-900 break-words flex-1" title={item.translatedText}>
+          <div className={`flex items-start justify-between gap-3 ${isPrice ? "" : "group"}`}>
+            <div className={`text-sm break-words flex-1 ${isPrice ? "text-amber-800 font-bold" : "text-emerald-900"}`} title={item.translatedText}>
               {getTruncated(item.translatedText, 90)}
             </div>
-            <button
-              type="button"
-              onClick={openTranslationEditor}
-              className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100 transition"
-              title="Edit translation"
-            >
-              <Edit2 className="h-3.5 w-3.5" />
-            </button>
+            {!isPrice && (
+              <button
+                type="button"
+                onClick={openTranslationEditor}
+                className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 text-emerald-600 hover:bg-emerald-100 transition"
+                title="Edit translation"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3 group">
-            <span className="text-xs text-slate-400 italic">Not translated</span>
-            <button
-              type="button"
-              onClick={openTranslationEditor}
-              className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
-              title="Add translation"
-            >
-              <Edit2 className="h-3.5 w-3.5" />
-            </button>
+          <div className={`flex items-center justify-between gap-3 ${isPrice ? "" : "group"}`}>
+            <span className="text-xs text-slate-400 italic">
+              {isPrice ? "Price — auto" : "Not translated"}
+            </span>
+            {!isPrice && (
+              <button
+                type="button"
+                onClick={openTranslationEditor}
+                className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+                title="Add translation"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         )}
       </td>
 
       {/* Column 4: Action Button */}
       <td className="px-4 py-3 text-center">
-        <button
-          onClick={() => onTranslateItem(item.sectionId)}
-          disabled={translatingId === item.sectionId}
-          className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
-        >
-          {translatingId === item.sectionId ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Translating...
-            </>
-          ) : (
-            <>
-              <Languages className="h-3.5 w-3.5" />
-              Translate
-            </>
-          )}
-        </button>
+        {isPrice ? (
+          <span className="inline-flex items-center gap-1 text-[11px] text-amber-500 font-semibold">
+            <Lock className="h-3 w-3" /> Protected
+          </span>
+        ) : (
+          <button
+            onClick={() => onTranslateItem(item.sectionId)}
+            disabled={translatingId === item.sectionId}
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1.5 text-white text-xs font-semibold transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            {translatingId === item.sectionId ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Translating...
+              </>
+            ) : (
+              <>
+                <Languages className="h-3.5 w-3.5" />
+                Translate
+              </>
+            )}
+          </button>
+        )}
       </td>
     </tr>
   );
@@ -802,6 +824,7 @@ export default function TranslationPage() {
         ...s,
         elements: s.elements.map(e => {
           if (e.id !== elementId) return e;
+          if (isPriceText(e.text)) return e;
           return isOriginal
             ? { ...e, text: newText }
             : { ...e, translatedText: newText };
@@ -826,6 +849,7 @@ export default function TranslationPage() {
     const edits = [];
     sections.forEach(s => {
       s.elements.forEach(e => {
+        if (isPriceText(e.text)) return;
         const orig = e.originalText || e.text;
         const selector = e.selector || null;
         const elementTag = e.tag || null;
