@@ -196,6 +196,8 @@ def seed_shopify_page_contents(page):
                 text = element.get_text(separator=" ", strip=True)
                 if not text or len(text) < 2:
                     continue
+                if TranslationFilter.should_skip(text):
+                    continue
                 html_tag = element.name.lower()
                 item_resource_id = page_resource_id
                 if not item_resource_id:
@@ -317,6 +319,8 @@ def fetch_and_parse_url():
             for elem_idx, element in enumerate(section.find_all(target_tags)):
                 text = element.get_text(separator=" ", strip=True)
                 if not text or len(text) < 2:
+                    continue
+                if TranslationFilter.should_skip(text):
                     continue
                 html_tag = element.name.lower()
                 key = f"{section_id}_{html_tag}_{section_idx}_{elem_idx}"

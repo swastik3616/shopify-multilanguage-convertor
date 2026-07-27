@@ -6,17 +6,17 @@ class TranslationFilter:
         'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
         'phone': r'[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}\b',
         'url': r'https?://[^\s]+|www\.[^\s]+',
-        'pure_number': r'^\d+(\.\d+)?$',  # Only numbers
+        'pure_number': r'^[\d,]+(\.\d+)?$',  # Only numbers (with optional commas)
         'id': r'#\d+|ID:\s*\d+|id=\d+',
         'html_tag': r'<[^>]+>',  # HTML tags
         'special_char_only': r'^[^\w\s]+$',  # Only special characters
         'currency_code': r'^\s*(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)\s*$',
         'currency_symbol': r'^\s*[\$€£¥₹₩₺₪฿₫]\s*$',
-        'price_amount': r'^[\$€£¥₹₩]?\s*[\d,]+\.?\d*\s*[-–]\s*[\$€£¥₹₩]?\s*[\d,]+\.?\d*$',  # Price ranges
-        'price_with_symbol': r'^[\$€£¥₹₩]\s*[\d,]+\.?\d*$',  # Symbol prefixed: $19.99
-        'price_with_suffix': r'^[\d,]+\.?\d*\s*[\$€£¥₹₩]$',  # Symbol suffixed: 19.99€
+        'price_amount': r'^(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)?\s*[\d,]+\.?\d*\s*[-–]\s*(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)?\s*[\d,]+\.?\d*$',  # Price ranges
+        'price_with_symbol': r'^(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*$',  # Symbol prefixed: $19.99, Rs. 100
+        'price_with_suffix': r'^[\d,]+\.?\d*\s*(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?|€)$',  # Symbol suffixed: 19.99€
         'price_with_code': r'^[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)$',
-        'from_price': r'^(From|from|Starting at|starting\s+at|As low as|as low as)\s+[\$€£¥₹₩]?\s*[\d,]+\.?\d*$',
+        'from_price': r'^(From|from|Starting at|starting\s+at|As low as|as low as)\s+(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)?\s*[\d,]+\.?\d*$',
     }
     
     @staticmethod
