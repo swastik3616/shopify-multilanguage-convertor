@@ -7,7 +7,7 @@ class TranslationFilter:
         'phone': r'[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}\b',
         'url': r'https?://[^\s]+|www\.[^\s]+',
         'pure_number': r'^[\d,]+(\.\d+)?$',  # Only numbers (with optional commas)
-        'id': r'#\d+|ID:\s*\d+|id=\d+',
+        'id': r'(?i)^(?:#\d+|ID:\s*\d+|id=\d+)$',
         'html_tag': r'<[^>]+>',  # HTML tags
         'special_char_only': r'^[^\w\s]+$',  # Only special characters
         'currency_code': r'^\s*(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)\s*$',
@@ -16,7 +16,12 @@ class TranslationFilter:
         'price_with_symbol': r'^(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*$',  # Symbol prefixed: $19.99, Rs. 100
         'price_with_suffix': r'^[\d,]+\.?\d*\s*(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?|€)$',  # Symbol suffixed: 19.99€
         'price_with_code': r'^[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)$',
-        'from_price': r'^(From|from|Starting at|starting\s+at|As low as|as low as)\s+(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)?\s*[\d,]+\.?\d*$',
+        'code_with_price': r'^(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)\s*[\d,]+\.?\d*$',
+        'from_price': r'(?i)^(?:From|Starting at|As low as)\s+(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)?\s*[\d,]+\.?\d*$',
+        'price_with_label': r'(?i)^(?:Regular price|Sale price|Unit price|Price)\s*:?\s*(?:(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*|[\d,]+\.?\d*\s*(?:USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN))$',
+        'price_with_label_suffix': r'(?i)^(?:(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*|[\d,]+\.?\d*\s*(?:USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN))\s*(?:Sale|Regular price)$',
+        'price_words_and_amount': r'(?i)^(?:Regular price|Sale price)?\s*(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*\s*(?:Sale|Regular price)?$',
+        'price_with_currency_code_suffix': r'^(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)$',
     }
     
     @staticmethod
