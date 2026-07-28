@@ -5,6 +5,10 @@ import os
 import flask
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from config import Config
+from models.merchant import db
+from models.subscription import Subscription
+import sqlalchemy as sa
 
 # Blueprints
 from routes.auth_routes import auth_bp
@@ -18,38 +22,50 @@ from routes.webhook_routes import webhook_bp
 from routes.search_routes import search_bp
 from routes.currency_routes import currency_bp
 
+# New billing / auth / webhook blueprints
+from routes.auth import auth_bp as auth_v2_bp
+from routes.billing import billing_bp
+from routes.webhook import webhook_bp as webhooks_v2_bp
+
 print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 
 app = Flask(__name__)
-# Added secret key for secure Flask sessions (required for OAuth state verification)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24))
+app.config.from_object(Config)
+
+# Flask-SQLAlchemy
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///dev.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.secret_key = app.config["FLASK_SECRET_KEY"]
+db.init_app(app)
+
+with app.app_context():
+    inspector = sa.inspect(db.engine)
+    tables = inspector.get_table_names()
+    if "merchants" not in tables or "subscriptions" not in tables:
+        db.create_all()
+        print("Created merchants and subscriptions tables")
+
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:5173")
 
 CORS(
     app,
-    resources={r"/*": {"origins": "*"}},
+    resources={r"/*": {"origins": CORS_ORIGIN}},
     allow_headers=["Content-Type", "X-Shopify-Shop-Domain", "Authorization"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    supports_credentials=False,
+    supports_credentials=True,
 )
 
-# ── Global CORS preflight handler ──────────────────────────────────────
-# Catches every OPTIONS request at the app level BEFORE blueprint routes
-# handle them, guaranteeing a rapid 204 with the right CORS headers.
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
         resp = flask.make_response("", 204)
-        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         resp.headers["Access-Control-Max-Age"] = "86400"
         return resp
 
-# ── CORS safety-net after_request ──────────────────────────────────────
-# Render.com can strip flask-cors headers in some deployment
-# configurations. This hook guarantees the headers are always present on
-# every response so the Shopify storefront can reach the backend.
-_ALWAYS_ORIGIN = "*"
+_ALWAYS_ORIGIN = CORS_ORIGIN
 _ALWAYS_HEADERS = "Content-Type, X-Shopify-Shop-Domain, Authorization"
 _ALWAYS_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
 
@@ -63,7 +79,6 @@ def add_cors_headers(response):
     _set_cors(response)
     return response
 
-# ── Global exception handler with CORS ──────────────────────────────────
 from werkzeug.exceptions import HTTPException
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -75,7 +90,7 @@ def handle_exception(e):
     _set_cors(response)
     return response
 
-# Register blueprints
+# Register existing blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(translation_bp)
 app.register_blueprint(content_bp)
@@ -87,7 +102,11 @@ app.register_blueprint(webhook_bp)
 app.register_blueprint(search_bp)
 app.register_blueprint(currency_bp)
 
-# ── Ensure AI_PROVIDERS table exists (idempotent) ────────────────────────
+# Register new billing / auth / webhook blueprints
+app.register_blueprint(auth_v2_bp)
+app.register_blueprint(billing_bp)
+app.register_blueprint(webhooks_v2_bp)
+
 try:
     from database import execute as _execute
     _execute("""
@@ -124,7 +143,7 @@ try:
                 %s, 'choices[0].message.content', %s, 'gpt-3.5-turbo', TRUE
             )
         """, (req_tpl, headers_tpl))
-        
+
         req_tpl_groq = '{"model": "{{model}}", "messages": [{"role": "system", "content": "You are a translation API. Always return ONLY valid JSON."}, {"role": "user", "content": "{{prompt}}"}], "temperature": 0, "max_tokens": {{max_tokens}}}'
         _execute("""
             INSERT INTO AI_PROVIDERS (
@@ -155,7 +174,6 @@ def home():
     return jsonify({"message": "Shopify Translator Backend Running"})
 
 
-# ── Serve storefront widget scripts ──────────────────────────────────
 import os as _os
 
 _STATICS = {

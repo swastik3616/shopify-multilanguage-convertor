@@ -1,215 +1,174 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { apiFetch } from "../services/apiClient";
 
-const plans = [
+const PLANS = [
   {
-    id: "basic",
+    id: "FREE",
+    name: "Free",
+    price: 0,
+    features: [
+      "Choose from 100+ languages",
+      "Up to 1 language for AI translation",
+      "500 product limit",
+      "20 collection limit",
+      "20 article limit",
+      "20 page limit",
+      "10 custom translations",
+      "5 glossary terms",
+      "Import / Export",
+    ],
+  },
+  {
+    id: "BASIC",
     name: "Basic",
-    monthly: 0,
-    yearly: 0,
-    current: true
+    price: 9,
+    features: [
+      "Everything in Free, plus:",
+      "5 languages for AI translation",
+      "3,000 product limit",
+      "500 collection limit",
+      "500 article limit",
+      "500 page limit",
+      "100 custom translations",
+      "100 image translations",
+      "100 third-party app translations",
+      "20 glossary terms",
+      "Store translation context",
+    ],
   },
   {
-    id: "pro",
+    id: "PRO",
     name: "Pro",
-    monthly: 11.99,
-    yearly: 9.99,
-    cta: "Select Pro"
+    price: 29,
+    features: [
+      "Everything in Basic, plus:",
+      "10 languages for AI translation",
+      "7,000 product limit",
+      "2,000 collection limit",
+      "2,000 article limit",
+      "2,000 page limit",
+      "Unlimited custom translations",
+      "Unlimited image translations",
+      "Unlimited third-party app translations",
+      "Unlimited glossary terms",
+      "Priority support",
+    ],
   },
-  {
-    id: "business",
-    name: "Business",
-    monthly: 29.99,
-    yearly: 24.99,
-    cta: "Select Business"
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    monthly: 59.99,
-    yearly: 49.99,
-    cta: "Select Premium"
-  }
 ];
 
-const featureRows = [
-  { label: "Choose from 100+ languages", values: ["check", "check", "check", "check"] },
-  { label: "Add up to 20 languages", values: ["check", "check", "check", "check"] },
-  { label: "Unlimited manual translations", values: ["check", "check", "check", "check"] },
-  { label: "AI translations", values: ["check", "check", "check", "check"] },
-  { label: "Bulk AI translations", values: ["cross", "check", "check", "check"] },
-  { label: "Languages for AI translation", values: ["1", "5", "10", "20"] },
-  { label: "Product limit for AI translation", values: ["500", "3000", "7000", "15000"] },
-  { label: "Collection limit for AI translation", values: ["20", "500", "2000", "10000"] },
-  { label: "Article limit for AI translation", values: ["20", "500", "2000", "10000"] },
-  { label: "Page limit for AI translation", values: ["20", "500", "2000", "10000"] },
-  { label: "Custom translations", values: ["10", "100", "unlimited", "unlimited"] },
-  { label: "Image translations", values: ["cross", "100", "unlimited", "unlimited"] },
-  { label: "Third party app translations", values: ["cross", "100", "unlimited", "unlimited"] },
-  { label: "Glossary", values: ["5", "20", "unlimited", "unlimited"] },
-  { label: "Import / Export", values: ["check", "check", "check", "check"] },
-  { label: "Store translation context", values: ["cross", "check", "check", "check"] },
-  { label: "Priority support", values: ["cross", "cross", "check", "check"] },
-  { label: "Dedicated account manager", values: ["cross", "cross", "cross", "check"] }
-];
+function PricingPage() {
+  const [currentPlan, setCurrentPlan] = useState("FREE");
+  const [loading, setLoading] = useState(false);
 
-function Cell({ value }) {
-  if (value === "check") {
-    return (
-      <svg className="h-4 w-4 text-slate-900" viewBox="0 0 20 20" fill="currentColor">
-        <path
-          fillRule="evenodd"
-          d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-          clipRule="evenodd"
-        />
-      </svg>
-    );
-  }
-  if (value === "cross") {
-    return (
-      <svg className="h-4 w-4 text-slate-300" viewBox="0 0 20 20" fill="currentColor">
-        <path
-          fillRule="evenodd"
-          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-          clipRule="evenodd"
-        />
-      </svg>
-    );
-  }
-  return <span className="text-sm text-slate-700">{value}</span>;
-}
+  useEffect(() => {
+    const shop = localStorage.getItem("shopify_shop");
+    if (!shop) return;
 
-function PricingComparisonPage() {
-  const [billing, setBilling] = useState("yearly"); // "monthly" | "yearly"
+    apiFetch(`/subscription/status/${encodeURIComponent(shop)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.plan) setCurrentPlan(data.plan);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSelectPlan = async (planId) => {
+    if (planId === currentPlan) return;
+
+    const shop = localStorage.getItem("shopify_shop");
+    if (!shop) {
+      alert("No shop connected. Please install the app first.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const resp = await apiFetch("/billing/create-subscription", {
+        method: "POST",
+        body: JSON.stringify({ shop, plan: planId }),
+      });
+
+      const data = await resp.json();
+
+      if (planId === "FREE") {
+        setCurrentPlan("FREE");
+        alert("Free plan activated!");
+        return;
+      }
+
+      if (data.confirmationUrl) {
+        window.location.href = data.confirmationUrl;
+      } else {
+        alert("Error: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div
-      className="min-h-full bg-slate-100 px-4 sm:px-8 py-8"
-      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
-    >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-      `}</style>
+    <div className="min-h-full bg-slate-100 px-4 sm:px-8 py-8">
+      <h1 className="text-lg font-bold text-slate-900 mb-6">Pricing Plans</h1>
 
-      <h1 className="text-lg font-bold text-slate-900 mb-6">Plans</h1>
-
-      {/* Billing toggle */}
-      <div className="max-w-7xl mx-auto mb-6">
-        <div className="bg-white rounded-2xl shadow-sm p-4 flex justify-center">
-          <div className="inline-flex items-center bg-slate-100 rounded-full p-1">
-            <button
-              onClick={() => setBilling("monthly")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                billing === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        {PLANS.map((plan) => {
+          const isCurrent = currentPlan === plan.id;
+          return (
+            <div
+              key={plan.id}
+              className={`bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col ${
+                isCurrent ? "ring-2 ring-violet-500" : ""
               }`}
             >
-              Pay monthly
-            </button>
-            <button
-              onClick={() => setBilling("yearly")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                billing === "yearly" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Pay annually
-              <span className="bg-sky-400 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded">
-                Save 17%
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-slate-900">{plan.name}</h2>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold text-slate-900">
+                    {plan.price === 0 ? "Free" : `$${plan.price}`}
+                  </span>
+                  {plan.price > 0 && (
+                    <span className="text-sm text-slate-500">/month</span>
+                  )}
+                </div>
+              </div>
 
-      {/* Comparison table */}
-      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[900px]">
-            <thead>
-              <tr>
-                <th className="w-56"></th>
-                {plans.map((plan) => {
-                  const price = billing === "yearly" ? plan.yearly : plan.monthly;
-                  const strikePrice = billing === "yearly" ? plan.monthly : null;
-                  const yearlySavings = plan.monthly > 0 ? ((plan.monthly - plan.yearly) * 12).toFixed(2) : null;
+              <ul className="px-6 pb-6 space-y-2 flex-1">
+                {plan.features.map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                    <svg className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                    </svg>
+                    {feat}
+                  </li>
+                ))}
+              </ul>
 
-                  return (
-                    <th
-                      key={plan.id}
-                      className={`relative text-left align-top px-6 pt-6 pb-5 ${
-                        plan.current ? "border-x-2 border-t-2 border-violet-500 rounded-t-xl" : ""
-                      }`}
-                    >
-                      {plan.current && (
-                        <span className="absolute -top-2.5 left-6 bg-sky-100 text-sky-700 text-[10px] font-semibold px-2 py-0.5 rounded">
-                          Current plan
-                        </span>
-                      )}
-                      <div className="text-base font-semibold text-slate-900">{plan.name}</div>
-                      <div className="mt-2 flex items-baseline gap-1.5">
-                        <span className="text-2xl font-bold text-slate-900">
-                          ${price.toFixed(2).replace(/\.00$/, "")}
-                        </span>
-                        <span className="text-xs text-slate-500">/mo</span>
-                        {strikePrice ? (
-                          <span className="text-xs text-slate-400 line-through">
-                            ${strikePrice.toFixed(2).replace(/\.00$/, "")}
-                          </span>
-                        ) : null}
-                      </div>
-                      {billing === "yearly" && plan.monthly > 0 && (
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          ${(plan.yearly * 12).toFixed(2)} billed yearly
-                        </div>
-                      )}
-                      {billing === "yearly" && yearlySavings && (
-                        <span className="inline-block mt-2 bg-emerald-100 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded">
-                          save ${yearlySavings} yearly
-                        </span>
-                      )}
-                      <div className="mt-4">
-                        {plan.current ? (
-                          <button
-                            disabled
-                            className="w-full py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-400 cursor-default"
-                          >
-                            Current plan
-                          </button>
-                        ) : (
-                          <button className="w-full py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors">
-                            {plan.cta}
-                          </button>
-                        )}
-                      </div>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {featureRows.map((row, rIdx) => (
-                <tr key={rIdx} className="border-t border-slate-100">
-                  <td className="px-6 py-3.5 text-sm text-slate-600">{row.label}</td>
-                  {row.values.map((value, cIdx) => (
-                    <td
-                      key={cIdx}
-                      className={`px-6 py-3.5 ${
-                        plans[cIdx].current
-                          ? `border-x-2 border-violet-500 ${
-                              rIdx === featureRows.length - 1 ? "border-b-2 rounded-b-xl" : ""
-                            }`
-                          : ""
-                      }`}
-                    >
-                      <Cell value={value} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              <div className="px-6 pb-6">
+                {isCurrent ? (
+                  <button
+                    disabled
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold bg-slate-100 text-slate-400 cursor-default"
+                  >
+                    Current plan
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSelectPlan(plan.id)}
+                    disabled={loading}
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                  >
+                    {loading ? "Processing..." : `Select ${plan.name}`}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-export default PricingComparisonPage;
+export default PricingPage;
