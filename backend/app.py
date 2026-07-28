@@ -4,7 +4,6 @@ load_dotenv()
 import os
 import flask
 from flask import Flask, jsonify, request
-from flask_cors import CORS
 from config import Config
 from models.merchant import db
 from models.subscription import Subscription
@@ -45,39 +44,42 @@ with app.app_context():
         db.create_all()
         print("Created merchants and subscriptions tables")
 
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:5173")
+_CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGIN", "*").split(",") if o.strip()]
+_ALLOW_CREDENTIALS = "*" not in _CORS_ORIGINS
 
-CORS(
-    app,
-    resources={r"/*": {"origins": CORS_ORIGIN}},
-    allow_headers=["Content-Type", "X-Shopify-Shop-Domain", "Authorization"],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    supports_credentials=True,
-)
+def _get_cors_origin():
+    origin = request.headers.get("Origin", "")
+    if "*" in _CORS_ORIGINS:
+        return "*"
+    if origin in _CORS_ORIGINS:
+        return origin
+    return _CORS_ORIGINS[0] if _CORS_ORIGINS else "*"
+
+_ALWAYS_HEADERS = "Content-Type, X-Shopify-Shop-Domain, Authorization"
+_ALWAYS_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
+
+@app.after_request
+def add_cors_headers(response):
+    origin = _get_cors_origin()
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Headers"] = _ALWAYS_HEADERS
+    response.headers["Access-Control-Allow-Methods"] = _ALWAYS_METHODS
+    if _ALLOW_CREDENTIALS:
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
         resp = flask.make_response("", 204)
-        resp.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Shopify-Shop-Domain, Authorization"
-        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        origin = _get_cors_origin()
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Headers"] = _ALWAYS_HEADERS
+        resp.headers["Access-Control-Allow-Methods"] = _ALWAYS_METHODS
         resp.headers["Access-Control-Max-Age"] = "86400"
+        if _ALLOW_CREDENTIALS:
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
         return resp
-
-_ALWAYS_ORIGIN = CORS_ORIGIN
-_ALWAYS_HEADERS = "Content-Type, X-Shopify-Shop-Domain, Authorization"
-_ALWAYS_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
-
-def _set_cors(resp):
-    resp.headers["Access-Control-Allow-Origin"] = _ALWAYS_ORIGIN
-    resp.headers["Access-Control-Allow-Headers"] = _ALWAYS_HEADERS
-    resp.headers["Access-Control-Allow-Methods"] = _ALWAYS_METHODS
-
-@app.after_request
-def add_cors_headers(response):
-    _set_cors(response)
-    return response
 
 from werkzeug.exceptions import HTTPException
 @app.errorhandler(Exception)
