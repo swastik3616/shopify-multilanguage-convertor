@@ -1,207 +1,215 @@
 import React, { useState } from "react";
 
-const pricingPlans = [
+const plans = [
   {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    description: "Perfect for getting started with basic translations.",
-    features: [
-      "1 Additional Language",
-      "Manual Translations",
-      "Basic Language Switcher",
-      "Community Support"
-    ],
-    buttonText: "Current Plan"
+    id: "basic",
+    name: "Basic",
+    monthly: 0,
+    yearly: 0,
+    current: true
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$19",
-    period: "/mo",
-    description: "Great for growing stores that need SEO support.",
-    features: [
-      "Up to 3 Languages",
-      "Auto AI Translations",
-      "SEO Metadata Translation",
-      "Email Support"
-    ],
-    buttonText: "Upgrade to Pro",
-    badge: "Most Popular"
-  },
-  {
-    id: "advance",
-    name: "Advance",
-    price: "$49",
-    period: "/mo",
-    description: "Advanced features for high-volume international stores.",
-    features: [
-      "Up to 10 Languages",
-      "Currency Converter Engine",
-      "Premium Floating Widget",
-      "Priority 24/7 Support"
-    ],
-    buttonText: "Upgrade to Advance"
+    monthly: 11.99,
+    yearly: 9.99,
+    cta: "Select Pro"
   },
   {
     id: "business",
     name: "Business",
-    price: "$99",
-    period: "/mo",
-    description: "Unlimited power and dedicated support for enterprise.",
-    features: [
-      "Unlimited Languages",
-      "Custom CSS/JS Integration",
-      "Dedicated Account Manager",
-      "Custom API Access"
-    ],
-    buttonText: "Upgrade to Business"
+    monthly: 29.99,
+    yearly: 24.99,
+    cta: "Select Business"
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    monthly: 59.99,
+    yearly: 49.99,
+    cta: "Select Premium"
   }
 ];
 
-function PricingPage() {
-  // Pro is selected by default since it carries the "Most Popular" badge
-  const [selectedId, setSelectedId] = useState("pro");
+const featureRows = [
+  { label: "Choose from 100+ languages", values: ["check", "check", "check", "check"] },
+  { label: "Add up to 20 languages", values: ["check", "check", "check", "check"] },
+  { label: "Unlimited manual translations", values: ["check", "check", "check", "check"] },
+  { label: "AI translations", values: ["check", "check", "check", "check"] },
+  { label: "Bulk AI translations", values: ["cross", "check", "check", "check"] },
+  { label: "Languages for AI translation", values: ["1", "5", "10", "20"] },
+  { label: "Product limit for AI translation", values: ["500", "3000", "7000", "15000"] },
+  { label: "Collection limit for AI translation", values: ["20", "500", "2000", "10000"] },
+  { label: "Article limit for AI translation", values: ["20", "500", "2000", "10000"] },
+  { label: "Page limit for AI translation", values: ["20", "500", "2000", "10000"] },
+  { label: "Custom translations", values: ["10", "100", "unlimited", "unlimited"] },
+  { label: "Image translations", values: ["cross", "100", "unlimited", "unlimited"] },
+  { label: "Third party app translations", values: ["cross", "100", "unlimited", "unlimited"] },
+  { label: "Glossary", values: ["5", "20", "unlimited", "unlimited"] },
+  { label: "Import / Export", values: ["check", "check", "check", "check"] },
+  { label: "Store translation context", values: ["cross", "check", "check", "check"] },
+  { label: "Priority support", values: ["cross", "cross", "check", "check"] },
+  { label: "Dedicated account manager", values: ["cross", "cross", "cross", "check"] }
+];
+
+function Cell({ value }) {
+  if (value === "check") {
+    return (
+      <svg className="h-4 w-4 text-slate-900" viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fillRule="evenodd"
+          d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+          clipRule="evenodd"
+        />
+      </svg>
+    );
+  }
+  if (value === "cross") {
+    return (
+      <svg className="h-4 w-4 text-slate-300" viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fillRule="evenodd"
+          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+          clipRule="evenodd"
+        />
+      </svg>
+    );
+  }
+  return <span className="text-sm text-slate-700">{value}</span>;
+}
+
+function PricingComparisonPage() {
+  const [billing, setBilling] = useState("yearly"); // "monthly" | "yearly"
 
   return (
     <div
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16"
+      className="min-h-full bg-slate-100 px-4 sm:px-8 py-8"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
-        .plan-card {
-          transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-                      box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
-                      border-color 220ms ease;
-        }
-        .plan-card:focus-visible {
-          outline: 2px solid #0f766e;
-          outline-offset: 3px;
-        }
-        .display-font {
-          font-family: 'Fraunces', Georgia, serif;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       `}</style>
 
-      {/* Header Section */}
-      <div className="text-center max-w-2xl mx-auto mb-14">
-        <span className="inline-block text-xs font-semibold tracking-[0.18em] uppercase text-teal-700 mb-3">
-          Pricing
-        </span>
-        <h1 className="display-font text-4xl sm:text-5xl font-medium text-slate-900 tracking-tight">
-          Simple, transparent pricing
-        </h1>
-        <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
-          Choose the right plan for your Shopify store. Upgrade at any time as your international audience grows.
-        </p>
-      </div>
+      <h1 className="text-lg font-bold text-slate-900 mb-6">Plans</h1>
 
-      {/* Pricing Cards Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
-        {pricingPlans.map((plan) => {
-          const isSelected = selectedId === plan.id;
-
-          return (
-            <div
-              key={plan.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedId(plan.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setSelectedId(plan.id);
-                }
-              }}
-              className={`plan-card relative p-8 bg-white border rounded-2xl flex flex-col cursor-pointer ${
-                isSelected
-                  ? "border-teal-700 ring-2 ring-teal-700 shadow-2xl -translate-y-2 z-10"
-                  : "border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1"
+      {/* Billing toggle */}
+      <div className="max-w-7xl mx-auto mb-6">
+        <div className="bg-white rounded-2xl shadow-sm p-4 flex justify-center">
+          <div className="inline-flex items-center bg-slate-100 rounded-full p-1">
+            <button
+              onClick={() => setBilling("monthly")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                billing === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
-              {/* Badge: shows on whichever plan carries it, but styled to match selection state */}
-              {plan.badge && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <span
-                    className={`inline-flex items-center rounded-full px-4 py-1 text-[11px] font-bold tracking-wide uppercase shadow-sm ${
-                      isSelected ? "bg-teal-700 text-white" : "bg-slate-800 text-white"
-                    }`}
-                  >
-                    {plan.badge}
-                  </span>
-                </div>
-              )}
+              Pay monthly
+            </button>
+            <button
+              onClick={() => setBilling("yearly")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                billing === "yearly" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Pay annually
+              <span className="bg-sky-400 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                Save 17%
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
 
-              {/* Selected checkmark */}
-              {isSelected && (
-                <div className="absolute top-5 right-5 h-6 w-6 rounded-full bg-teal-700 flex items-center justify-center">
-                  <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              )}
+      {/* Comparison table */}
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[900px]">
+            <thead>
+              <tr>
+                <th className="w-56"></th>
+                {plans.map((plan) => {
+                  const price = billing === "yearly" ? plan.yearly : plan.monthly;
+                  const strikePrice = billing === "yearly" ? plan.monthly : null;
+                  const yearlySavings = plan.monthly > 0 ? ((plan.monthly - plan.yearly) * 12).toFixed(2) : null;
 
-              {/* Plan Title & Description */}
-              <div className="mb-6 pr-6">
-                <h3 className="display-font text-xl font-semibold text-slate-900">{plan.name}</h3>
-                <p className="mt-2 text-sm text-slate-500 min-h-[40px] leading-relaxed">
-                  {plan.description}
-                </p>
-              </div>
-
-              {/* Price */}
-              <div className="mb-6 flex items-baseline text-slate-900">
-                <span className="display-font text-4xl font-semibold tracking-tight">{plan.price}</span>
-                {plan.period && (
-                  <span className="ml-1 text-base font-medium text-slate-500">{plan.period}</span>
-                )}
-              </div>
-
-              {/* Feature List */}
-              <ul className="mb-8 space-y-3.5 flex-1">
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start">
-                    <svg
-                      className={`h-5 w-5 shrink-0 mt-0.5 ${isSelected ? "text-teal-700" : "text-slate-400"}`}
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
+                  return (
+                    <th
+                      key={plan.id}
+                      className={`relative text-left align-top px-6 pt-6 pb-5 ${
+                        plan.current ? "border-x-2 border-t-2 border-violet-500 rounded-t-xl" : ""
+                      }`}
                     >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="ml-3 text-sm text-slate-700 font-medium">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* Action Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedId(plan.id);
-                }}
-                className={`w-full py-3 px-4 rounded-xl font-semibold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  isSelected
-                    ? "bg-teal-700 text-white hover:bg-teal-800 focus:ring-teal-700 shadow-sm"
-                    : "bg-slate-50 text-slate-800 hover:bg-slate-100 border border-slate-200 focus:ring-slate-500"
-                }`}
-              >
-                {isSelected ? "Selected" : plan.buttonText}
-              </button>
-            </div>
-          );
-        })}
+                      {plan.current && (
+                        <span className="absolute -top-2.5 left-6 bg-sky-100 text-sky-700 text-[10px] font-semibold px-2 py-0.5 rounded">
+                          Current plan
+                        </span>
+                      )}
+                      <div className="text-base font-semibold text-slate-900">{plan.name}</div>
+                      <div className="mt-2 flex items-baseline gap-1.5">
+                        <span className="text-2xl font-bold text-slate-900">
+                          ${price.toFixed(2).replace(/\.00$/, "")}
+                        </span>
+                        <span className="text-xs text-slate-500">/mo</span>
+                        {strikePrice ? (
+                          <span className="text-xs text-slate-400 line-through">
+                            ${strikePrice.toFixed(2).replace(/\.00$/, "")}
+                          </span>
+                        ) : null}
+                      </div>
+                      {billing === "yearly" && plan.monthly > 0 && (
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          ${(plan.yearly * 12).toFixed(2)} billed yearly
+                        </div>
+                      )}
+                      {billing === "yearly" && yearlySavings && (
+                        <span className="inline-block mt-2 bg-emerald-100 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded">
+                          save ${yearlySavings} yearly
+                        </span>
+                      )}
+                      <div className="mt-4">
+                        {plan.current ? (
+                          <button
+                            disabled
+                            className="w-full py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-400 cursor-default"
+                          >
+                            Current plan
+                          </button>
+                        ) : (
+                          <button className="w-full py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+                            {plan.cta}
+                          </button>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {featureRows.map((row, rIdx) => (
+                <tr key={rIdx} className="border-t border-slate-100">
+                  <td className="px-6 py-3.5 text-sm text-slate-600">{row.label}</td>
+                  {row.values.map((value, cIdx) => (
+                    <td
+                      key={cIdx}
+                      className={`px-6 py-3.5 ${
+                        plans[cIdx].current
+                          ? `border-x-2 border-violet-500 ${
+                              rIdx === featureRows.length - 1 ? "border-b-2 rounded-b-xl" : ""
+                            }`
+                          : ""
+                      }`}
+                    >
+                      <Cell value={value} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
 
-export default PricingPage;
+export default PricingComparisonPage;
