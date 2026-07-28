@@ -41,6 +41,7 @@ function Sidebar() {
   const systemLinks = [
     { name: "Store Settings", path: "/store-settings", icon: Store },
     { name: "Settings", path: "/settings", icon: Settings },
+    { name: "Pricing", path: "/pricing", icon: DollarSign }
   ];
 
   const NavLink = ({ item }) => {

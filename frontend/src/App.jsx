@@ -12,6 +12,7 @@ import AuditHistoryPage from "./pages/AuditHistoryPage";
 import StoreSettingsPage from "./pages/StoreSettingsPage";
 import SeoPage from "./pages/SeoPage";
 import CurrencyPage from "./pages/CurrencyPage";
+import PricingPage from "./pages/PricingPage";
 
 function AppContent() {
   return (
@@ -27,6 +28,7 @@ function AppContent() {
         <Route path="/audit-history" element={<AuditHistoryPage />} />
         <Route path="/store-settings" element={<StoreSettingsPage />} />
         <Route path="/currency" element={<CurrencyPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
       </Routes>
     </DashboardLayout>
   );

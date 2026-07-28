@@ -1,5 +1,9 @@
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load .env file from the backend directory
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 # Add the project root to python path to allow importing from backend
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
