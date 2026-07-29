@@ -23,7 +23,7 @@ class Config:
     CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:5173")
 
     PLANS = {
-        "FREE": {"name": "Free", "price": 0, "recurrence": "every_30_days"},
-        "BASIC": {"name": "Basic", "price": 9.0, "recurrence": "every_30_days"},
-        "PRO": {"name": "Pro", "price": 29.0, "recurrence": "every_30_days"},
+        "FREE": {"name": "Free", "price": 0, "recurrence": "EVERY_30_DAYS"},
+        "BASIC": {"name": "Basic", "price": 9.0, "recurrence": "EVERY_30_DAYS"},
+        "PRO": {"name": "Pro", "price": 29.0, "recurrence": "EVERY_30_DAYS"},
     }

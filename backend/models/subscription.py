@@ -1,7 +1,5 @@
 from datetime import datetime, timezone
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
+from models.merchant import db
 
 
 class Subscription(db.Model):
