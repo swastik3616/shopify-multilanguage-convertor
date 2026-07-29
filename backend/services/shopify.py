@@ -35,25 +35,18 @@ mutation AppSubscriptionCreate(
   $returnUrl: URL!
   $test: Boolean!
   $trialDays: Int!
-  $price: Decimal!
-  $recurrence: AppSubscriptionInterval!
+  $lineItems: [AppSubscriptionLineItemInput!]!
 ) {
   appSubscriptionCreate(
     name: $name
     returnUrl: $returnUrl
     test: $test
     trialDays: $trialDays
-    lineItems: [{
-      plan: {
-        appRecurringPricingDetails: {
-          price: { amount: $price, currencyCode: USD }
-          interval: $recurrence
-        }
-      }
-    }]
+    lineItems: $lineItems
   ) {
     confirmationUrl
     userErrors { field message }
+    appSubscription { id }
   }
 }
 """
@@ -83,8 +76,19 @@ def create_subscription(shop_domain: str, encrypted_token: str, plan_name: str, 
         "returnUrl": return_url,
         "test": test,
         "trialDays": trial_days,
-        "price": str(plan_config["price"]),
-        "recurrence": plan_config["recurrence"],
+        "lineItems": [
+            {
+                "plan": {
+                    "appRecurringPricingDetails": {
+                        "price": {
+                            "amount": plan_config["price"],
+                            "currencyCode": "USD"
+                        },
+                        "interval": plan_config["recurrence"]
+                    }
+                }
+            }
+        ],
     }
 
     data = graphql_query(shop_domain, encrypted_token, CREATE_SUBSCRIPTION_MUTATION, variables)
