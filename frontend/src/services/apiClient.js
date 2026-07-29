@@ -67,8 +67,8 @@ export async function apiFetch(path, options = {}) {
 
     try {
       const jsonBody = JSON.parse(bodyText);
-      if (jsonBody.message) {
-        errorMessage = jsonBody.message;
+      if (jsonBody.message || jsonBody.error) {
+        errorMessage = jsonBody.message || jsonBody.error;
       }
     } catch (e) {
       // Not JSON, fallback to detailed text
