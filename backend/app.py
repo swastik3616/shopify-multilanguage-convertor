@@ -45,17 +45,16 @@ with app.app_context():
         print("Created merchants and subscriptions tables")
 
 _CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGIN", "*").split(",") if o.strip()]
-_ALLOW_CREDENTIALS = "*" not in _CORS_ORIGINS
 
 def _get_cors_origin():
     origin = request.headers.get("Origin", "")
     if "*" in _CORS_ORIGINS:
-        return "*"
+        return origin if origin else "*"
     if origin in _CORS_ORIGINS:
         return origin
     return _CORS_ORIGINS[0] if _CORS_ORIGINS else "*"
 
-_ALWAYS_HEADERS = "Content-Type, X-Shopify-Shop-Domain, Authorization"
+_ALWAYS_HEADERS = "Content-Type, X-Shopify-Shop-Domain, Authorization, ngrok-skip-browser-warning"
 _ALWAYS_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
 
 @app.after_request
@@ -64,8 +63,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Headers"] = _ALWAYS_HEADERS
     response.headers["Access-Control-Allow-Methods"] = _ALWAYS_METHODS
-    if _ALLOW_CREDENTIALS:
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 @app.before_request
@@ -77,8 +75,7 @@ def handle_preflight():
         resp.headers["Access-Control-Allow-Headers"] = _ALWAYS_HEADERS
         resp.headers["Access-Control-Allow-Methods"] = _ALWAYS_METHODS
         resp.headers["Access-Control-Max-Age"] = "86400"
-        if _ALLOW_CREDENTIALS:
-            resp.headers["Access-Control-Allow-Credentials"] = "true"
+        resp.headers["Access-Control-Allow-Credentials"] = "true"
         return resp
 
 from werkzeug.exceptions import HTTPException
@@ -89,7 +86,7 @@ def handle_exception(e):
     else:
         response = jsonify({"success": False, "message": "Internal Server Error", "error": str(e)})
         response.status_code = 500
-    _set_cors(response)
+    # Flask after_request will handle CORS for this response automatically
     return response
 
 # Register existing blueprints
