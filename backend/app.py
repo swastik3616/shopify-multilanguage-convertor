@@ -79,12 +79,15 @@ def handle_preflight():
         return resp
 
 from werkzeug.exceptions import HTTPException
+import traceback
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     if isinstance(e, HTTPException):
         response = e.get_response()
     else:
-        response = jsonify({"success": False, "message": "Internal Server Error", "error": str(e)})
+        tb = traceback.format_exc()
+        response = jsonify({"success": False, "message": "Internal Server Error", "error": str(e), "traceback": tb})
         response.status_code = 500
     # Flask after_request will handle CORS for this response automatically
     return response
