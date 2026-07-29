@@ -147,4 +147,14 @@ def auth_callback():
             (shop_normalized, encrypted_atok),
         )
 
+    # Sync to SQLAlchemy Merchant table for billing endpoints
+    from models.merchant import db, Merchant
+    merchant = Merchant.query.filter_by(shop_domain=shop_normalized).first()
+    if merchant:
+        merchant.access_token = encrypted_atok
+    else:
+        merchant = Merchant(shop_domain=shop_normalized, access_token=encrypted_atok)
+        db.session.add(merchant)
+    db.session.commit()
+
     return "Installation successful! You can now close this tab and return to the app."

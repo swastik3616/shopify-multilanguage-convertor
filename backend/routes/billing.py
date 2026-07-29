@@ -24,7 +24,14 @@ def create_subscription_route():
 
     merchant = Merchant.query.filter_by(shop_domain=shop).first()
     if not merchant:
-        return jsonify({"error": "Merchant not found. Install the app first."}), 404
+        from database import execute
+        store = execute("SELECT ACCESS_TOKEN FROM SHOPIFY_STORES WHERE SHOP = %s LIMIT 1", (shop,), fetch="one")
+        if store:
+            merchant = Merchant(shop_domain=shop, access_token=store["ACCESS_TOKEN"])
+            db.session.add(merchant)
+            db.session.commit()
+        else:
+            return jsonify({"error": "Merchant not found. Install the app first."}), 404
 
     if plan == "FREE":
         sub = Subscription.query.filter_by(shop_domain=shop).first()
@@ -63,7 +70,14 @@ def billing_callback():
 
     merchant = Merchant.query.filter_by(shop_domain=shop).first()
     if not merchant:
-        return jsonify({"error": "Merchant not found"}), 404
+        from database import execute
+        store = execute("SELECT ACCESS_TOKEN FROM SHOPIFY_STORES WHERE SHOP = %s LIMIT 1", (shop,), fetch="one")
+        if store:
+            merchant = Merchant(shop_domain=shop, access_token=store["ACCESS_TOKEN"])
+            db.session.add(merchant)
+            db.session.commit()
+        else:
+            return jsonify({"error": "Merchant not found"}), 404
 
     try:
         subscriptions = get_active_subscriptions(shop, merchant.access_token)
