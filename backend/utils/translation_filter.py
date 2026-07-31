@@ -22,6 +22,7 @@ class TranslationFilter:
         'price_with_label_suffix': r'(?i)^(?:(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*|[\d,]+\.?\d*\s*(?:USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN))\s*(?:Sale|Regular price)$',
         'price_words_and_amount': r'(?i)^(?:Regular price|Sale price)?\s*(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*\s*(?:Sale|Regular price)?$',
         'price_with_currency_code_suffix': r'^(?:[\$€£¥₹₩₺₪฿₫]|Rs\.?|Ksh|R\$|kr\.?)\s*[\d,]+\.?\d*\s+(USD|EUR|GBP|INR|AED|CAD|AUD|SGD|JPY|CNY|KRW|BRL|ZAR|TRY|MYR|THB|IDR|PHP|CZK|PLN|DKK|SEK|NOK|HUF|ILS|VND|NGN|EGP|MXN)$',
+        'price_labels_only': r'(?i)^(?:Regular price|Sale price|Unit price|Price|Sale|Regular)$',
     }
     
     @staticmethod

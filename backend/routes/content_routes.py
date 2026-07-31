@@ -405,11 +405,21 @@ def get_contents():
             fetch="all",
         ) or []
 
+    # Clean up legacy rows that match the skip filters (e.g., prices or price labels)
+    valid_rows = []
+    for r in rows:
+        if TranslationFilter.should_skip(r["SOURCE_TEXT"]):
+            # Delete from DB to ensure they don't reappear
+            execute("DELETE FROM PAGE_CONTENTS WHERE ID=%s", (r["ID"],))
+            execute("DELETE FROM TRANSLATIONS WHERE SOURCE_TEXT=%s", (r["SOURCE_TEXT"],))
+        else:
+            valid_rows.append(r)
+
     return jsonify([{
         "id": r["ID"], "page": r["PAGE"], "key": r["KEY"],
         "source_text": r["SOURCE_TEXT"], "html_tag": r["HTML_TAG"],
         "section_id": r["SECTION_ID"], "resource_id": r["RESOURCE_ID"],
-    } for r in rows])
+    } for r in valid_rows])
 
 
 @content_bp.route("/contents", methods=["POST", "OPTIONS"])
