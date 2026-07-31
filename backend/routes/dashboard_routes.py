@@ -103,7 +103,7 @@ def api_dashboard_extension():
             try:
                 token = store_setting.get("access_token", "")
                 r = req.get(
-                    f"https://{store_url}/admin/api/2026-04/shop.json",
+                    f"https://{store_url}/admin/api/2024-04/shop.json",
                     headers={"X-Shopify-Access-Token": token},
                     timeout=5,
                 )

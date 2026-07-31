@@ -23,7 +23,7 @@ def shopify_check_token():
 
     try:
         headers = {"X-Shopify-Access-Token": access_token}
-        res = requests.get(f"https://{store_url}/admin/api/2026-04/shop.json", headers=headers, timeout=10)
+        res = requests.get(f"https://{store_url}/admin/api/2024-04/shop.json", headers=headers, timeout=10)
         try:
             body = res.json()
         except Exception:
@@ -49,7 +49,7 @@ def shopify_test():
         return jsonify({"success": False, "message": "No Shopify store connected for this shop"}), 404
 
     headers = {"X-Shopify-Access-Token": store["ACCESS_TOKEN"]}
-    response = requests.get(f"https://{store['SHOP']}/admin/api/2026-04/shop.json", headers=headers)
+    response = requests.get(f"https://{store['SHOP']}/admin/api/2024-04/shop.json", headers=headers)
     return jsonify(response.json())
 
 

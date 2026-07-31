@@ -12,7 +12,7 @@ def fetch_shopify_pages():
             "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{store_url}/admin/api/2026-04/pages.json"
+        url = f"https://{store_url}/admin/api/2024-04/pages.json"
         res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
         return res.json().get("pages", [])
@@ -31,7 +31,7 @@ def fetch_shopify_products(limit=5):
             "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{store_url}/admin/api/2026-04/products.json?limit={limit}&fields=id,title,body_html,handle"
+        url = f"https://{store_url}/admin/api/2024-04/products.json?limit={limit}&fields=id,title,body_html,handle"
         res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
         return res.json().get("products", [])
@@ -50,7 +50,7 @@ def fetch_shopify_collections(limit=5):
             "X-Shopify-Access-Token": access_token,
             "Content-Type": "application/json"
         }
-        url = f"https://{store_url}/admin/api/2026-04/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
+        url = f"https://{store_url}/admin/api/2024-04/custom_collections.json?limit={limit}&fields=id,title,body_html,handle"
         res = requests.get(url, headers=headers, timeout=10)
         res.raise_for_status()
         return res.json().get("custom_collections", [])

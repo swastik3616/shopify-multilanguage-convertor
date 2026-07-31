@@ -37,7 +37,7 @@ def get_seo_resources():
     """ % graphql_type
 
     headers = {"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"}
-    url = f"https://{store_url}/admin/api/2026-04/graphql.json"
+    url = f"https://{store_url}/admin/api/2024-04/graphql.json"
 
     try:
         res = requests.post(url, headers=headers, json={"query": query})
@@ -131,7 +131,7 @@ def update_original_seo():
         variables = {"id": resource_id, "page": {"metafields": metafields}}
 
     try:
-        res = requests.post(f"https://{store_url}/admin/api/2026-04/graphql.json", headers=headers, json={"query": mutation, "variables": variables})
+        res = requests.post(f"https://{store_url}/admin/api/2024-04/graphql.json", headers=headers, json={"query": mutation, "variables": variables})
         res.raise_for_status()
         data = res.json()
         if "errors" in data:
@@ -208,7 +208,7 @@ def translate_seo():
     """
     variables = {"resourceId": resource_id, "translations": translations}
     headers = {"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"}
-    url = f"https://{store_url}/admin/api/2026-04/graphql.json"
+    url = f"https://{store_url}/admin/api/2024-04/graphql.json"
 
     try:
         res = requests.post(url, headers=headers, json={"query": mutation, "variables": variables})

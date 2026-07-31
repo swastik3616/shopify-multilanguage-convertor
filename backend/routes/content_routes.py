@@ -31,7 +31,7 @@ def push_update_to_shopify(page, key, text):
                     payload["product"]["title"] = text
                 elif field == "desc":
                     payload["product"]["body_html"] = text
-                requests.put(f"https://{store_url}/admin/api/2026-04/products/{product_id}.json", headers=headers, json=payload, timeout=10)
+                requests.put(f"https://{store_url}/admin/api/2024-04/products/{product_id}.json", headers=headers, json=payload, timeout=10)
 
         elif page == "collection" and key.startswith("collection_"):
             parts = key.split("_")
@@ -43,7 +43,7 @@ def push_update_to_shopify(page, key, text):
                     payload["custom_collection"]["title"] = text
                 elif field == "desc":
                     payload["custom_collection"]["body_html"] = text
-                requests.put(f"https://{store_url}/admin/api/2026-04/custom_collections/{collection_id}.json", headers=headers, json=payload, timeout=10)
+                requests.put(f"https://{store_url}/admin/api/2024-04/custom_collections/{collection_id}.json", headers=headers, json=payload, timeout=10)
     except Exception as e:
         print(f"Error updating Shopify: {e}")
 
@@ -237,6 +237,8 @@ def get_shopify_page_urls():
         return jsonify({"success": False, "message": "No Shopify store connected."}), 400
         
     pages = fetch_shopify_pages()
+    products = fetch_shopify_products(limit=10)
+    collections = fetch_shopify_collections(limit=10)
     
     urls = []
     # Add home page by default
@@ -248,8 +250,26 @@ def get_shopify_page_urls():
         # Filter out custom pages named 'Home' or 'Home Page' to avoid duplicates
         if handle and title and title.lower() not in ["home page", "home"]:
             urls.append({
-                "title": title,
+                "title": f"Page: {title}",
                 "url": f"https://{store_url}/pages/{handle}"
+            })
+            
+    for p in products:
+        handle = p.get("handle")
+        title = p.get("title")
+        if handle and title:
+            urls.append({
+                "title": f"Product: {title}",
+                "url": f"https://{store_url}/products/{handle}"
+            })
+            
+    for c in collections:
+        handle = c.get("handle")
+        title = c.get("title")
+        if handle and title:
+            urls.append({
+                "title": f"Collection: {title}",
+                "url": f"https://{store_url}/collections/{handle}"
             })
             
     return jsonify({"success": True, "pages": urls})
