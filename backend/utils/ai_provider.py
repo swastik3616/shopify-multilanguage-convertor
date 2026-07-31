@@ -128,7 +128,25 @@ def call_provider(provider_id_or_name, prompt):
 
 def get_provider_response(provider, model, api_key, source_text, target_language):
     prompt = f"Translate the following text to {target_language}. IMPORTANT: Do NOT translate currency codes, names, or symbols (such as USD, EUR, INR, GBP, AED, CAD, $, €, £, ₹). Keep currency codes and symbols exactly as they are in the original text. Only return the translated text without quotes or explanations.\n\nText: {source_text}"
-    return call_provider(provider, prompt)
+    response = call_provider(provider, prompt)
+    
+    # Fix: If the AI provider incorrectly returns a JSON object (due to strict system prompts), extract the value
+    response_stripped = response.strip()
+    if response_stripped.startswith("{") and response_stripped.endswith("}"):
+        try:
+            parsed = json.loads(response_stripped)
+            if isinstance(parsed, dict):
+                # Try common keys first
+                for key in ["translatedText", "translation", "text", "result", "0"]:
+                    if key in parsed:
+                        return str(parsed[key])
+                # If only one key exists, use its value
+                if len(parsed) == 1:
+                    return str(list(parsed.values())[0])
+        except Exception:
+            pass
+            
+    return response
 
 def get_bulk_provider_response(provider, model, api_key, source_texts_dict, target_language):
     import time
@@ -145,6 +163,19 @@ def get_bulk_provider_response(provider, model, api_key, source_texts_dict, targ
         parsed = parse_bulk_json_response(response_text)
         if not isinstance(parsed, dict) or not parsed:
             raise ValueError("Parsed result is not a valid JSON object or is empty.")
+            
+        # Fix: Clean up nested dicts if AI returns {"0": {"translatedText": "পণ্য"}}
+        for k, v in parsed.items():
+            if isinstance(v, dict):
+                # Extract value if it's nested
+                if len(v) == 1:
+                    parsed[k] = str(list(v.values())[0])
+                else:
+                    for key in ["translatedText", "translation", "text", "result", "0"]:
+                        if key in v:
+                            parsed[k] = str(v[key])
+                            break
+                            
         return parsed
     except Exception as e:
         print(f"Bulk Translation Error ({provider}):", str(e))
