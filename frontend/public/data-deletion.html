@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Deletion Policy - Language Translator Plugin</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 2em; margin-bottom: 0.2em; }
+        h2 { font-size: 1.5em; margin-top: 1.5em; border-bottom: 1px solid #eaeaea; padding-bottom: 5px; }
+        .last-updated { color: #666; font-style: italic; margin-bottom: 2em; }
+        ul, ol { margin-bottom: 1em; }
+        a { color: #0056b3; text-decoration: none; }
+        .toc { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 2em; }
+    </style>
+</head>
+<body>
+
+    <h1>Data Deletion Policy</h1>
+    <div class="last-updated">Last Updated: August 3, 2026</div>
+
+    <div class="toc">
+        <strong>Table of Contents</strong>
+        <ol>
+            <li><a href="#automatic-deletion">Automatic Deletion</a></li>
+            <li><a href="#manual-requests">Manual Deletion Requests</a></li>
+            <li><a href="#backups">Data Backups</a></li>
+            <li><a href="#contact">Contact</a></li>
+        </ol>
+    </div>
+
+    <p>At Swastik3616, we respect your privacy and ensure that you retain control over your store's data. This policy outlines how data is handled when you decide to stop using the Language Translator Plugin.</p>
+
+    <h2 id="automatic-deletion">1. Automatic Deletion (Shopify Webhooks)</h2>
+    <p>We are fully compliant with Shopify's mandatory data webhooks. If you uninstall the Language Translator Plugin from your Shopify admin dashboard, Shopify sends a <code>shop/redact</code> webhook payload to our servers exactly 48 hours after uninstallation.</p>
+    <p>Upon receiving this webhook, our automated systems will permanently delete all database records associated with your store, including API tokens, translated content caches, and merchant account metadata.</p>
+
+    <h2 id="manual-requests">2. Manual Deletion Requests</h2>
+    <p>If you or one of your customers requests the deletion of specific personal data before the app is uninstalled, we comply with Shopify's <code>customers/redact</code> webhook. Furthermore, you may directly request manual deletion of your store's account data at any time by emailing us.</p>
+    <p>To manually request an immediate data purge, email <a href="mailto:swastik3616@gmail.com">swastik3616@gmail.com</a> with your <code>.myshopify.com</code> domain. We will verify your identity as the store owner and complete the data erasure within 5 business days.</p>
+
+    <h2 id="backups">3. Data Backups</h2>
+    <p>To maintain service integrity and disaster recovery capabilities, we maintain secure, encrypted backups of our databases. When your data is deleted from our active production database, it may still exist in our encrypted backup archives for a maximum of 30 days before being automatically overwritten and permanently destroyed.</p>
+
+    <h2 id="contact">4. Contact</h2>
+    <p>If you have any questions regarding our data retention practices, please reach out to us at <a href="mailto:swastik3616@gmail.com">swastik3616@gmail.com</a>.</p>
+
+</body>
+</html>
