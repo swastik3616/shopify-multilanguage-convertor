@@ -54,6 +54,7 @@ To ensure optimal performance and minimize API costs, translations are intellige
 - 🔍 **SEO Optimization**: Translate vital product and page metadata (titles, descriptions) natively via the Shopify GraphQL API.
 - 🔄 **Automated Webhooks**: Keep shop data and billing states perfectly synchronized via reliable webhook processing endpoints.
 - 🖥️ **Translation Workspace**: A dedicated Side-by-Side UI mapping your exact website layout (HTML semantic tags) for manual translation review and editing.
+- 📊 **Observability & Monitoring**: Built-in Prometheus metrics exporter coupled with Grafana Alloy for real-time performance tracking and system observation.
 
 ---
 
@@ -86,6 +87,7 @@ graph TD
 - **Framework**: Python 3.9+ with Flask (Modular Blueprints)
 - **Database**: PostgreSQL (Production) / SQLite (Local) via SQLAlchemy ORM & Alembic Migrations
 - **Architecture**: Modular application factory pattern with robust CORS and Error handling
+- **Observability**: Prometheus Metrics (flask-exporter) & Grafana Alloy
 - **Server**: Gunicorn WSGI
 - **Hosting**: Render
 
@@ -216,7 +218,7 @@ shopify app dev
 
 ### Production Guidelines
 
-- **Backend (Render)**: Deploy the `backend` directory as a Web Service. Set the Build Command to `pip install -r requirements.txt` and Start Command to `gunicorn app:app`. Ensure a PostgreSQL instance is provisioned and linked via the `DATABASE_URL` environment variable. Alembic migrations should be run on initialization.
+- **Backend (Render)**: Deploy the `backend` directory as a Web Service. Set the Build Command to `pip install -r requirements.txt` and Start Command to `gunicorn app:app`. Ensure a PostgreSQL instance is provisioned and linked via the `DATABASE_URL` environment variable. Alembic migrations should be run on initialization. For monitoring, run Grafana Alloy with `config.alloy` and set the `GRAFANA_TOKEN` environment variable.
 - **Frontend (Vercel)**: Import the `frontend` directory. Ensure `VITE_API_URL` is set to your production backend URL. The included `vercel.json` automatically manages the CSP `frame-ancestors` directive required by Shopify App Bridge.
 - **Extension**: Run `shopify app deploy` from the extension directory to publish widget updates to the Shopify CDN.
 
