@@ -10,6 +10,13 @@ from models.subscription import Subscription
 import sqlalchemy as sa
 import logging
 import time
+import sentry_sdk
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    traces_sample_rate=1.0
+)
+from prometheus_flask_exporter import PrometheusMetrics
+metrics = PrometheusMetrics(app)
 
 # Blueprints
 from routes.auth_routes import auth_bp
@@ -53,7 +60,6 @@ def after(response):
     return response
 
 
-    
 # Flask-SQLAlchemy
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///dev.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
