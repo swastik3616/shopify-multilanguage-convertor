@@ -13,3 +13,6 @@ dbutils
 cryptography
 alembic
 SQLAlchemy
+sentry-sdk
+prometheus-flask-exporter
+python-json-logger
