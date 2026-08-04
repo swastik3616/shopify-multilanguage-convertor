@@ -7,3 +7,7 @@ postgres_export/
 # Python
 __pycache__/
 venv/
+
+# Alloy
+*.alloy
+.env
