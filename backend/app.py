@@ -13,7 +13,11 @@ import time
 import sentry_sdk
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
-    traces_sample_rate=1.0
+    traces_sample_rate=1.0,
+    # Setting this option to True tells Sentry to automatically capture
+    # all HTTP requests, including headers, body, etc. These can be viewed
+    # in Sentry under the "Discover" tab.
+    request_bodies=True,
 )
 from prometheus_flask_exporter import PrometheusMetrics
 metrics = PrometheusMetrics(app)
