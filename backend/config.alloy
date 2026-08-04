@@ -1,9 +1,11 @@
 prometheus.scrape "flask_metrics" {
   targets = [
     {
-      "__address__" = "shopify-multilanguage-convertor.onrender.com",
+      "__address__" = "shopify-multilanguage-convertor.onrender.com:443",
     },
   ]
+
+  scheme = "https"
 
   metrics_path = "/metrics"
 
@@ -16,10 +18,12 @@ prometheus.scrape "flask_metrics" {
 prometheus.remote_write "metrics_hosted_prometheus" {
   endpoint {
     name = "hosted-prometheus"
-    url  = "https://prometheus-prod-43-prod-ap-south-1.grafana.net/api/prom/push"
+
+    url = "https://prometheus-prod-43-prod-ap-south-1.grafana.net/api/prom/push"
 
     basic_auth {
       username = "3422384"
       password = "YOUR_NEW_GRAFANA_TOKEN"
     }
+  }
 }
