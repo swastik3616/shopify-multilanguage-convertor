@@ -11,16 +11,13 @@ import sqlalchemy as sa
 import logging
 import time
 import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
+    integrations=[FlaskIntegration()],
     traces_sample_rate=1.0,
-    # Setting this option to True tells Sentry to automatically capture
-    # all HTTP requests, including headers, body, etc. These can be viewed
-    # in Sentry under the "Discover" tab.
-    request_bodies=True,
 )
-from prometheus_flask_exporter import PrometheusMetrics
-metrics = PrometheusMetrics(app)
 
 # Blueprints
 from routes.auth_routes import auth_bp
@@ -39,14 +36,23 @@ from routes.auth import auth_bp as auth_v2_bp
 from routes.billing import billing_bp
 from routes.webhook import webhook_bp as webhooks_v2_bp
 
+
+#Add Structure Logging 
+from pythonjsonlogger import jsonlogger
+from prometheus_flask_exporter import PrometheusMetrics
+logger = logging.getLogger()
+
+handler = logging.StreamHandler()
+handler.setFormatter(jsonlogger.JsonFormatter())
+
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
 print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+metrics = PrometheusMetrics(app)
 
 @app.route("/test")
 def test():
@@ -60,7 +66,15 @@ def before():
 @app.after_request
 def after(response):
     duration = time.perf_counter() - request.start_time
-    print(f"{request.path} took {duration:.3f}s")
+    logger.info(
+    "Request completed",
+    extra={
+        "path": request.path,
+        "method": request.method,
+        "status": response.status_code,
+        "duration_ms": round(duration * 1000, 2)
+    }
+)
     return response
 
 
