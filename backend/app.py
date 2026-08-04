@@ -8,6 +8,8 @@ from config import Config
 from models.merchant import db
 from models.subscription import Subscription
 import sqlalchemy as sa
+import logging
+import time
 
 # Blueprints
 from routes.auth_routes import auth_bp
@@ -31,6 +33,27 @@ print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 app = Flask(__name__)
 app.config.from_object(Config)
 
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@app.route("/test")
+def test():
+    logger.info("Login API called")
+    return {"status": "success"}
+
+@app.before_request
+def before():
+    request.start_time = time.perf_counter()
+
+@app.after_request
+def after(response):
+    duration = time.perf_counter() - request.start_time
+    print(f"{request.path} took {duration:.3f}s")
+    return response
+
+
+    
 # Flask-SQLAlchemy
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///dev.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
