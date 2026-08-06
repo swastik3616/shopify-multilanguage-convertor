@@ -89,7 +89,7 @@ graph TD
 - **Architecture**: Modular application factory pattern with robust CORS and Error handling
 - **Observability**: Prometheus Metrics (flask-exporter) & Grafana Alloy
 - **Server**: Gunicorn WSGI
-- **Hosting**: Render
+- **Hosting**: Render,graphana
 
 ### Frontend Dashboard
 - **Framework**: React 19 + Vite 8
